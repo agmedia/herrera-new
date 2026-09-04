@@ -1,0 +1,77 @@
+.scroll-to-top-button {
+    position: fixed;
+    right: 1rem;
+    bottom: 4.75rem;
+    z-index: 9998;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border: 0;
+    border-radius: 9999px;
+    background: var(--navigation-background-color, #f5ae72);
+    color: var(--navigation-text-color, #111827);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.24);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translate3d(0, 10px, 0) scale(0.92);
+    backface-visibility: hidden;
+    will-change: opacity, transform;
+    transition: opacity .24s ease, transform .28s ease, visibility .24s ease, box-shadow .24s ease;
+}
+
+.scroll-to-top-button--mobile {
+    bottom: calc(5.75rem + env(safe-area-inset-bottom, 0px));
+}
+
+.scroll-to-top-button.is-visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translate3d(0, 0, 0) scale(1);
+}
+
+.scroll-to-top-button:hover {
+    background: var(--navigation-highlight-color, #0057c8);
+    color: var(--navigation-background-color, #e65100);
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.28);
+}
+
+.scroll-to-top-button svg {
+    display: block;
+    width: 1.1rem;
+    height: 1.1rem;
+    transition: transform .24s ease;
+}
+
+.scroll-to-top-button:hover svg {
+    transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .scroll-to-top-button,
+    .scroll-to-top-button svg {
+        transition: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .scroll-to-top-button {
+        display: none !important;
+    }
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .scroll-to-top-button,
+    .scroll-to-top-button.is-visible,
+    .scroll-to-top-button:hover {
+        transform: none;
+    }
+
+    .scroll-to-top-button:hover svg {
+        transform: none;
+    }
+}

@@ -1,0 +1,246 @@
+.category-index-page {
+    --category-ink: #18212f;
+    --category-muted: #667085;
+    --category-line: #e2e8f0;
+    --category-blue: #2859bd;
+}
+
+.category-index-section {
+    padding-top: 32px;
+    padding-bottom: 48px;
+}
+
+.category-index-grid {
+    display: grid;
+    border-top: 1px solid var(--category-line);
+    border-left: 1px solid var(--category-line);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.category-index-card {
+    display: flex;
+    min-width: 0;
+    min-height: 100%;
+    border-right: 1px solid var(--category-line);
+    border-bottom: 1px solid var(--category-line);
+    background: #fff;
+    color: var(--category-ink);
+    flex-direction: column;
+    text-decoration: none;
+    transition: background-color 160ms ease;
+}
+
+.category-index-card:hover {
+    background: #fafbfc;
+    color: var(--category-ink);
+    text-decoration: none;
+}
+
+.category-index-card:focus-visible {
+    position: relative;
+    z-index: 1;
+    outline: 2px solid var(--category-blue);
+    outline-offset: -2px;
+}
+
+.category-index-card-media {
+    display: flex;
+    aspect-ratio: 16 / 10;
+    min-height: 0;
+    overflow: hidden;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: #f8fafc;
+}
+
+.category-index-card-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    mix-blend-mode: multiply;
+}
+
+.category-index-card-placeholder {
+    display: grid;
+    width: 72px;
+    height: 72px;
+    color: #94a3b8;
+    place-items: center;
+}
+
+.category-index-card-placeholder svg {
+    width: 46px;
+    height: 46px;
+}
+
+.category-index-card-content {
+    display: flex;
+    min-height: 104px;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 20px 20px;
+}
+
+.category-index-card-copy {
+    display: block;
+    min-width: 0;
+}
+
+.category-index-card-title {
+    display: block;
+    color: var(--category-ink);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.4;
+}
+
+.category-index-card-count {
+    display: block;
+    margin-top: 6px;
+    color: var(--category-muted);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    line-height: 1.4;
+    text-transform: uppercase;
+}
+
+.category-index-card-arrow {
+    display: block;
+    width: 20px;
+    height: 20px;
+    margin-top: 1px;
+    color: #64748b;
+    flex: 0 0 auto;
+    transition: color 160ms ease, transform 160ms ease;
+}
+
+.category-index-card-arrow svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.category-index-card:hover .category-index-card-arrow {
+    color: var(--category-blue);
+    transform: translateX(2px);
+}
+
+.category-index-empty {
+    padding: 64px 24px;
+    border: 1px solid var(--category-line);
+    background: #fff;
+    color: var(--category-muted);
+    text-align: center;
+}
+
+.category-index-mobile {
+    padding: 0 14px 30px;
+}
+
+.category-index-mobile-header {
+    padding: 22px 18px;
+    border-bottom: 1px solid var(--category-line);
+    background: #fff;
+    text-align: center;
+}
+
+.category-index-mobile-header h1 {
+    margin: 0;
+    color: var(--category-ink);
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+}
+
+.category-index-mobile-header p {
+    margin: 5px 0 0;
+    color: var(--category-muted);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.category-index-mobile .category-index-section {
+    padding-top: 24px;
+}
+
+.category-index-mobile .category-index-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.category-index-mobile .category-index-card-media {
+    aspect-ratio: 1;
+    padding: 14px;
+}
+
+.category-index-mobile .category-index-card-content {
+    min-height: 92px;
+    gap: 8px;
+    padding: 12px 12px 14px;
+}
+
+.category-index-mobile .category-index-card-title {
+    font-size: 13px;
+}
+
+.category-index-mobile .category-index-card-count {
+    margin-top: 4px;
+    font-size: 8px;
+}
+
+.category-index-mobile .category-index-card-arrow {
+    width: 16px;
+    height: 16px;
+}
+
+@media (max-width: 1180px) {
+    .category-index-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 820px) {
+    .category-index-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .category-index-card-media {
+        aspect-ratio: 1;
+    }
+}
+
+@media (max-width: 580px) {
+    .category-index-section {
+        padding-top: 24px;
+        padding-bottom: 36px;
+    }
+
+    .category-index-card-media {
+        padding: 14px;
+    }
+
+    .category-index-card-content {
+        min-height: 92px;
+        gap: 8px;
+        padding: 12px 12px 14px;
+    }
+
+    .category-index-card-title {
+        font-size: 13px;
+    }
+
+    .category-index-card-count {
+        margin-top: 4px;
+        font-size: 8px;
+    }
+
+    .category-index-card-arrow {
+        width: 16px;
+        height: 16px;
+    }
+}

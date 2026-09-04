@@ -1,0 +1,22 @@
+/* Shared Font Awesome 6 SVG sprite presentation. */
+.fa6-icon {
+    display: block;
+    overflow: visible;
+    flex-shrink: 0;
+}
+
+.section-heading-line-icon--reverse {
+    transform: rotate(180deg);
+}
+
+.section-heading-line-track {
+    background-repeat: repeat-x;
+}
+
+.section-heading-line-track--default {
+    background-image: repeating-linear-gradient(to right, #cbd5e1 0, #cbd5e1 18px, transparent 18px, transparent 28px);
+}
+
+.section-heading-line-track--soft {
+    background-image: repeating-linear-gradient(to right, #d6dee8 0, #d6dee8 18px, transparent 18px, transparent 28px);
+}

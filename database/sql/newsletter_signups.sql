@@ -1,0 +1,27 @@
+CREATE TABLE IF NOT EXISTS `newsletter_signups` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT UNSIGNED NULL,
+  `email` VARCHAR(191) NOT NULL,
+  `source` VARCHAR(50) NOT NULL DEFAULT 'footer',
+  `locale` VARCHAR(12) NOT NULL DEFAULT 'hr',
+  `provider` VARCHAR(20) NOT NULL DEFAULT 'none',
+  `sync_status` VARCHAR(20) NOT NULL DEFAULT 'skipped',
+  `consent_accepted` TINYINT(1) NOT NULL DEFAULT 0,
+  `provider_reference` VARCHAR(191) NULL,
+  `provider_error` TEXT NULL,
+  `ip_address` VARCHAR(45) NULL,
+  `user_agent` VARCHAR(1024) NULL,
+  `subscribed_at` TIMESTAMP NULL DEFAULT NULL,
+  `synced_at` TIMESTAMP NULL DEFAULT NULL,
+  `payload` JSON NULL,
+  `created_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `newsletter_signups_email_unique` (`email`),
+  KEY `newsletter_signups_user_id_index` (`user_id`),
+  KEY `newsletter_signups_provider_index` (`provider`),
+  KEY `newsletter_signups_sync_status_index` (`sync_status`),
+  KEY `newsletter_signups_subscribed_at_index` (`subscribed_at`),
+  CONSTRAINT `newsletter_signups_user_id_foreign`
+    FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

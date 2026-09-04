@@ -1,0 +1,35 @@
+@font-face {
+    font-family: "Risingsun";
+    src: url("/front-theme/fonts/custom/RisingSun-Regular.woff") format("woff");
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Risingsun";
+    src: url("/front-theme/fonts/custom/RisingSun-Bold.woff") format("woff");
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Risingsun";
+    src: url("/front-theme/fonts/custom/RisingSun-Italic.woff") format("woff");
+    font-style: italic;
+    font-weight: 400;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Risingsun";
+    src: url("/front-theme/fonts/custom/RisingSun-BoldItalic.woff") format("woff");
+    font-style: italic;
+    font-weight: 700;
+    font-display: swap;
+}
+
+.font-risingsun {
+    font-family: "Risingsun", Arial, Helvetica, sans-serif;
+}

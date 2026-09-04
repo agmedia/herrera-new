@@ -1,0 +1,144 @@
+/* Shared storefront product-card styles. */
+[data-product-card-form] .product-size-radio:checked + .product-size-label-text {
+    border-color: #ffffff;
+    background: #ffffff;
+    color: #0f172a;
+}
+
+[data-product-card-image-frame] {
+    aspect-ratio: 1 / 1;
+    width: 100%;
+}
+
+.product-card-lined [data-product-card-image-frame] {
+    background: #fff;
+}
+
+.product-card-lined {
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+}
+
+.product-card-lined-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+}
+
+.product-card-lined [data-product-card-image-frame] img {
+    padding: clamp(.65rem, 4%, 1.1rem);
+}
+
+.product-card-lined h3 {
+    display: -webkit-box;
+    min-height: 2.5em;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.product-card-lined-price {
+    margin-top: auto;
+    min-height: 4rem;
+}
+
+.product-card-lined-form {
+    margin-top: .75rem;
+}
+
+.product-card-wishlist {
+    border: 0;
+    background: transparent;
+    color: #64748b;
+    filter: drop-shadow(0 1px 1px rgba(255, 255, 255, .95));
+}
+
+.product-card-wishlist:hover {
+    color: #0f172a;
+}
+
+.product-card-wishlist.is-active {
+    color: #0f172a;
+}
+
+.product-card-lined-controls {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: .5rem;
+}
+
+.product-card-lined-qty {
+    display: grid;
+    width: 100px;
+    min-width: 100px;
+    height: 40px;
+    grid-template-columns: 26px minmax(0, 1fr) 26px;
+}
+
+.product-card-lined-qty > button,
+.product-card-lined-qty > label {
+    min-width: 0;
+}
+
+.product-card-lined-qty > button {
+    position: relative;
+    background: #fff;
+    color: #0f172a;
+    cursor: pointer;
+    transition: background-color .18s ease, color .18s ease;
+}
+
+.product-card-lined-qty > button:hover,
+.product-card-lined-qty > button:focus-visible {
+    outline: none;
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.product-card-lined-qty > button:focus-visible {
+    box-shadow: inset 0 0 0 1px #94a3b8;
+}
+
+.product-card-lined-qty > button svg,
+.product-card-lined-qty > button svg use {
+    fill: currentColor;
+}
+
+.product-card-lined-qty > button svg {
+    display: block;
+    width: 14px;
+    height: 14px;
+    opacity: 1;
+}
+
+.product-card-lined-qty > label {
+    background: #fff;
+}
+
+.product-card-lined-cart {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+}
+
+.product-card-lined .product-size-radio:checked + .product-size-label-text {
+    border-color: var(--store-announcement-background-color, #0057c8);
+    background: var(--store-announcement-background-color, #0057c8);
+    color: #fff;
+}
+
+.product-card-lined-cart {
+    border: 1px solid #11896d;
+    background: #11896d;
+    color: #fff;
+}
+
+.product-card-lined-cart:hover,
+.product-card-lined-cart:focus-visible {
+    border-color: var(--store-announcement-background-color, #0057c8);
+    outline: none;
+    background: var(--store-announcement-background-color, #0057c8);
+    color: #fff;
+}

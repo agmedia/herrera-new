@@ -71,6 +71,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'front.device' => \App\Http\Middleware\DetectFrontendVariant::class,
             'front.b2b' => \App\Http\Middleware\ProtectB2BStorefront::class,
             'front.search' => \App\Http\Middleware\GuardStorefrontSearch::class,
+            'front.cache' => \App\Http\Middleware\CacheGuestStorefront::class,
             'catalog.feature' => \App\Http\Middleware\EnsureCatalogFeatureEnabled::class,
             'user.feature' => \App\Http\Middleware\EnsureUserFeatureEnabled::class,
             'api.user.enabled' => \App\Http\Middleware\EnsureApiUserEnabled::class,

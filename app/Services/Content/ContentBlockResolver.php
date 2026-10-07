@@ -3,6 +3,7 @@
 namespace App\Services\Content;
 
 use App\Models\Content\ContentBlockSlot;
+use App\Services\Front\GuestStorefrontCache;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
@@ -38,9 +39,20 @@ class ContentBlockResolver
             $strictVariant ? 'strict' : 'fallback'
         );
 
+        $ttlSeconds = (int) config('content_blocks.cache.ttl_seconds', 3600);
+        if ((bool) config('storefront_cache.enabled', false)) {
+            $ttlSeconds = min($ttlSeconds, max(1, min(3600, (int) config('storefront_cache.ttl_seconds', 120))));
+            try {
+                // Bulk item/media writes do not dispatch the block model observer.
+                $cacheKey .= ':guest-revision:'.app(GuestStorefrontCache::class)->revision();
+            } catch (\Throwable) {
+                // Preserve the existing source cache when the guest store is unavailable.
+            }
+        }
+
         return Cache::remember(
             $cacheKey,
-            (int) config('content_blocks.cache.ttl_seconds', 3600),
+            $ttlSeconds,
             function () use ($placement, $locale, $targetType, $targetRef, $frontendVariant, $strictVariant): Collection {
                 $baseQuery = ContentBlockSlot::query()
                     ->with([

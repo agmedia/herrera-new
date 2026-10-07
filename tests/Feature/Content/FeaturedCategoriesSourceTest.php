@@ -3,9 +3,11 @@
 namespace Tests\Feature\Content;
 
 use App\Models\Catalog\Category\Category;
+use App\Models\Catalog\Product\Product;
 use App\Models\Content\ContentBlock;
 use App\Services\Content\FeaturedCategoriesService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class FeaturedCategoriesSourceTest extends TestCase
@@ -40,6 +42,38 @@ class FeaturedCategoriesSourceTest extends TestCase
 
         $this->assertSame([$second->id, $first->id], $categories->pluck('id')->all());
         $this->assertSame('manual', FeaturedCategoriesService::source(['category_source' => 'unknown']));
+    }
+
+    public function test_tile_layout_can_load_categories_without_product_or_descendant_totals(): void
+    {
+        $root = $this->category('root', 0);
+        $this->category('child', 0, ['parent_id' => $root->id]);
+        $block = $this->block(['category_source' => 'all_root']);
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+        $categories = app(FeaturedCategoriesService::class)->forBlock($block, 'en', 'en', includeCounts: false);
+        $sql = implode(' ', array_column(DB::getQueryLog(), 'query'));
+        DB::disableQueryLog();
+
+        $this->assertSame([$root->id], $categories->pluck('id')->all());
+        $this->assertArrayNotHasKey('products_count', $categories->first()->getAttributes());
+        $this->assertArrayNotHasKey('subcategories_count', $categories->first()->getAttributes());
+        $this->assertStringNotContainsString('products', $sql);
+        $this->assertStringNotContainsString('nested_set_', $sql);
+    }
+
+    public function test_default_layout_keeps_product_totals_including_visible_descendants(): void
+    {
+        $root = $this->category('root', 0);
+        $child = $this->category('child', 0, ['parent_id' => $root->id]);
+        $product = Product::query()->create(['code' => 'child-product', 'is_active' => true, 'base_price' => 10, 'stock_qty' => 1]);
+        $product->categories()->attach($child);
+
+        $categories = app(FeaturedCategoriesService::class)->forBlock($this->block(['category_source' => 'all_root']), 'en', 'en');
+
+        $this->assertSame(1, $categories->first()->products_count);
+        $this->assertSame(1, $categories->first()->subcategories_count);
     }
 
     private function category(string $code, int $order, array $attributes = []): Category

@@ -88,7 +88,21 @@
         $herreraProductsById = $herreraProductQuery()
             ->whereIn('id', $herreraSelectedProductIds)
             ->withStorefrontEnergyData()
-            ->with(['translations', 'media', 'taxRate', 'manufacturer.translations', 'categories.translations'])
+            ->withApprovedCommentSummary([$herreraLocale, $herreraFallbackLocale])
+            ->with([
+                'translations', 'media', 'taxRate', 'manufacturer.translations', 'categories.translations',
+                'attributes' => \App\Support\ProductMaterialLabel::eagerLoadAttributes($herreraLocale, $herreraFallbackLocale),
+                'optionValues' => fn ($q) => $q
+                    ->where('is_active', true)
+                    ->orderBy('sort_order')
+                    ->orderBy('id')
+                    ->with([
+                        'optionValue.option:id,payload',
+                        'optionValue.translations' => fn ($q) => $q->whereIn('locale', [$herreraLocale, $herreraFallbackLocale]),
+                        'parentOptionValue.option:id,payload',
+                        'parentOptionValue.translations' => fn ($q) => $q->whereIn('locale', [$herreraLocale, $herreraFallbackLocale]),
+                    ]),
+            ])
             ->get()->keyBy('id');
         $herreraProducts = $herreraSelectedProductIds->map(fn ($id) => $herreraProductsById->get($id))->filter();
         $herreraProductCount = $herreraProducts->count();

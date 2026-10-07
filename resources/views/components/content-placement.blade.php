@@ -40,10 +40,24 @@
                 ->withStorefrontEnergyData()
                 ->visibleOnStorefront($hideOutOfStockProducts)
                 ->whereIn('id', $productIds)
+                ->withApprovedCommentSummary([$locale, $fallbackLocale])
                 ->with([
                     'translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale]),
+                    'taxRate',
+                    'categories.translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale]),
+                    'manufacturer.translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale]),
                     'attributes' => \App\Support\ProductMaterialLabel::eagerLoadAttributes($locale, $fallbackLocale),
                     'media' => fn ($q) => $q->whereIn('collection_name', ['product_main', 'product_gallery']),
+                    'optionValues' => fn ($q) => $q
+                        ->where('is_active', true)
+                        ->orderBy('sort_order')
+                        ->orderBy('id')
+                        ->with([
+                            'optionValue.option:id,payload',
+                            'optionValue.translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale]),
+                            'parentOptionValue.option:id,payload',
+                            'parentOptionValue.translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale]),
+                        ]),
                 ])
                 ->get()
                 ->sortBy(fn ($row) => array_search((int) $row->id, $productIds, true))
@@ -61,12 +75,15 @@
 
         $categories = collect();
         $isFeaturedCategories = (string) $block->type === 'featured_categories';
+        $usesHerreraCategoryTiles = $isFeaturedCategories && $overrideView === ''
+            && str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera');
         if ($isFeaturedCategories) {
             $categories = app(\App\Services\Content\FeaturedCategoriesService::class)->forBlock(
                 $block,
                 $locale,
                 $fallbackLocale,
                 $hideOutOfStockProducts,
+                includeCounts: ! $usesHerreraCategoryTiles,
             );
         } elseif ($categoryIds !== []) {
             $categoryRelations = [

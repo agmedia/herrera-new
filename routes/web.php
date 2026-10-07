@@ -77,7 +77,7 @@ Route::post('account/impersonation/stop', [CustomerImpersonationController::clas
     ->middleware('auth')
     ->name('front.impersonation.stop');
 
-Route::middleware(['front.locale', 'front.device', 'front.search', 'front.b2b'])
+Route::middleware(['front.locale', 'front.device', 'front.search', 'front.b2b', 'front.cache'])
     ->group(function (): void {
         Route::get('locale/{code}', function (string $code, Request $request) {
             $fallback = strtolower((string) config('app.locale', 'en'));

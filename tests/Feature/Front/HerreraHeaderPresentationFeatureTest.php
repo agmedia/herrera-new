@@ -42,6 +42,24 @@ class HerreraHeaderPresentationFeatureTest extends TestCase
         $this->assertSame(1, $xpath->query('//*[@data-header-search-form]')->count());
     }
 
+    public function test_mobile_search_toggle_precedes_account_and_controls_the_single_autocomplete_form(): void
+    {
+        $this->configure();
+        $response = $this->withHeader('User-Agent', 'iPhone Mobile')->get(route('home'))->assertOk();
+        $xpath = $this->xpath($response->getContent());
+        $toggle = $xpath->query('//*[contains(@class, "responsive-header-actions")]/*[1]')->item(0);
+        $this->assertTrue($toggle->hasAttribute('data-header-search-toggle'));
+        $this->assertSame('false', $toggle->getAttribute('aria-expanded'));
+        $this->assertSame('header-search-panel', $toggle->getAttribute('aria-controls'));
+        $account = $xpath->query('//*[contains(@class, "responsive-header-actions")]/*[2]')->item(0);
+        $this->assertSame(route('front.auth.login'), $account->getAttribute('href'));
+        $panel = $xpath->query('//*[@id="header-search-panel"]')->item(0);
+        $this->assertFalse($panel->hasAttribute('data-header-search-persistent'));
+        $this->assertSame('1023', $panel->getAttribute('data-header-search-breakpoint'));
+        $this->assertSame(1, $xpath->query('//*[@data-header-search-form]')->count());
+        $this->assertSame('1', $xpath->query('//*[@data-header-search-form]')->item(0)->getAttribute('data-autocomplete-enabled'));
+    }
+
     public function test_homepage_displays_every_active_catalog_root_and_no_nested_or_scheduled_root(): void
     {
         $this->configure();

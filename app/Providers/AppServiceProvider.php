@@ -26,6 +26,7 @@ use App\Observers\Settings\LocalSettingObserver;
 use App\Services\Catalog\CatalogFeatureService;
 use App\Services\Content\ContentBlockResolver;
 use App\Services\Front\CartService;
+use App\Services\Front\GuestStorefrontCache;
 use App\Services\Front\NavigationMenuService;
 use App\Services\Front\StoreSettingsService;
 use App\Services\Front\WishlistService;
@@ -68,6 +69,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(UserTrackingService::class, fn ($app) => new UserTrackingService($app->make(SystemSettingsService::class)));
         $this->app->singleton(LoyaltyService::class, fn ($app) => new LoyaltyService($app->make(SystemSettingsService::class)));
         $this->app->scoped(AssetVersion::class, fn () => new AssetVersion);
+        $this->app->scoped(GuestStorefrontCache::class);
         $this->app->scoped(\App\Services\Pricing\PriceCatalogResolver::class);
     }
 
@@ -79,6 +81,7 @@ class AppServiceProvider extends ServiceProvider
         // One listener per application; always clear the current request, including
         // writes made while placing an order or changing stock/pricing directly.
         DB::listen(static function (QueryExecuted $query): void {
+            app(GuestStorefrontCache::class)->onQueryExecuted($query);
             if (preg_match('/^\s*(?:insert|update|delete|replace|truncate|alter|drop|create)\b/i', $query->sql) === 1) {
                 CartService::forgetRequestSnapshot();
             }

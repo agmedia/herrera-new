@@ -18,7 +18,7 @@ class FeaturedCategoriesService
         return in_array($source, self::SOURCES, true) ? $source : 'manual';
     }
 
-    public function forBlock(ContentBlock $block, string $locale, string $fallbackLocale, bool $hideOutOfStockProducts = false): Collection
+    public function forBlock(ContentBlock $block, string $locale, string $fallbackLocale, bool $hideOutOfStockProducts = false, bool $includeCounts = true): Collection
     {
         $source = self::source(is_array($block->payload) ? $block->payload : null);
         $selectedIds = $block->items
@@ -36,12 +36,15 @@ class FeaturedCategoriesService
                     ->whereIn('collection_name', ['category_icon', 'category_banner'])
                     ->orderBy('order_column')
                     ->orderBy('id'),
-            ])
-            ->withCount([
+            ]);
+
+        if ($includeCounts) {
+            $query->withCount([
                 'descendants as subcategories_count' => fn ($q) => $q
                     ->where('scope', Category::SCOPE_CATALOG)
                     ->currentlyVisible(),
             ]);
+        }
 
         if ($source === 'all_root') {
             $query->whereNull('parent_id')->orderBy('sort_order')->orderBy('id');
@@ -56,7 +59,11 @@ class FeaturedCategoriesService
                 ->values();
         }
 
-        // Keep the existing category totals for other storefronts that show them.
+        if (! $includeCounts) {
+            return $categories;
+        }
+
+        // Only layouts displaying totals need to traverse descendants and count products.
         $categories->each(function (Category $category) use ($hideOutOfStockProducts): void {
             $scopeIds = Category::query()
                 ->descendantsAndSelf((int) $category->id)

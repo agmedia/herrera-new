@@ -9,6 +9,11 @@ use Illuminate\Support\Facades\Storage;
 
 class StoreSettingsService
 {
+    /** @var array<string, array<string, mixed>> */
+    private array $resolvedSettings = [];
+
+    private ?\Illuminate\Http\Request $resolvedRequest = null;
+
     public function __construct(
         private readonly SystemSettingsService $settings
     ) {}
@@ -18,7 +23,19 @@ class StoreSettingsService
      */
     public function all(): array
     {
-        return [
+        $request = request();
+        if ($request !== $this->resolvedRequest) {
+            $this->resolvedRequest = $request;
+            $this->resolvedSettings = [];
+        }
+        // Settings saves clear their source map, so changes within the same
+        // request also produce a fresh result instead of retaining old links.
+        $cacheKey = app()->getLocale().'|'.config('app.locale').'|'.hash('sha256', serialize($this->settings->all()));
+        if (isset($this->resolvedSettings[$cacheKey])) {
+            return $this->resolvedSettings[$cacheKey];
+        }
+
+        return $this->resolvedSettings[$cacheKey] = [
             'announcement' => $this->announcement(),
             'benefits_bar' => $this->benefitsBar(),
             'images' => $this->images(),

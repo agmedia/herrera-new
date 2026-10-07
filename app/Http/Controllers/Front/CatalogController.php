@@ -16,6 +16,7 @@ use App\Models\Content\Blog\BlogPost;
 use App\Models\User;
 use App\Services\Catalog\CatalogFeatureService;
 use App\Services\Content\ContentBlockResolver;
+use App\Services\Front\GuestStorefrontCache;
 use App\Services\Front\StorefrontProductSearch;
 use App\Services\Front\StorefrontSearchCountCache;
 use App\Services\Front\WishlistService;
@@ -1127,7 +1128,7 @@ class CatalogController extends Controller
             sha1($categorySlug)
         );
 
-        $ids = Cache::remember($cacheKey, now()->addMinutes(10), static function () use (
+        $ids = Cache::remember($this->publicSourceCacheKey($cacheKey), $this->publicSourceCacheSeconds(600), static function () use (
             $locale,
             $fallbackLocale,
             $categorySlug
@@ -1173,7 +1174,7 @@ class CatalogController extends Controller
             sha1($manufacturerSlug)
         );
 
-        return (int) Cache::remember($cacheKey, now()->addMinutes(10), static function () use (
+        return (int) Cache::remember($this->publicSourceCacheKey($cacheKey), $this->publicSourceCacheSeconds(600), static function () use (
             $locale,
             $fallbackLocale,
             $manufacturerSlug
@@ -1255,7 +1256,7 @@ class CatalogController extends Controller
         $hideOutOfStock = $this->hideOutOfStockProducts() || $availableOnly;
         $cacheKey = sprintf('front:catalog:categories:v2:%s:%s:%s', $locale, $fallbackLocale, $this->localAvailabilityOnly ? 'local-48h' : ($hideOutOfStock ? 'hide-oos' : 'all-stock'));
 
-        return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($locale, $fallbackLocale, $hideOutOfStock) {
+        return Cache::remember($this->publicSourceCacheKey($cacheKey), $this->publicSourceCacheSeconds(600), function () use ($locale, $fallbackLocale, $hideOutOfStock) {
             return Category::query()
                 ->select(['id', 'code', 'sort_order'])
                 ->where('scope', Category::SCOPE_CATALOG)
@@ -1281,7 +1282,7 @@ class CatalogController extends Controller
         $hideOutOfStock = $this->hideOutOfStockProducts() || $availableOnly;
         $cacheKey = sprintf('front:catalog:shop-root-categories:v2:%s:%s:%s', $locale, $fallbackLocale, $this->localAvailabilityOnly ? 'local-48h' : ($hideOutOfStock ? 'hide-oos' : 'all-stock'));
 
-        return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($locale, $fallbackLocale, $hideOutOfStock) {
+        return Cache::remember($this->publicSourceCacheKey($cacheKey), $this->publicSourceCacheSeconds(600), function () use ($locale, $fallbackLocale, $hideOutOfStock) {
             $categories = Category::query()
                 ->select(['id', 'code', 'parent_id', 'sort_order'])
                 ->where('scope', Category::SCOPE_CATALOG)
@@ -1348,7 +1349,7 @@ class CatalogController extends Controller
             $this->localAvailabilityOnly ? 'local-48h' : ($hideOutOfStock ? 'hide-oos' : 'all-stock')
         );
 
-        return Cache::remember($cacheKey, now()->addMinutes(10), function () use (
+        return Cache::remember($this->publicSourceCacheKey($cacheKey), $this->publicSourceCacheSeconds(600), function () use (
             $locale,
             $fallbackLocale,
             $hideOutOfStock,
@@ -1394,7 +1395,7 @@ class CatalogController extends Controller
             $this->localAvailabilityOnly ? 'local-48h' : ($hideOutOfStock ? 'hide-oos' : 'all-stock')
         );
 
-        return Cache::remember($cacheKey, now()->addMinutes(10), function () use (
+        return Cache::remember($this->publicSourceCacheKey($cacheKey), $this->publicSourceCacheSeconds(600), function () use (
             $manufacturerId,
             $locale,
             $fallbackLocale,
@@ -1566,7 +1567,7 @@ class CatalogController extends Controller
             $this->localAvailabilityOnly ? 'local-48h' : ($hideOutOfStock ? 'hide-oos' : 'all-stock')
         );
 
-        $rows = Cache::remember($cacheKey, now()->addMinutes(10), function () use (
+        $rows = Cache::remember($this->publicSourceCacheKey($cacheKey), $this->publicSourceCacheSeconds(600), function () use (
             $locale,
             $fallbackLocale,
             $optionIds,
@@ -1697,7 +1698,7 @@ class CatalogController extends Controller
             $this->localAvailabilityOnly ? 'local-48h' : ($hideOutOfStock ? 'hide-oos' : 'all-stock')
         );
 
-        $rows = Cache::remember($cacheKey, now()->addMinutes(10), function () use (
+        $rows = Cache::remember($this->publicSourceCacheKey($cacheKey), $this->publicSourceCacheSeconds(600), function () use (
             $locale,
             $fallbackLocale,
             $groupCodes,
@@ -1957,7 +1958,7 @@ class CatalogController extends Controller
             json_encode($cachePayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: ''
         );
 
-        $availability = Cache::remember($cacheKey, now()->addMinutes(10), function () use (
+        $availability = Cache::remember($this->publicSourceCacheKey($cacheKey), $this->publicSourceCacheSeconds(600), function () use (
             $candidateOptionIds,
             $candidateAttributeIds,
             $selectedOptions,
@@ -2227,7 +2228,7 @@ class CatalogController extends Controller
             $this->localAvailabilityOnly ? 'local-48h' : ($hideOutOfStock ? 'hide-oos' : 'all-stock')
         );
 
-        return Cache::remember($cacheKey, now()->addMinutes(10), function () use (
+        return Cache::remember($this->publicSourceCacheKey($cacheKey), $this->publicSourceCacheSeconds(600), function () use (
             $locale,
             $fallbackLocale,
             $scopeIds,
@@ -2794,7 +2795,7 @@ class CatalogController extends Controller
 
     private function catalogLastModifiedTimestamp(): int
     {
-        return (int) Cache::remember('front:catalog:last-modified-ts', now()->addMinutes(2), static function (): int {
+        return (int) Cache::remember($this->publicSourceCacheKey('front:catalog:last-modified-ts'), $this->publicSourceCacheSeconds(120), static function (): int {
             $modelType = Product::class;
 
             $timestamps = [
@@ -2822,6 +2823,27 @@ class CatalogController extends Controller
 
             return $max;
         });
+    }
+
+    private function publicSourceCacheSeconds(int $seconds): int
+    {
+        return (bool) config('storefront_cache.enabled', false)
+            ? min($seconds, max(1, min(3600, (int) config('storefront_cache.ttl_seconds', 120))))
+            : $seconds;
+    }
+
+    private function publicSourceCacheKey(string $key): string
+    {
+        if (! (bool) config('storefront_cache.enabled', false)) {
+            return $key;
+        }
+
+        try {
+            // An invalidated HTML render must also reload its underlying catalog snapshots.
+            return $key.':guest-revision:'.app(GuestStorefrontCache::class)->revision();
+        } catch (\Throwable) {
+            return $key;
+        }
     }
 
     private function catalogEtag(Request $request, string $scope, int $lastModifiedTs): string

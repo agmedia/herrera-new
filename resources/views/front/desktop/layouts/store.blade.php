@@ -201,7 +201,7 @@
                 </a>
             @endif
 
-            <div class="header-search-panel-shell" data-header-search-panel data-header-search-persistent>
+            <div id="header-search-panel" class="header-search-panel-shell" data-header-search-panel data-header-search-breakpoint="{{ $herreraStorefront ? '1023' : '1279' }}" @unless($herreraStorefront) data-header-search-persistent @endunless>
                 <form
                     method="GET"
                     action="{{ route('shop.index') }}"
@@ -318,6 +318,18 @@
             </div>
 
             <div class="responsive-header-actions flex h-full items-stretch border-l border-slate-200 lg:hidden">
+                @if ($herreraStorefront)
+                    <button
+                        type="button"
+                        class="responsive-header-action inline-flex w-12 items-center justify-center border-r border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50 hover:text-black sm:w-14"
+                        aria-label="{{ __('ui.front.desktop.search') }}"
+                        aria-expanded="false"
+                        aria-controls="header-search-panel"
+                        data-header-search-toggle
+                    >
+                        <x-fa-icon name="magnifying-glass" class="h-5 w-5" />
+                    </button>
+                @endif
                 @auth
                     <a href="{{ route('account.dashboard') }}" class="responsive-header-action inline-flex w-12 items-center justify-center border-r border-slate-200 text-slate-700 transition hover:bg-slate-50 hover:text-black sm:w-14 lg:w-16" aria-label="{{ __('ui.front.desktop.account') }}">
                         <x-fa-icon name="user" style="regular" class="h-5 w-5" />

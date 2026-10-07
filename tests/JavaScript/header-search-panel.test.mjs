@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const script = readFileSync(new URL('../../public/front-theme/scripts/header-search-panel.js', import.meta.url), 'utf8');
 
-function harness({ enabled = true, mobile = false, persistent = true } = {}) {
+function harness({ enabled = true, mobile = false, persistent = true, breakpoint = '1279' } = {}) {
     let now = 0;
     let timerId = 0;
     const timers = new Map();
@@ -21,6 +21,7 @@ function harness({ enabled = true, mobile = false, persistent = true } = {}) {
     });
     const element = () => {
         const classes = new Set();
+        const attributes = new Map();
         return Object.assign(events(), {
             dataset: {}, hidden: true, value: '', textContent: '', children: [],
             classList: {
@@ -30,7 +31,9 @@ function harness({ enabled = true, mobile = false, persistent = true } = {}) {
             },
             set innerHTML(value) { this.children = []; },
             appendChild(child) { this.children.push(child); },
-            setAttribute() {}, hasAttribute() { return true; },
+            setAttribute(name, value) { attributes.set(name, value); },
+            getAttribute(name) { return attributes.get(name); },
+            hasAttribute() { return true; },
             contains(target) { return this === target || this.children.some((child) => child.contains(target)); },
             getBoundingClientRect() { return { top: 0 }; },
             querySelectorAll() { return []; },
@@ -38,8 +41,12 @@ function harness({ enabled = true, mobile = false, persistent = true } = {}) {
     };
     const panel = element();
     panel.hasAttribute = () => persistent;
+    panel.dataset.headerSearchBreakpoint = breakpoint;
     const form = element();
     const input = element();
+    const toggle = element();
+    panel.children.push(form);
+    form.children.push(input);
     const nodes = new Map([
         ['[data-header-search-panel]', panel], ['[data-header-search-form]', form],
         ['[data-header-search-input]', input],
@@ -55,13 +62,17 @@ function harness({ enabled = true, mobile = false, persistent = true } = {}) {
     form.querySelector = (selector) => nodes.get(selector);
     const document = Object.assign(events(), {
         readyState: 'complete', activeElement: null,
-        querySelector: (selector) => nodes.get(selector), querySelectorAll: () => [], createElement: element,
+        querySelector: (selector) => nodes.get(selector),
+        querySelectorAll: (selector) => selector === '[data-header-search-toggle]' ? [toggle] : [],
+        createElement: element,
     });
     input.focus = () => { document.activeElement = input; input.emit('focus'); };
     input.blur = () => { document.activeElement = null; };
+    toggle.focus = () => { document.activeElement = toggle; };
+    const media = Object.assign(events(), { matches: mobile });
     const window = Object.assign(events(), {
         location: { origin: 'https://shop.example', assign() {} }, scrollY: 0, scrollTo() {},
-        matchMedia: () => Object.assign(events(), { matches: mobile }),
+        matchMedia(query) { media.query = query; return media; },
         setTimeout(callback, delay) { const id = ++timerId; timers.set(id, { callback, at: now + delay }); return id; },
         clearTimeout(id) { timers.delete(id); },
         fetch(url, options) {
@@ -72,7 +83,7 @@ function harness({ enabled = true, mobile = false, persistent = true } = {}) {
     });
     vm.runInNewContext(script, { document, window, URL, AbortController, Date: { now: () => now } });
     return {
-        input, form, panel, window, requests, nodes,
+        input, form, panel, toggle, document, media, window, requests, nodes,
         type(value) { input.value = value; input.emit('input'); },
         advance(duration) {
             const end = now + duration;
@@ -166,6 +177,44 @@ test('mobile opening and delayed panel focus send only one autocomplete request'
     page.input.value = 'ventilator'; page.input.focus();
     page.input.focus(); page.advance(1000);
     assert.equal(page.requests.length, 1);
+});
+
+test('mobile search starts closed, icon opens and focuses it, Escape restores the icon focus', () => {
+    const page = harness({ mobile: true, persistent: false, breakpoint: '1023' });
+    assert.equal(page.media.query, '(max-width: 1023px)');
+    assert.equal(page.panel.classList.contains('is-open'), false);
+    assert.equal(page.panel.getAttribute('aria-hidden'), 'true');
+    assert.equal(page.toggle.getAttribute('aria-expanded'), 'false');
+    page.toggle.emit('click');
+    assert.equal(page.panel.classList.contains('is-open'), true);
+    assert.equal(page.panel.getAttribute('aria-hidden'), 'false');
+    assert.equal(page.toggle.getAttribute('aria-expanded'), 'true');
+    page.advance(260);
+    assert.equal(page.document.activeElement, page.input);
+    page.document.emit('keydown', { key: 'Escape' });
+    assert.equal(page.panel.classList.contains('is-open'), false);
+    assert.equal(page.panel.getAttribute('aria-hidden'), 'true');
+    assert.equal(page.toggle.getAttribute('aria-expanded'), 'false');
+    assert.equal(page.document.activeElement, page.toggle);
+});
+
+test('outside clicks close mobile search without a delayed focus reopening it; desktop search stays visible', () => {
+    const page = harness({ mobile: true, persistent: false, breakpoint: '1023' });
+    page.toggle.emit('click');
+    page.document.emit('click', { target: {} });
+    page.advance(1000);
+    assert.equal(page.panel.classList.contains('is-open'), false);
+    assert.equal(page.document.activeElement, null);
+    page.media.matches = false;
+    page.media.emit('change');
+    assert.equal(page.panel.getAttribute('aria-hidden'), 'false');
+    page.input.focus();
+    page.document.emit('keydown', { key: 'Escape' });
+    assert.equal(page.panel.getAttribute('aria-hidden'), 'false');
+    assert.equal(page.document.activeElement, page.input);
+    page.media.matches = true;
+    page.media.emit('change');
+    assert.equal(page.panel.getAttribute('aria-hidden'), 'true');
 });
 
 test('page-local result cache stays bounded and evicts older searches', async () => {

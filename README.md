@@ -100,6 +100,29 @@ NABAVA_NET_STOREFRONT_URL=https://www.example.hr
 
 Nabava.net can access it using `?username=...&password=...`. Keep the credentials in the server environment and never commit them to the repository.
 
+## Storefront cache
+
+The B2B public catalogue can use a short server-side HTML cache:
+
+```dotenv
+STOREFRONT_CACHE_ENABLED=true
+STOREFRONT_CACHE_STORE=file
+STOREFRONT_CACHE_TTL=120
+```
+
+Only anonymous, unpersonalized catalogue pages are eligible. Signed-in customers,
+cart/wishlist sessions, product detail pages and form requests bypass the HTML
+cache. Each response retains its own session and CSRF token. Responses stay
+private in browser/proxy caches. Catalogue, content and settings writes invalidate
+the server cache after the database transaction commits. Each cache layer has a
+bounded lifetime, including source snapshots used by the HTML cache. The public
+menu shares the same revision. Restart long-running workers
+after deploying changes, and rebuild the Laravel configuration cache when changing
+these environment values.
+
+`public/.user.ini` enables dynamic response compression on CGI/FastCGI hosts;
+Apache compression and long-lived asset caching are configured in `.htaccess`.
+
 ## Useful Commands
 
 ```bash

@@ -7,6 +7,7 @@ use App\Models\Content\Page\InfoPage;
 use App\Services\Settings\SystemSettingsService;
 use App\Support\Media\HerreraCategoryImage;
 use App\Support\Media\MediaUrl;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 class NavigationMenuService
@@ -31,19 +32,42 @@ class NavigationMenuService
     {
         $locale = strtolower(trim($locale));
         $fallbackLocale = strtolower((string) config('app.locale', 'en'));
-        $cacheKey = $locale.'|'.$fallbackLocale;
+        $items = collect($this->configuredItems())
+            ->filter(fn ($item): bool => (bool) ($item['is_active'] ?? true))
+            ->sortBy(fn ($item): int => (int) ($item['sort_order'] ?? 0))
+            ->values();
+        $revision = '';
+        $publicStore = null;
+        if ((bool) config('storefront_cache.enabled', false)) {
+            try {
+                $revision = app(GuestStorefrontCache::class)->revision();
+                $publicStore = Cache::store(config('storefront_cache.store') ?: config('cache.default'));
+            } catch (\Throwable) {
+                // A cache outage must not prevent the public navigation rendering.
+            }
+        }
+        $cacheKey = hash('sha256', serialize([
+            $locale, $fallbackLocale, request()->getSchemeAndHttpHost(), config('app.url'), $revision, $items->all(),
+        ]));
 
         if (isset($this->resolvedCache[$cacheKey])) {
             return $this->resolvedCache[$cacheKey];
         }
 
-        $items = collect($this->configuredItems())
-            ->filter(fn ($item): bool => (bool) ($item['is_active'] ?? true))
-            ->sortBy(fn ($item): int => (int) ($item['sort_order'] ?? 0))
-            ->values();
-
         if ($items->isEmpty()) {
             return $this->resolvedCache[$cacheKey] = [];
+        }
+
+        $publicCacheKey = 'front:navigation:'.$cacheKey;
+        if ($publicStore !== null) {
+            try {
+                $cached = $publicStore->get($publicCacheKey);
+                if (is_array($cached)) {
+                    return $this->resolvedCache[$cacheKey] = $cached;
+                }
+            } catch (\Throwable) {
+                $publicStore = null;
+            }
         }
 
         $categoryIds = $items
@@ -189,6 +213,14 @@ class NavigationMenuService
             if (is_array($entry) && trim((string) ($entry['url'] ?? '')) !== '') {
                 $entry['is_highlighted'] = (bool) ($item['is_highlighted'] ?? false);
                 $resolved[] = $entry;
+            }
+        }
+
+        if ($publicStore !== null) {
+            try {
+                $publicStore->put($publicCacheKey, $resolved, 120);
+            } catch (\Throwable) {
+                // Fall back to the uncached menu when storage is unavailable.
             }
         }
 

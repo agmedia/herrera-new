@@ -39,7 +39,8 @@
             && !!footer
             && !!viewAllLink;
 
-        const mobileViewport = window.matchMedia('(max-width: 1279px)');
+        const mobileBreakpoint = panel.dataset.headerSearchBreakpoint || '1279';
+        const mobileViewport = window.matchMedia(`(max-width: ${mobileBreakpoint}px)`);
         const isMobileViewport = function () {
             return mobileViewport.matches;
         };
@@ -53,6 +54,13 @@
         let abortController = null;
         let activeRequestQuery = '';
         let resultLinks = [];
+        let focusTimer = 0;
+
+        const syncPanelAccessibility = function () {
+            const mobileOpen = isMobileViewport() && isOpen;
+            panel.setAttribute('aria-hidden', isMobileViewport() && !isOpen ? 'true' : 'false');
+            toggles.forEach((toggle) => toggle.setAttribute('aria-expanded', mobileOpen ? 'true' : 'false'));
+        };
         // Keep results within this document only: personalized prices must never
         // be shared through browser storage or survive a page/account change.
         const resultCache = new Map();
@@ -501,10 +509,15 @@
         const openPanel = function () {
             panel.classList.add('is-open');
             isOpen = true;
+            syncPanelAccessibility();
 
             ensurePanelVisible();
 
-            window.setTimeout(function () {
+            window.clearTimeout(focusTimer);
+            focusTimer = window.setTimeout(function () {
+                if (!isOpen) {
+                    return;
+                }
                 input.focus();
                 if (autocompleteEnabled && input.value.trim().length >= MIN_QUERY_LENGTH) {
                     requestAutocomplete();
@@ -512,22 +525,29 @@
             }, isMobileViewport() ? 260 : 120);
         };
 
-        const closePanel = function () {
+        const closePanel = function (restoreFocus = false) {
             closeSuggestions();
+            window.clearTimeout(focusTimer);
 
             if (isMobileViewport() && !isPersistentMobileSearch()) {
                 panel.classList.remove('is-open');
                 isOpen = false;
+                dismissMobileKeyboard();
+                syncPanelAccessibility();
+                if (restoreFocus) {
+                    toggles[0]?.focus({ preventScroll: true });
+                }
                 return;
             }
 
             isOpen = true;
+            syncPanelAccessibility();
         };
 
         toggles.forEach(function (toggle) {
             toggle.addEventListener('click', function () {
                 if (isOpen) {
-                    closePanel();
+                    closePanel(true);
                     return;
                 }
 
@@ -599,7 +619,7 @@
 
         document.addEventListener('keydown', function (event) {
             if (event.key === 'Escape' && isOpen) {
-                closePanel();
+                closePanel(true);
             }
         });
 
@@ -607,11 +627,18 @@
             if (!isMobileViewport()) {
                 panel.classList.remove('is-open');
                 isOpen = true;
+                syncPanelAccessibility();
                 return;
             }
 
             isOpen = isPersistentMobileSearch() || panel.classList.contains('is-open');
+            if (!isOpen) {
+                closeSuggestions();
+            }
+            syncPanelAccessibility();
         };
+
+        syncViewportState();
 
         if (typeof mobileViewport.addEventListener === 'function') {
             mobileViewport.addEventListener('change', syncViewportState);

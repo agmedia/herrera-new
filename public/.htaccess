@@ -58,6 +58,10 @@
     </Files>
 </IfModule>
 
+<Files ".user.ini">
+    Require all denied
+</Files>
+
 <IfModule mod_deflate.c>
     AddOutputFilterByType DEFLATE text/plain text/html text/xml text/css text/javascript application/javascript application/json image/svg+xml
 </IfModule>

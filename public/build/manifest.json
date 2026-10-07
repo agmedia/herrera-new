@@ -1,0 +1,58 @@
+{
+  "_ace-4qUWPj6a.js": {
+    "file": "assets/ace-4qUWPj6a.js",
+    "name": "ace",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "_ext-language_tools-B6ek7HAu.js": {
+    "file": "assets/ext-language_tools-B6ek7HAu.js",
+    "name": "ext-language_tools",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "_mode-html-SlqjV4XJ.js": {
+    "file": "assets/mode-html-SlqjV4XJ.js",
+    "name": "mode-html",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "_theme-tomorrow_night-Bh09ExlY.js": {
+    "file": "assets/theme-tomorrow_night-Bh09ExlY.js",
+    "name": "theme-tomorrow_night",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
+  },
+  "resources/css/app.css": {
+    "file": "assets/app-StGU3X-g.css",
+    "src": "resources/css/app.css",
+    "isEntry": true,
+    "name": "app",
+    "names": [
+      "app.css"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-C8nrXOwM.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true,
+    "dynamicImports": [
+      "_ace-4qUWPj6a.js",
+      "_ext-language_tools-B6ek7HAu.js",
+      "_mode-html-SlqjV4XJ.js",
+      "_theme-tomorrow_night-Bh09ExlY.js"
+    ],
+    "css": [
+      "assets/app-8Ofu9GWj.css"
+    ]
+  }
+}

@@ -20,18 +20,5 @@ self.addEventListener('activate', function(event) {
 
         await self.clients.claim();
         await self.registration.unregister();
-
-        var clients = await self.clients.matchAll({
-            type: 'window',
-            includeUncontrolled: true
-        });
-
-        await Promise.all(clients.map(function(client) {
-            if (client.url && 'navigate' in client) {
-                return client.navigate(client.url).catch(function() {});
-            }
-
-            return Promise.resolve();
-        }));
     })());
 });

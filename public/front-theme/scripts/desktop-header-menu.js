@@ -345,7 +345,8 @@
         const accordionToggleButtons = root.querySelectorAll('[data-mobile-menu-toggle]');
         const menuLinks = Array.from(root.querySelectorAll('a[href]'));
         const accordionStateKey = 'desktop-mobile-menu-accordion-state-v2';
-        let isRestoringAccordionState = false;
+        const restoredSectionStates = new WeakMap();
+        let lastSyncedPath;
 
         const forceClosedState = () => {
             root.classList.add('pointer-events-none');
@@ -469,15 +470,23 @@
             });
         };
 
+        const restoreSectionOpen = (section, open) => {
+            if (section.open === open) {
+                return;
+            }
+
+            // Native details toggle events are queued after this restoration finishes.
+            restoredSectionStates.set(section, open);
+            section.open = open;
+        };
+
         const restoreAccordionState = () => {
             const accordionState = readAccordionState();
 
-            isRestoringAccordionState = true;
             accordionSections.forEach((section) => {
                 const key = getSectionKey(section);
-                section.open = key ? Boolean(accordionState[key]) : false;
+                restoreSectionOpen(section, key ? Boolean(accordionState[key]) : false);
             });
-            isRestoringAccordionState = false;
         };
 
         const findBestLinkForPath = (path) => menuLinks
@@ -510,6 +519,10 @@
 
         const syncMenuState = () => {
             const currentPath = normalizePath(window.location.href);
+            if (currentPath === lastSyncedPath) {
+                return;
+            }
+            lastSyncedPath = currentPath;
             const currentLink = currentPath ? findBestLinkForPath(currentPath) : null;
 
             restoreAccordionState();
@@ -528,14 +541,12 @@
                 currentSection = currentSection.parentElement?.closest('details') ?? null;
             }
 
-            isRestoringAccordionState = true;
             sectionsToReveal.forEach((section) => {
                 const key = getSectionKey(section);
                 if (key && !Object.prototype.hasOwnProperty.call(accordionState, key)) {
-                    section.open = true;
+                    restoreSectionOpen(section, true);
                 }
             });
-            isRestoringAccordionState = false;
 
             clearActiveState();
             revealLinkPath(currentLink);
@@ -574,8 +585,12 @@
         closeButtons.forEach((button) => button.addEventListener('click', closeMenu));
         accordionSections.forEach((section) => {
             section.addEventListener('toggle', () => {
-                if (isRestoringAccordionState) {
-                    return;
+                if (restoredSectionStates.has(section)) {
+                    const restoredOpen = restoredSectionStates.get(section);
+                    restoredSectionStates.delete(section);
+                    if (section.open === restoredOpen) {
+                        return;
+                    }
                 }
 
                 const key = getSectionKey(section);
@@ -669,5 +684,9 @@
     } else {
         init();
     }
-    window.addEventListener('pageshow', init);
+    window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+            init();
+        }
+    });
 })();

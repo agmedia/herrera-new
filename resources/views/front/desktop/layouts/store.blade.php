@@ -28,6 +28,8 @@
         $storefrontCssBundleIncludesLegacyAssets = true;
         $storefrontAssetVersion = app(\App\Support\AssetVersion::class)->current();
     @endphp
+    <script defer src="{{ asset('front-theme/scripts/desktop-header-menu.js') }}?v={{ filemtime(public_path('front-theme/scripts/desktop-header-menu.js')) }}"></script>
+    <script defer src="{{ asset('front-theme/scripts/header-search-panel.js') }}?v={{ filemtime(public_path('front-theme/scripts/header-search-panel.js')) }}"></script>
     @include('front.partials.cookie-consent-head')
     @stack('head')
     @unless (str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera'))
@@ -1072,8 +1074,6 @@
 
         const onLoadScripts = [];
 
-        onLoadScripts.push(@json(asset('front-theme/scripts/desktop-header-menu.js').'?v='.filemtime(public_path('front-theme/scripts/desktop-header-menu.js'))));
-        onLoadScripts.push(@json(asset('front-theme/scripts/header-search-panel.js').'?v='.filemtime(public_path('front-theme/scripts/header-search-panel.js'))));
         onLoadScripts.push(@json(asset('front-theme/scripts/store-benefits-rotator.js').'?v='.filemtime(public_path('front-theme/scripts/store-benefits-rotator.js'))));
         onLoadScripts.push(@json(asset('front-theme/scripts/wishlist-toggle.js').'?v='.filemtime(public_path('front-theme/scripts/wishlist-toggle.js'))));
 

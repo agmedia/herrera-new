@@ -60,6 +60,24 @@ class HerreraHeaderPresentationFeatureTest extends TestCase
         $this->assertSame('1', $xpath->query('//*[@data-header-search-form]')->item(0)->getAttribute('data-autocomplete-enabled'));
     }
 
+    public function test_header_controls_download_during_html_parsing_and_mobile_height_stays_stable(): void
+    {
+        $this->configure();
+        $response = $this->get(route('home'))->assertOk();
+        $xpath = $this->xpath($response->getContent());
+
+        foreach (['desktop-header-menu.js', 'header-search-panel.js'] as $script) {
+            $nodes = $xpath->query('//head/script[contains(@src, "'.$script.'")]');
+            $this->assertSame(1, $nodes->count());
+            $this->assertTrue($nodes->item(0)->hasAttribute('defer'));
+        }
+
+        $css = file_get_contents(public_path('front-theme/styles/herrera-b2b.css'));
+        $mobileCss = substr($css, strpos($css, '@media (max-width: 1023px)'));
+        $this->assertStringContainsString('grid-template-rows: 72px', $mobileCss);
+        $this->assertStringNotContainsString('grid-template-rows: 64px', $mobileCss);
+    }
+
     public function test_homepage_displays_every_active_catalog_root_and_no_nested_or_scheduled_root(): void
     {
         $this->configure();

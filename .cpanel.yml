@@ -1,0 +1,4 @@
+---
+deployment:
+  tasks:
+    - /bin/bash /home/herrera/repositories/herrera-new/scripts/deploy-staging.sh

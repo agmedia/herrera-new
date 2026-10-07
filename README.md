@@ -130,3 +130,33 @@ php artisan optimize:clear
 php artisan test
 php artisan route:list
 ```
+
+## cPanel staging deployment
+
+The registered checkout is `/home/herrera/repositories/herrera-new`, on branch
+`codex/herrera-b2b-foundation`. It deploys only to `https://herrera.herrera.hr`.
+After pushing changes to GitHub, open **Git Version Control → Manage → Pull or
+Deploy**, click **Update from Remote**, then **Deploy HEAD Commit**.
+
+When frontend sources change, prepare and commit the production bundle locally:
+
+```bash
+npm run build
+bash scripts/deploy-staging.sh --stamp-build
+git add public/build
+```
+
+Commit these files together with their source changes before pushing. The server
+validates the bundle fingerprint and manifest; it does not require Node.js.
+
+`.cpanel.yml` runs `scripts/deploy-staging.sh` with PHP 8.4. Deployment first checks
+the staging URL, `APP_ENV=staging`, database `herrera_redesign`, safe mode and cache
+settings. It backs up changed files and `.env` privately, preserves uploads,
+storage, symlinks, old hashed assets and the cPanel PHP handler, then refreshes
+autoload/configuration/routes/views. Changed Composer locks install their exact
+dependencies without development packages. Errors trigger a rollback attempt;
+backups are retained in `/home/herrera/.herrera-staging-backups`.
+
+Deployment does not run database migrations, import data or modify production.
+See the [cPanel deployment guide](https://docs.cpanel.net/knowledge-base/web-services/guide-to-git-deployment/)
+for the two-button pull workflow.

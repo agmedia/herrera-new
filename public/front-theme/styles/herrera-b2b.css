@@ -154,7 +154,6 @@ body.herrera-storefront { --herrera-action: #007b8b; --herrera-footer: #24353b; 
  .herrera-storefront .herrera-mobile-shortcuts a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; border: 0; background: transparent; color: #32373b; font-size: 13px; font-weight: 600; }
  .herrera-storefront .herrera-mobile-shortcuts a { color: var(--herrera-action); }
  .herrera-storefront .herrera-mobile-shortcuts svg { width: 15px; height: 15px; }
- .herrera-storefront .site-main-header.is-sticky .herrera-header-layout { grid-template-rows: 64px; }
 }
 
 .herrera-storefront .site-footer { background: var(--herrera-footer); color: #d2dfe3; font-size: 15px; line-height: 1.6; }

@@ -344,8 +344,7 @@
         const accordionSections = root.querySelectorAll('[data-mobile-menu-accordion]');
         const accordionToggleButtons = root.querySelectorAll('[data-mobile-menu-toggle]');
         const menuLinks = Array.from(root.querySelectorAll('a[href]'));
-        const accordionStateKey = 'desktop-mobile-menu-accordion-state-v2';
-        const restoredSectionStates = new WeakMap();
+        const resetSectionStates = new WeakMap();
         let lastSyncedPath;
 
         const forceClosedState = () => {
@@ -381,12 +380,6 @@
             }
         };
 
-        const slugify = (value) => value
-            .toLowerCase()
-            .trim()
-            .replace(/\s+/g, '-')
-            .replace(/[^a-z0-9\-/_]/g, '');
-
         const getSectionDepth = (link) => {
             let depth = 0;
             let currentSection = link.closest('details');
@@ -397,45 +390,6 @@
             }
 
             return depth;
-        };
-
-        const getSectionKey = (section) => {
-            if (section.dataset.menuSectionKey) {
-                return section.dataset.menuSectionKey;
-            }
-
-            const link = section.querySelector(':scope > summary [data-mobile-nav-link]');
-            const path = link ? normalizePath(link.href) : null;
-            const fallbackLabel = link ? slugify(link.textContent || '') : '';
-            const key = path || fallbackLabel || '';
-
-            if (key) {
-                section.dataset.menuSectionKey = key;
-            }
-
-            return key;
-        };
-
-        const readAccordionState = () => {
-            try {
-                const raw = sessionStorage.getItem(accordionStateKey);
-                if (!raw) {
-                    return {};
-                }
-
-                const parsed = JSON.parse(raw);
-                return parsed && typeof parsed === 'object' ? parsed : {};
-            } catch {
-                return {};
-            }
-        };
-
-        const writeAccordionState = (state) => {
-            try {
-                sessionStorage.setItem(accordionStateKey, JSON.stringify(state));
-            } catch {
-                // Ignore storage failures and keep menu functional.
-            }
         };
 
         const collapseSection = (section) => {
@@ -470,23 +424,18 @@
             });
         };
 
-        const restoreSectionOpen = (section, open) => {
+        const resetSectionOpen = (section, open) => {
             if (section.open === open) {
                 return;
             }
 
-            // Native details toggle events are queued after this restoration finishes.
-            restoredSectionStates.set(section, open);
+            // Ignore the queued native toggle caused by resetting the menu.
+            resetSectionStates.set(section, open);
             section.open = open;
         };
 
-        const restoreAccordionState = () => {
-            const accordionState = readAccordionState();
-
-            accordionSections.forEach((section) => {
-                const key = getSectionKey(section);
-                restoreSectionOpen(section, key ? Boolean(accordionState[key]) : false);
-            });
+        const resetAccordionSections = () => {
+            accordionSections.forEach((section) => resetSectionOpen(section, false));
         };
 
         const findBestLinkForPath = (path) => menuLinks
@@ -506,7 +455,7 @@
             });
         };
 
-        const revealLinkPath = (link) => {
+        const highlightCurrentLink = (link) => {
             if (!link) {
                 return;
             }
@@ -525,31 +474,8 @@
             lastSyncedPath = currentPath;
             const currentLink = currentPath ? findBestLinkForPath(currentPath) : null;
 
-            restoreAccordionState();
             clearActiveState();
-
-            if (!currentLink) {
-                return;
-            }
-
-            const accordionState = readAccordionState();
-            const sectionsToReveal = [];
-            let currentSection = currentLink.closest('details');
-
-            while (currentSection) {
-                sectionsToReveal.unshift(currentSection);
-                currentSection = currentSection.parentElement?.closest('details') ?? null;
-            }
-
-            sectionsToReveal.forEach((section) => {
-                const key = getSectionKey(section);
-                if (key && !Object.prototype.hasOwnProperty.call(accordionState, key)) {
-                    restoreSectionOpen(section, true);
-                }
-            });
-
-            clearActiveState();
-            revealLinkPath(currentLink);
+            highlightCurrentLink(currentLink);
         };
 
         const closeMenu = () => {
@@ -563,11 +489,12 @@
             root.classList.remove('pointer-events-none');
             root.dataset.menuOpen = '1';
             root.inert = false;
+            resetAccordionSections();
             syncMenuState();
             if (event?.currentTarget?.hasAttribute('data-mobile-menu-open-categories')) {
                 const catalogSection = root.querySelector('[data-mobile-menu-catalog]');
                 if (catalogSection instanceof HTMLDetailsElement) {
-                    catalogSection.open = true;
+                    resetSectionOpen(catalogSection, true);
                 }
             }
             overlay?.classList.remove('opacity-0');
@@ -585,19 +512,12 @@
         closeButtons.forEach((button) => button.addEventListener('click', closeMenu));
         accordionSections.forEach((section) => {
             section.addEventListener('toggle', () => {
-                if (restoredSectionStates.has(section)) {
-                    const restoredOpen = restoredSectionStates.get(section);
-                    restoredSectionStates.delete(section);
-                    if (section.open === restoredOpen) {
+                if (resetSectionStates.has(section)) {
+                    const resetOpen = resetSectionStates.get(section);
+                    resetSectionStates.delete(section);
+                    if (section.open === resetOpen) {
                         return;
                     }
-                }
-
-                const key = getSectionKey(section);
-                if (key) {
-                    const accordionState = readAccordionState();
-                    accordionState[key] = section.open;
-                    writeAccordionState(accordionState);
                 }
 
                 if (!section.open) {
@@ -706,6 +626,7 @@
             });
         });
 
+        resetAccordionSections();
         syncMenuState();
     };
 

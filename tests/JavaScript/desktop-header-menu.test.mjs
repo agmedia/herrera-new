@@ -5,7 +5,8 @@ import vm from 'node:vm';
 
 const script = readFileSync(new URL('../../public/front-theme/scripts/desktop-header-menu.js', import.meta.url), 'utf8');
 
-function harness({ savedSections = {}, hrefs = [] } = {}) {
+function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections), hrefs = [],
+    currentPath = '/shop', parents = {}, linkSections = [], categoriesButton = false } = {}) {
     const queuedToggles = new Set();
     class Element {
         constructor() {
@@ -50,15 +51,33 @@ function harness({ savedSections = {}, hrefs = [] } = {}) {
     const openButton = new Element();
     const panel = new Element();
     const overlay = new Element();
-    const sections = Object.keys(savedSections).map((key) => new Details(key));
+    const sections = sectionKeys.map((key) => new Details(key));
+    const sectionsByKey = new Map(sections.map((section) => [section.dataset.menuSectionKey, section]));
+    sections.forEach((section) => {
+        const parent = sectionsByKey.get(parents[section.dataset.menuSectionKey]);
+        if (parent) {
+            const wrapper = new Element(); wrapper.children = []; wrapper.tagName = 'UL';
+            wrapper.closest = (selector) => selector === 'details' ? parent : null;
+            section.parentElement = wrapper;
+        }
+    });
     const links = hrefs.map((href) => Object.assign(new Element(), {
         href: new URL(href, 'https://shop.example/shop').href,
     }));
+    links.forEach((link, index) => {
+        link.closest = (selector) => selector === 'details' ? sectionsByKey.get(linkSections[index]) || null : null;
+    });
+    const sectionToggles = sections.map((section) => {
+        const toggle = new Element(); toggle.closest = () => section; return toggle;
+    });
+    if (categoriesButton) openButton.setAttribute('data-mobile-menu-open-categories', '');
     root.querySelector = (selector) => ({
         '[data-mobile-menu-panel]': panel, '[data-mobile-menu-close]': overlay,
+        '[data-mobile-menu-catalog]': sectionsByKey.get('catalog'),
     })[selector] || null;
     root.querySelectorAll = (selector) => ({
         '[data-mobile-menu-accordion]': sections, '[data-mobile-menu-close]': [overlay],
+        '[data-mobile-menu-toggle]': sectionToggles,
         'a[href]': links,
     })[selector] || [];
     const document = new Element();
@@ -68,7 +87,7 @@ function harness({ savedSections = {}, hrefs = [] } = {}) {
     })[selector] || null;
     document.querySelectorAll = (selector) => selector === '[data-mobile-menu-open]' ? [openButton] : [];
     const window = new Element();
-    window.location = { origin: 'https://shop.example', href: 'https://shop.example/shop' };
+    window.location = { origin: 'https://shop.example', href: new URL(currentPath, 'https://shop.example').href };
     window.scrollY = 0;
     window.requestAnimationFrame = (callback) => callback();
     const storage = { reads: 0, writes: 0, value: JSON.stringify(savedSections) };
@@ -80,7 +99,7 @@ function harness({ savedSections = {}, hrefs = [] } = {}) {
         document, window, sessionStorage, URL, HTMLElement: Element, HTMLDetailsElement: Details,
     });
     return {
-        root, header, window, document, openButton, overlay, sections, storage, links,
+        root, header, window, document, openButton, overlay, sections, storage, links, sectionToggles,
         open() { openButton.emit('click', { preventDefault() {}, currentTarget: openButton }); },
         flushToggles() {
             while (queuedToggles.size > 0) {
@@ -113,24 +132,38 @@ test('BFCache restoration closes the previous menu without duplicate input handl
     assert.equal(page.root.dataset.menuOpen, '1');
 });
 
-test('queued restoration toggles do not write storage; deliberate changes are saved', () => {
-    const page = harness({ savedSections: { catalog: true } });
-    assert.equal(page.sections[0].open, true);
+test('old saved category branches are ignored and only the outer catalogue opens', () => {
+    const page = harness({ savedSections: { catalog: true, rasvjeta: true, unutarnja: true, paneli: true }, categoriesButton: true });
+    assert.equal(page.sections.every((section) => !section.open), true);
+    page.open();
     page.flushToggles();
+    assert.deepEqual(page.sections.map((section) => section.open), [true, false, false, false]);
+    assert.equal(page.storage.reads, 0);
     assert.equal(page.storage.writes, 0);
-    page.sections[0].open = false;
-    page.flushToggles();
-    assert.equal(page.storage.writes, 1);
-    assert.deepEqual(JSON.parse(page.storage.value), { catalog: false });
 });
 
-test('opening the menu repeatedly keeps current accordion state without re-reading storage', () => {
-    const page = harness({ savedSections: { catalog: true } });
+test('the active category stays highlighted without automatically revealing its ancestors', () => {
+    const page = harness({ sectionKeys: ['catalog', 'rasvjeta', 'unutarnja'], categoriesButton: true,
+        parents: { rasvjeta: 'catalog', unutarnja: 'rasvjeta' }, linkSections: ['unutarnja'],
+        hrefs: ['/categories/paneli'], currentPath: '/categories/paneli' });
+    assert.equal(page.sections.every((section) => !section.open), true);
+    assert.equal(page.links[0].getAttribute('aria-current'), 'page');
+    page.open();
     page.flushToggles();
-    const readsAfterInit = page.storage.reads;
-    page.open(); page.overlay.emit('click'); page.open();
-    assert.equal(page.sections[0].open, true);
-    assert.equal(page.storage.reads, readsAfterInit);
+    assert.deepEqual(page.sections.map((section) => section.open), [true, false, false]);
+    assert.equal(page.links[0].getAttribute('aria-current'), 'page');
+});
+
+test('deliberate category toggling works while every manual reopening starts with closed children', () => {
+    const page = harness({ sectionKeys: ['catalog', 'rasvjeta'], categoriesButton: true });
+    page.open(); page.flushToggles();
+    page.sectionToggles[1].emit('click', { preventDefault() {}, stopPropagation() {} });
+    page.flushToggles();
+    assert.equal(page.sections[1].open, true);
+    page.overlay.emit('click'); page.open(); page.flushToggles();
+    assert.deepEqual(page.sections.map((section) => section.open), [true, false]);
+    assert.equal(page.storage.reads, 0);
+    assert.equal(page.storage.writes, 0);
 });
 
 test('ordinary full-page link navigation keeps the outgoing drawer and scroll lock still', () => {

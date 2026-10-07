@@ -29,6 +29,7 @@ body.herrera-storefront { --herrera-action: #007b8b; --herrera-footer: #24353b; 
  .herrera-storefront .site-top-bar-social-label { display: inline; }
 }
 .herrera-storefront .site-main-header-shell { padding-bottom: 0; }
+.herrera-storefront .site-main-header.is-sticky .site-main-header-shell { border-bottom: 0; }
 .herrera-storefront .site-main-header.is-sticky + .site-main-header-spacer { display: none; }
 .herrera-storefront .herrera-header-quick-order,
 .herrera-storefront .herrera-mobile-shortcuts { display: none; }

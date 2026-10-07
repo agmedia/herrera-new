@@ -208,35 +208,12 @@
             });
         }
 
-        const hasStoredCookieConsent = () => document.cookie.split(';').some((entry) => entry.trim().startsWith('cc_cookie='));
-
-        const scheduleCookieConsentBoot = () => {
-            if (hasStoredCookieConsent()) {
-                bootCookieConsent();
-                return;
-            }
-
-            let booted = false;
-            const runBootOnce = () => {
-                if (booted) {
-                    return;
-                }
-                booted = true;
-                bootCookieConsent();
-            };
-
-            const interactionEvents = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
-            interactionEvents.forEach((eventName) => {
-                window.addEventListener(eventName, runBootOnce, { once: true, passive: true });
-            });
-
-            window.setTimeout(runBootOnce, 6000);
-        };
-
-        if (document.readyState === 'complete') {
-            scheduleCookieConsentBoot();
+        // Initialize before interaction: opening a scroll-locking modal on a
+        // navigation tap can move the outgoing page in mobile Safari.
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', bootCookieConsent, { once: true });
         } else {
-            window.addEventListener('load', scheduleCookieConsentBoot, { once: true });
+            bootCookieConsent();
         }
     </script>
 @endif

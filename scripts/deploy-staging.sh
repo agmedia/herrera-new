@@ -56,6 +56,7 @@ mkdir -p "$backup_base"
 exec 9>"$backup_base/deploy.lock"
 flock -n 9 || fail 'Another staging deployment is running.'
 backup_root="$(mktemp -d "$backup_base/$(date -u +%Y%m%dT%H%M%SZ)-${revision:0:12}-XXXXXX")"
+target_root_mode="$(stat -c '%a' "$target_root")"
 stage_root="$backup_root/new"
 mkdir -p "$stage_root" "$backup_root/old"
 cp -p "$target_root/.env" "$backup_root/old/.env"
@@ -75,7 +76,7 @@ while IFS= read -r -d '' file; do
         check="$check/$component"
         [[ ! -L "$check" ]] || fail "Refusing to overwrite a staging symlink: $file"
     done
-    if [[ -f "$target_root/$file" ]] && cmp -s "$source_root/$file" "$target_root/$file"; then continue; fi
+    if [[ -f "$target_root/$file" && "$(stat -c '%a' "$target_root/$file")" == 644 ]] && cmp -s "$source_root/$file" "$target_root/$file"; then continue; fi
     mkdir -p "$stage_root/$parent"
     cp -p "$source_root/$file" "$stage_root/$file"
     if [[ -f "$target_root/$file" ]]; then
@@ -102,7 +103,8 @@ rollback() {
     trap - ERR
     set +e
     if [[ "$applied" == true ]]; then
-        rsync -a --exclude=.env "$backup_root/old/" "$target_root/"
+        rsync -a --chmod=D755,F644 --exclude=.env "$backup_root/old/" "$target_root/"
+        chmod "$target_root_mode" "$target_root"
         while IFS= read -r -d '' file; do
             case "$file" in public/*) continue ;; esac
             [[ ! -L "$target_root/$file" ]] && rm -f -- "$target_root/$file"

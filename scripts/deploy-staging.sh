@@ -127,6 +127,13 @@ cd "$target_root"
 [[ ! -f storage/framework/down ]] || fail 'Staging is already in maintenance mode; leave its existing state untouched.'
 "$php_bin" artisan down --retry=10
 applied=true
+# Explicit parents avoid private umask defaults for newly introduced public paths.
+while IFS= read -r -d '' file; do
+    parent="$(dirname "$file")"
+    if [[ "$parent" != . ]]; then
+        install -d -m 755 "$target_root/$parent"
+    fi
+done < "$backup_root/changed-files"
 rsync -a --no-implied-dirs --chmod=D755,F644 --from0 --files-from="$backup_root/changed-files" "$stage_root/" "$target_root/"
 if [[ "$dependencies_changed" == true ]]; then
     "$php_bin" "$composer_bin" install --no-dev --prefer-dist --no-interaction --optimize-autoloader --no-scripts

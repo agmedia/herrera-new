@@ -610,9 +610,44 @@
             suggestionsList.addEventListener('wheel', dismissMobileKeyboard, { passive: true });
         }
 
+        const leavesCurrentDocument = function (event, link) {
+            if (!link || event.defaultPrevented || (event.button !== undefined && event.button !== 0)
+                || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
+                || link.hasAttribute('download')) {
+                return false;
+            }
+
+            const target = (link.getAttribute('target') || '').trim().toLowerCase();
+            if (target && target !== '_self') {
+                return false;
+            }
+
+            try {
+                const destination = new URL(link.href, window.location.href);
+                const current = new URL(window.location.href);
+                if (!['http:', 'https:'].includes(destination.protocol)) {
+                    return false;
+                }
+
+                const sameDocument = destination.origin === current.origin
+                    && destination.pathname === current.pathname && destination.search === current.search;
+                return !sameDocument || !destination.href.includes('#');
+            } catch {
+                return false;
+            }
+        };
+
         document.addEventListener('click', function (event) {
             const target = event.target;
             if (isOpen && !panel.contains(target) && !Array.from(toggles).some((toggle) => toggle.contains(target))) {
+                if (!leavesCurrentDocument(event, target?.closest?.('a[href]'))) {
+                    closePanel();
+                }
+            }
+        });
+
+        window.addEventListener('pageshow', function (event) {
+            if (event.persisted) {
                 closePanel();
             }
         });

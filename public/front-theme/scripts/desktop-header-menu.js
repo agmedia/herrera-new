@@ -670,9 +670,39 @@
                 event.stopPropagation();
             });
         });
+        const leavesCurrentDocument = (event, link) => {
+            if (event.defaultPrevented || (event.button !== undefined && event.button !== 0)
+                || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey
+                || link.hasAttribute('download')) {
+                return false;
+            }
+
+            const target = (link.getAttribute('target') || '').trim().toLowerCase();
+            if (target && target !== '_self') {
+                return false;
+            }
+
+            try {
+                const destination = new URL(link.href, window.location.href);
+                const current = new URL(window.location.href);
+                if (!['http:', 'https:'].includes(destination.protocol)) {
+                    return false;
+                }
+
+                const sameDocument = destination.origin === current.origin
+                    && destination.pathname === current.pathname && destination.search === current.search;
+                const hasFragment = destination.href.includes('#');
+                return !sameDocument || !hasFragment;
+            } catch {
+                return false;
+            }
+        };
         menuLinks.forEach((link) => {
-            link.addEventListener('click', () => {
-                closeMenu();
+            link.addEventListener('click', (event) => {
+                // Keep the outgoing page still while a new document is loading.
+                if (!leavesCurrentDocument(event, link)) {
+                    closeMenu();
+                }
             });
         });
 

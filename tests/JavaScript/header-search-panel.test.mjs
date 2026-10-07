@@ -33,7 +33,7 @@ function harness({ enabled = true, mobile = false, persistent = true, breakpoint
             appendChild(child) { this.children.push(child); },
             setAttribute(name, value) { attributes.set(name, value); },
             getAttribute(name) { return attributes.get(name); },
-            hasAttribute() { return true; },
+            hasAttribute(name) { return attributes.has(name); },
             contains(target) { return this === target || this.children.some((child) => child.contains(target)); },
             getBoundingClientRect() { return { top: 0 }; },
             querySelectorAll() { return []; },
@@ -71,7 +71,7 @@ function harness({ enabled = true, mobile = false, persistent = true, breakpoint
     toggle.focus = () => { document.activeElement = toggle; };
     const media = Object.assign(events(), { matches: mobile });
     const window = Object.assign(events(), {
-        location: { origin: 'https://shop.example', assign() {} }, scrollY: 0, scrollTo() {},
+        location: { origin: 'https://shop.example', href: 'https://shop.example/shop', assign() {} }, scrollY: 0, scrollTo() {},
         matchMedia(query) { media.query = query; return media; },
         setTimeout(callback, delay) { const id = ++timerId; timers.set(id, { callback, at: now + delay }); return id; },
         clearTimeout(id) { timers.delete(id); },
@@ -215,6 +215,48 @@ test('outside clicks close mobile search without a delayed focus reopening it; d
     page.media.matches = true;
     page.media.emit('change');
     assert.equal(page.panel.getAttribute('aria-hidden'), 'true');
+});
+
+function outsideLink(href = '/categories/rasvjeta', attributes = {}) {
+    return {
+        href: new URL(href, 'https://shop.example/shop').href,
+        closest() { return this; },
+        hasAttribute(name) { return Object.hasOwn(attributes, name); },
+        getAttribute(name) { return attributes[name] || null; },
+    };
+}
+
+test('full-page links preserve outgoing mobile search and keyboard until navigation; Back closes it', () => {
+    const page = harness({ mobile: true, persistent: false, breakpoint: '1023' });
+    page.toggle.emit('click'); page.advance(260);
+    let prevented = false;
+    page.document.emit('click', { target: outsideLink(), button: 0, preventDefault() { prevented = true; } });
+    assert.equal(page.panel.classList.contains('is-open'), true);
+    assert.equal(page.document.activeElement, page.input);
+    assert.equal(prevented, false);
+    page.window.emit('pageshow', { persisted: false });
+    assert.equal(page.panel.classList.contains('is-open'), true);
+    page.window.emit('pageshow', { persisted: true });
+    assert.equal(page.panel.classList.contains('is-open'), false);
+    assert.equal(page.document.activeElement, null);
+});
+
+test('same-document and auxiliary links still close mobile search', () => {
+    const cases = [
+        { href: '#catalog' }, { href: '/shop#' }, { href: 'mailto:info@example.com' },
+        { href: 'javascript:void(0)' }, { event: { ctrlKey: true } },
+        { event: { metaKey: true } }, { event: { shiftKey: true } },
+        { event: { altKey: true } }, { event: { button: 1 } },
+        { event: { defaultPrevented: true } },
+        { attributes: { target: '_blank' } }, { attributes: { download: '' } },
+    ];
+    for (const entry of cases) {
+        const page = harness({ mobile: true, persistent: false, breakpoint: '1023' });
+        page.toggle.emit('click'); page.advance(260);
+        page.document.emit('click', { target: outsideLink(entry.href, entry.attributes), button: 0, ...entry.event });
+        assert.equal(page.panel.classList.contains('is-open'), false, JSON.stringify(entry));
+        assert.equal(page.document.activeElement, null);
+    }
 });
 
 test('page-local result cache stays bounded and evicts older searches', async () => {

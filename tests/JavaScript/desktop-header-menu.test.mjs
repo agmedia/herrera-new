@@ -5,12 +5,13 @@ import vm from 'node:vm';
 
 const script = readFileSync(new URL('../../public/front-theme/scripts/desktop-header-menu.js', import.meta.url), 'utf8');
 
-function harness({ savedSections = {} } = {}) {
+function harness({ savedSections = {}, hrefs = [] } = {}) {
     const queuedToggles = new Set();
     class Element {
         constructor() {
             this.dataset = {};
             this.listeners = new Map();
+            this.attributes = new Map();
             const classes = new Set();
             this.classList = {
                 add: (value) => classes.add(value), remove: (value) => classes.delete(value),
@@ -27,7 +28,11 @@ function harness({ savedSections = {} } = {}) {
         }
         querySelector() { return null; }
         querySelectorAll() { return []; }
-        hasAttribute() { return false; }
+        hasAttribute(name) { return this.attributes.has(name); }
+        getAttribute(name) { return this.attributes.get(name) || null; }
+        setAttribute(name, value) { this.attributes.set(name, value); }
+        removeAttribute(name) { this.attributes.delete(name); }
+        closest() { return null; }
         getBoundingClientRect() { return { height: 72 }; }
     }
     class Details extends Element {
@@ -46,11 +51,15 @@ function harness({ savedSections = {} } = {}) {
     const panel = new Element();
     const overlay = new Element();
     const sections = Object.keys(savedSections).map((key) => new Details(key));
+    const links = hrefs.map((href) => Object.assign(new Element(), {
+        href: new URL(href, 'https://shop.example/shop').href,
+    }));
     root.querySelector = (selector) => ({
         '[data-mobile-menu-panel]': panel, '[data-mobile-menu-close]': overlay,
     })[selector] || null;
     root.querySelectorAll = (selector) => ({
         '[data-mobile-menu-accordion]': sections, '[data-mobile-menu-close]': [overlay],
+        'a[href]': links,
     })[selector] || [];
     const document = new Element();
     document.body = new Element(); document.readyState = 'complete';
@@ -71,7 +80,7 @@ function harness({ savedSections = {} } = {}) {
         document, window, sessionStorage, URL, HTMLElement: Element, HTMLDetailsElement: Details,
     });
     return {
-        root, header, window, document, openButton, overlay, sections, storage,
+        root, header, window, document, openButton, overlay, sections, storage, links,
         open() { openButton.emit('click', { preventDefault() {}, currentTarget: openButton }); },
         flushToggles() {
             while (queuedToggles.size > 0) {
@@ -122,4 +131,37 @@ test('opening the menu repeatedly keeps current accordion state without re-readi
     page.open(); page.overlay.emit('click'); page.open();
     assert.equal(page.sections[0].open, true);
     assert.equal(page.storage.reads, readsAfterInit);
+});
+
+test('ordinary full-page link navigation keeps the outgoing drawer and scroll lock still', () => {
+    const page = harness({ hrefs: ['/categories/rasvjeta'] });
+    page.open();
+    let prevented = false;
+    page.links[0].emit('click', { button: 0, preventDefault() { prevented = true; } });
+    assert.equal(page.root.dataset.menuOpen, '1');
+    assert.equal(page.document.body.classList.contains('overflow-hidden'), true);
+    assert.equal(prevented, false);
+    page.window.emit('pageshow', { persisted: true });
+    assert.equal(page.root.dataset.menuOpen, '0');
+});
+
+test('manual closing and same-document, auxiliary, download or canceled links still dismiss the drawer', () => {
+    const cases = [
+        { href: '#catalog' }, { href: '/shop#' }, { href: 'tel:+38512345' },
+        { href: 'javascript:void(0)' }, { event: { ctrlKey: true } },
+        { event: { metaKey: true } }, { event: { shiftKey: true } },
+        { event: { altKey: true } }, { event: { button: 1 } },
+        { event: { defaultPrevented: true } },
+        { attributes: { target: '_blank' } }, { attributes: { download: '' } },
+    ];
+    for (const entry of cases) {
+        const page = harness({ hrefs: [entry.href || '/categories/rasvjeta'] });
+        for (const [name, value] of Object.entries(entry.attributes || {})) page.links[0].setAttribute(name, value);
+        page.open();
+        page.links[0].emit('click', { button: 0, ...entry.event });
+        assert.equal(page.root.dataset.menuOpen, '0', JSON.stringify(entry));
+        assert.equal(page.document.body.classList.contains('overflow-hidden'), false);
+    }
+    const page = harness(); page.open(); page.overlay.emit('click');
+    assert.equal(page.root.dataset.menuOpen, '0');
 });

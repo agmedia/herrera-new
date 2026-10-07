@@ -42,7 +42,7 @@
     <link rel="stylesheet" href="{{ asset('front-theme/styles/termol-overrides.css') }}?v={{ filemtime(public_path('front-theme/styles/termol-overrides.css')) }}-{{ $storefrontAssetVersion }}">
     <link rel="stylesheet" href="{{ asset('front-theme/styles/header-cart-popover.css') }}?v={{ filemtime(public_path('front-theme/styles/header-cart-popover.css')) }}-{{ $storefrontAssetVersion }}">
     {{-- Configurable storefront values remain external so product markup contains no inline CSS. --}}
-    <link rel="stylesheet" data-storefront-settings href="{{ route('front.storefront.styles', ['v' => $storefrontAssetVersion]) }}">
+    <link rel="stylesheet" data-storefront-settings href="{{ route('front.storefront.styles', ['v' => app(\App\Services\Front\StorefrontStylesService::class)->version()]) }}">
     <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera.css')) }}-{{ $storefrontAssetVersion }}">
     @if (str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera'))
         <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-b2b.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-b2b.css')) }}-{{ $storefrontAssetVersion }}">

@@ -35,4 +35,9 @@ class StorefrontStylesService
             $announcement['scroll_duration_seconds'],
         );
     }
+
+    public function version(?string $css = null): string
+    {
+        return hash('sha256', $css ?? $this->css());
+    }
 }

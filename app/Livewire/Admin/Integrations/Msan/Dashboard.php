@@ -164,11 +164,15 @@ class Dashboard extends Component
 
     private function authorizeView(): void
     {
+        abort_unless(\App\Support\Integrations\MsanModule::available(), 404);
+
         abort_unless($this->canView(), 403);
     }
 
     private function authorizeSync(): void
     {
+        abort_unless(\App\Support\Integrations\MsanModule::available(), 404);
+
         abort_unless($this->canSync(), 403);
     }
 

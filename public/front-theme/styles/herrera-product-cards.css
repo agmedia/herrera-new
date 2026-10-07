@@ -1,0 +1,83 @@
+/* Shared Herrera purchase controls for home, catalog and product carousels. */
+.herrera-storefront .product-card-lined .product-card-lined-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    gap: 8px;
+}
+
+.herrera-storefront .product-card-lined .product-card-lined-qty {
+    width: 100%;
+    min-width: 0;
+    height: 44px;
+    grid-template-columns: 28px minmax(0, 1fr) 28px;
+    overflow: hidden;
+    border-color: #cfdee2;
+    border-radius: 6px;
+}
+
+.herrera-storefront .product-card-lined .product-card-lined-qty:focus-within {
+    outline: 2px solid #007b8b;
+    outline-offset: 2px;
+}
+
+.herrera-storefront .product-card-lined .product-card-lined-qty > button:is(:hover, :focus-visible) {
+    background: #edf7f9;
+    color: #007b8b;
+}
+
+.herrera-storefront .product-card-lined .product-card-lined-qty > button:focus-visible {
+    box-shadow: inset 0 0 0 2px #007b8b;
+}
+
+.herrera-storefront .product-card-lined .product-card-lined-controls .product-card-lined-cart {
+    width: 44px;
+    min-width: 0;
+    height: 44px;
+    border-color: #007b8b;
+    border-radius: 6px !important;
+    background: #007b8b;
+    color: #fff;
+}
+
+.herrera-storefront .product-card-lined .product-card-lined-cart:is(:hover, :focus-visible) {
+    border-color: #24353b;
+    background: #24353b;
+    color: #fff;
+}
+
+.herrera-storefront .product-card-lined .product-card-lined-cart:focus-visible,
+.herrera-storefront .product-card-lined .product-size-radio:focus-visible + .product-size-label-text {
+    outline: 2px solid #007b8b;
+    outline-offset: 2px;
+}
+
+.herrera-storefront .product-card-lined .product-size-label-text {
+    border-radius: 4px;
+}
+
+.herrera-storefront .product-card-lined .product-size-radio:checked + .product-size-label-text {
+    border-color: #007b8b;
+    background: #007b8b;
+    color: #fff;
+}
+
+.herrera-storefront .product-card-lined .product-size-label-text:hover,
+.herrera-storefront .product-card-lined .product-size-radio:checked + .product-size-label-text:hover {
+    border-color: #24353b;
+    background: #24353b;
+    color: #fff;
+}
+
+@media (max-width: 479px) {
+    .herrera-storefront .product-card-lined .product-card-lined-controls {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .herrera-storefront .product-card-lined .product-card-lined-qty {
+        grid-template-columns: 44px minmax(0, 1fr) 44px;
+    }
+
+    .herrera-storefront .product-card-lined .product-card-lined-controls .product-card-lined-cart {
+        width: 100%;
+    }
+}

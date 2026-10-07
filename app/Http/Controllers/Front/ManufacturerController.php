@@ -7,7 +7,7 @@ use App\Http\Controllers\Front\Concerns\ResolvesFrontendView;
 use App\Models\Catalog\Manufacturer\Manufacturer;
 use App\Services\Catalog\CatalogFeatureService;
 use App\Services\Content\ContentBlockResolver;
-use App\Support\Media\MediaUrl;
+use App\Support\Media\ManufacturerLogo;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -117,10 +117,7 @@ class ManufacturerController extends Controller
                 ?? $manufacturer->translations->firstWhere('locale', $fallbackLocale)
                 ?? $manufacturer->translations->first();
             $name = trim((string) ($translation?->name ?: $manufacturer->code));
-            $logo = $manufacturer->getFirstMedia('manufacturer_logo');
-            $uploadedLogoUrl = MediaUrl::hasUsableOriginal($logo) ? (string) $logo->getUrl() : null;
-            $knownLogoUrl = trim((string) config('manufacturer_logos.'.$manufacturer->code, ''));
-            $logoUrl = $uploadedLogoUrl ?: ($knownLogoUrl !== '' ? $knownLogoUrl : null);
+            $logo = ManufacturerLogo::resolve($manufacturer);
             $nameParts = preg_split('/\s+/u', $name, -1, PREG_SPLIT_NO_EMPTY) ?: [];
             $initials = collect($nameParts)
                 ->take(2)
@@ -133,7 +130,8 @@ class ManufacturerController extends Controller
                 'slug' => $translation?->slug ?? (string) $manufacturer->id,
                 'letter' => $this->manufacturerInitial($name),
                 'initials' => Str::upper($initials !== '' ? $initials : mb_substr($name, 0, 2)),
-                'logo_url' => $logoUrl,
+                'logo_url' => $logo['url'],
+                'logo_variant' => $logo['variant'],
                 'products_count' => (int) $manufacturer->products_count,
             ];
         });

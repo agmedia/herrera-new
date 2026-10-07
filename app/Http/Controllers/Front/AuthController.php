@@ -10,6 +10,7 @@ use App\Models\User\UserAddress;
 use App\Models\User\UserProfile;
 use App\Services\Front\AddressDirectoryService;
 use App\Services\Front\StoreSettingsService;
+use App\Services\Pricing\B2BAccessService;
 use App\Services\User\DefaultCustomerGroupAssigner;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Auth\Events\Registered;
@@ -92,8 +93,12 @@ class AuthController extends Controller
         return redirect()->to($this->resolveIntendedPath($request));
     }
 
-    public function showRegister(Request $request): View
+    public function showRegister(Request $request): View|RedirectResponse
     {
+        if (app(B2BAccessService::class)->requiresApprovedAccount()) {
+            return redirect()->route('front.auth.b2b-register');
+        }
+
         return view($this->frontendView($request, 'auth.register'), [
             'countryOptions' => $this->addressDirectory->countries((string) app()->getLocale()),
             'placesAssetUrl' => $this->addressDirectory->placesAssetUrl(),
@@ -307,6 +312,10 @@ class AuthController extends Controller
 
     public function register(Request $request): RedirectResponse
     {
+        if (app(B2BAccessService::class)->requiresApprovedAccount()) {
+            return $this->registerB2B($request);
+        }
+
         $captchaSettings = $this->storeSettings->captcha();
         $captchaEnabled = $this->recaptchaIsEnabled($captchaSettings);
 

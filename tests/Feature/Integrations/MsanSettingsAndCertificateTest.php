@@ -14,6 +14,7 @@ use Tests\TestCase;
 class MsanSettingsAndCertificateTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\EnablesLegacyMsanModule;
 
     public function test_admin_values_never_return_secrets_and_blank_values_preserve_encrypted_secrets(): void
     {

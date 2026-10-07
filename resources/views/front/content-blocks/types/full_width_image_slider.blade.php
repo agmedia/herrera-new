@@ -105,13 +105,13 @@
                 $price = $pricing->forProduct($product, $viewer);
                 $imageUrl = \App\Support\Media\MediaUrl::conversionOrNull($mainMedia, 'card_320w', $preferWebp)
                     ?? \App\Support\Media\MediaUrl::conversionOrNull($mainMedia, 'card_480w', $preferWebp)
-                    ?? ($mainMedia ? (string) $mainMedia->getUrl() : null);
+                    ?? \App\Support\Media\LegacyCatalogImage::first($product, ['card_320w', 'card_480w'], $preferWebp);
 
                 return [
                     (int) $product->id => [
                         'name' => (string) $translation->name,
                         'url' => route('products.show', ['slug' => $translation->slug]),
-                        'price' => number_format((float) ($price['current_gross'] ?? 0), 2).' €',
+                        'price' => ($price['can_view_price'] ?? true) ? number_format((float) ($price['display_current'] ?? $price['current_gross'] ?? 0), 2).' €'.(($price['display_includes_tax'] ?? true) === false ? ' '.__('ui.b2b.pricing.excludes_tax') : '') : __('ui.b2b.pricing.access_required'),
                         'image_url' => $imageUrl,
                     ],
                 ];

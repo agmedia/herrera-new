@@ -248,7 +248,7 @@ return [
             'summary' => 'Central list of reusable attribute groups from manual and imported sources.',
             'bullets' => [
                 'Open a group to see and manage only its attribute values.',
-                'Source badges distinguish manual, Termol, Kozo, M SAN and other imported filter values.',
+                'Source badges distinguish manual and imported filter values.',
                 'Create the group first, then add its available attribute values.',
             ],
         ],
@@ -665,29 +665,25 @@ return [
                 ],
             ],
         ],
-        'admin.integrations.msan.*' => [
-            'title' => 'Integracije / M SAN',
-            'summary' => 'Upravljanje vezom prema M SAN-u, lokalnom radnom kopijom kataloga te kontroliranim uvozom odabranih artikala.',
+        'admin.integrations.eprel.*' => [
+            'title' => 'Integracije / EPREL',
+            'summary' => 'Službeni energetski podaci za proizvode lokalnog kataloga, neovisno o dobavljačkim integracijama.',
             'sections' => [
                 [
-                    'title' => 'Preporučeni redoslijed',
+                    'title' => 'Priprema',
                     'items' => [
-                        '1) U Postavkama spremite certifikat i PIN te provjerite vezu.',
-                        '2) Na Pregledu dohvatite katalog u lokalnu radnu kopiju.',
-                        '3) Mapirajte ili zanemarite dobavljačke kategorije.',
-                        '4) U Artiklima odaberite proizvode koji smiju ući u webshop.',
-                        '5) U Artiklima pokrenite uvoz samo prethodno odabranih proizvoda.',
-                        '6) U Izvršavanjima provjerite sažetak i eventualne pogreške.',
+                        'U EPREL postavkama spremite API ključ i uključite dohvat.',
+                        'Odaberite prikladne kategorije i EPREL grupu pa najprije provjerite mali probni opseg.',
+                        'Za pouzdano podudaranje koristite originalnu šifru modela, proizvođača i valjani EAN.',
                     ],
                 ],
                 [
-                    'title' => 'Sigurnost i kontrola',
+                    'title' => 'Sigurnost',
                     'items' => [
-                        'PIN i privatni ključ nikada se ne prikazuju nakon spremanja.',
-                        'Dohvat kataloga ne objavljuje proizvode na webshopu.',
-                        'Novi artikli trebaju ostati neaktivni dok ih administrator ne provjeri.',
-                        'Početna sinkronizacija ne uvozi zasebni M SAN skup strukturiranih karakteristika za filtre; on je predviđen za drugu fazu zbog veličine do 1 GB i ograničenja jednog poziva na sat.',
-                        'Sinkronizaciju nemojte pokretati češće od ograničenja M SAN servisa.',
+                        'API ključ pohranjuje se šifrirano i ne prikazuje se nakon spremanja.',
+                        'Dohvat ne mijenja cijene, zalihe ni dostupnost proizvoda.',
+                        'Ne postoji svaki artikl u EPREL-u; izostanak zapisa nije potvrda greške artikla.',
+                        'Provjerite podudaranja i moguće sukobe s ručno potvrđenim energetskim podacima.',
                     ],
                 ],
             ],

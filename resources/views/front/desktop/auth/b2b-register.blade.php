@@ -107,7 +107,11 @@
                         <span>
                             {{ __('ui.auth.register.b2b_accuracy') }}
                             {{ __('ui.auth.register.terms_prefix') }}
-                            <a href="{{ route('pages.show', ['slug' => 'uvjeti-koristenja']) }}" class="font-semibold text-blue-700 underline underline-offset-2" target="_blank" rel="noopener noreferrer">{{ __('ui.auth.register.terms_link') }}</a>.
+                            @if (!empty($storeSettings['legal']['terms']['url']))
+                                <a href="{{ $storeSettings['legal']['terms']['url'] }}" class="font-semibold text-blue-700 underline underline-offset-2" target="_blank" rel="noopener noreferrer">{{ $storeSettings['legal']['terms']['title'] }}</a>.
+                            @else
+                                {{ __('ui.auth.register.terms_link') }}.
+                            @endif
                         </span>
                     </label>
                     @error('terms_accepted')

@@ -19,9 +19,14 @@
             @php
                 $mt = $manufacturer->translations->firstWhere('locale', app()->getLocale())
                     ?? $manufacturer->translations->firstWhere('locale', config('app.locale'));
+                $manufacturerLogo = \App\Support\Media\ManufacturerLogo::resolve($manufacturer);
             @endphp
             <article class="{{ $cardClass }}">
-                <div class="h-28 rounded-xl bg-gradient-to-br from-slate-200 to-slate-100"></div>
+                @if ($manufacturerLogo['url'])
+                    <div class="manufacturer-block-logo {{ $manufacturerLogo['variant'] !== '' ? 'manufacturer-logo--'.$manufacturerLogo['variant'] : '' }}">
+                        <img src="{{ $manufacturerLogo['url'] }}" alt="{{ $mt?->name ?? $manufacturer->code }}" width="160" height="64" loading="lazy" decoding="async">
+                    </div>
+                @endif
                 <h3 class="mt-3 text-sm font-semibold text-slate-900">{{ $mt?->name ?? $manufacturer->code }}</h3>
             </article>
         @empty
@@ -31,4 +36,3 @@
         @endforelse
     </div>
 </section>
-

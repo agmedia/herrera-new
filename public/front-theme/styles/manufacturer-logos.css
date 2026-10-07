@@ -1,0 +1,80 @@
+/* Display the original manufacturer artwork consistently across brand lists. */
+.manufacturer-block-logo {
+    display: flex;
+    width: min(100%, 180px);
+    height: 72px;
+    align-items: center;
+    justify-content: center;
+}
+
+.manufacturer-block-logo img {
+    width: 100%;
+    max-width: 160px;
+    height: 64px;
+    object-fit: contain;
+}
+
+.manufacturer-logo--struhm {
+    width: min(100%, 152px);
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 152 / 45;
+    align-items: flex-start;
+    overflow: hidden;
+}
+
+.manufacturer-logo--struhm img {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    height: auto;
+    max-height: none;
+    transform: translateY(-3px);
+}
+
+.manufacturer-logo--midea,
+.manufacturer-logo--gewiss {
+    overflow: hidden;
+}
+
+.popular-brand-logo.manufacturer-logo--midea,
+.popular-brand-logo.manufacturer-logo--gewiss {
+    display: flex;
+    width: min(100%, 180px);
+    height: 64px;
+    min-height: 64px;
+    align-items: center;
+    justify-content: center;
+}
+
+.manufacturer-logo--midea img {
+    width: 276px;
+    min-width: 276px;
+    max-width: none;
+    height: auto;
+    max-height: none;
+}
+
+.manufacturer-logo--gewiss img {
+    width: 174px;
+    min-width: 174px;
+    max-width: none;
+    height: auto;
+    max-height: none;
+}
+
+.manufacturer-logo--on-red {
+    border-radius: 5px;
+    background: #da2735;
+    padding: 10px;
+}
+
+.manufacturer-logo--on-dark {
+    border-radius: 5px;
+    background: #26353a;
+    padding: 10px;
+}
+
+.popular-brand-card:hover .manufacturer-logo--struhm img {
+    transform: translateY(-3px) scale(1.025);
+}

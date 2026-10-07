@@ -180,6 +180,8 @@
                                     <option value="facebook">Facebook</option>
                                     <option value="youtube">YouTube</option>
                                     <option value="instagram">Instagram</option>
+                                    <option value="linkedin">LinkedIn</option>
+                                    <option value="twitter">X / Twitter</option>
                                 </select>
                             </div>
                             <div>

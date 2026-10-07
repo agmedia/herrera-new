@@ -209,7 +209,7 @@
                 + max(0, count($eprelBrandCriteria) - 2);
             $currentAdmin = auth()->user();
             $canManageEprelSettings = $currentAdmin
-                && ($currentAdmin->isA('superadmin') || $currentAdmin->can('integrations.msan.settings.manage'));
+                && ($currentAdmin->isA('superadmin') || $currentAdmin->can('integrations.eprel.settings.manage'));
             $isValidHttpsUrl = static function ($value): bool {
                 $value = trim((string) $value);
                 $parts = filter_var($value, FILTER_VALIDATE_URL) !== false ? parse_url($value) : false;
@@ -244,7 +244,7 @@
             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                     <p class="admin-section-title">{{ __('Energetske oznake i informacijski listovi') }}</p>
-                    <p class="mt-1 max-w-3xl text-sm text-slate-600">{{ __('Za svaki kontekst proizvoda možete spremiti zasebnu energetsku klasu. Uvezene M SAN/EPREL deklaracije su samo za čitanje; ručne deklaracije ostaju sačuvane pri sljedećoj sinkronizaciji.') }}</p>
+                    <p class="mt-1 max-w-3xl text-sm text-slate-600">{{ __('Za svaki kontekst proizvoda možete spremiti zasebnu energetsku klasu. Uvezene i službene EPREL deklaracije su samo za čitanje; ručne deklaracije ostaju sačuvane pri sljedećoj sinkronizaciji.') }}</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <button
@@ -271,7 +271,7 @@
                                 <span class="rounded-full border border-cyan-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-800">{{ __('Službeni EU podaci') }}</span>
                             </div>
                             <p class="mt-2 text-sm leading-6 text-slate-600">
-                                {{ __('Jednim klikom tražimo točno podudaranje po EPREL broju, GTIN/EAN barkodu, M SAN modelu, part numberu, SKU-u i šifri artikla. Klasa, raspon i službene poveznice popunit će se automatski.') }}
+                                {{ __('Jednim klikom tražimo točno podudaranje po EPREL broju, GTIN/EAN barkodu, izvornom modelu, oznaci proizvođača, SKU-u i šifri artikla. Klasa, raspon i službene poveznice popunit će se automatski.') }}
                             </p>
                         </div>
                         <div class="flex shrink-0 items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900">
@@ -370,9 +370,9 @@
                         </div>
                     @elseif (! $eprelLookupReady)
                         <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                            {{ __('Za automatski dohvat uključite EPREL i spremite API ključ u postavkama integracije.') }}
+                            {{ __('Za dohvat uključite EPREL i spremite API ključ u samostalnim EPREL postavkama.') }}
                             @if ($canManageEprelSettings)
-                                <a href="{{ route('admin.integrations.msan.settings') }}" class="ml-1 font-semibold underline underline-offset-2">{{ __('Otvori postavke') }}</a>
+                                <a href="{{ route('admin.integrations.eprel.settings') }}" class="ml-1 font-semibold underline underline-offset-2">{{ __('Otvori postavke') }}</a>
                             @else
                                 <span class="ml-1 font-medium">{{ __('Obratite se administratoru sustava.') }}</span>
                             @endif

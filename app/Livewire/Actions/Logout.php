@@ -12,6 +12,18 @@ class Logout
      */
     public function __invoke(): void
     {
+        $request = request();
+        if (! $request->hasSession()) {
+            $request->setLaravelSession(Session::driver());
+        }
+
+        $impersonation = app(\App\Services\User\CustomerImpersonationService::class);
+        if ($impersonation->isActive($request)) {
+            $impersonation->stop($request);
+
+            return;
+        }
+
         Auth::guard('web')->logout();
 
         Session::invalidate();

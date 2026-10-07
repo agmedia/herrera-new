@@ -1,0 +1,368 @@
+/* Herrera product presentation; shared pricing, variants and cart hooks stay intact. */
+.herrera-storefront .product-detail-shell {
+    width: 100%;
+    color: #24353b;
+}
+.herrera-storefront .product-detail-hero,
+.herrera-storefront .product-detail-breadcrumb {
+    max-width: none;
+}
+.herrera-storefront .product-detail-breadcrumb {
+    margin-bottom: 20px;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.6;
+    letter-spacing: 0;
+    text-transform: none;
+}
+.herrera-storefront .product-detail-breadcrumb a:hover,
+.herrera-storefront .product-detail-breadcrumb a:focus-visible {
+    color: var(--herrera-action);
+}
+.herrera-storefront .product-detail-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(28px, 3.2vw, 60px);
+}
+.herrera-storefront .product-detail-layout > aside {
+    position: static;
+    min-width: 0;
+}
+.herrera-storefront .product-gallery-main {
+    border-color: #dfe8eb;
+    border-radius: 12px;
+}
+.herrera-storefront .product-gallery-slide-button {
+    height: auto;
+    aspect-ratio: 1;
+    max-height: 640px;
+}
+.herrera-storefront .product-gallery-slide-image {
+    padding: clamp(20px, 3vw, 48px);
+}
+.herrera-storefront .product-gallery-thumbnail {
+    border-color: #dfe8eb;
+    border-radius: 6px;
+}
+.herrera-storefront .product-gallery-thumbnail:is(:hover, :focus-visible, .is-active) {
+    border-color: var(--herrera-action);
+}
+.herrera-storefront .product-gallery-main .splide__arrow {
+    color: var(--herrera-action);
+}
+.herrera-storefront .product-gallery-main .splide__arrow:is(:hover, :focus-visible):not(:disabled) {
+    border-color: #24353b;
+    background: #24353b;
+    color: #fff;
+}
+.herrera-storefront .product-gallery-main .splide__arrow svg {
+    fill: currentColor;
+}
+.herrera-storefront .product-gallery-main .splide__arrow:focus-visible {
+    outline: 2px solid var(--herrera-action);
+    outline-offset: 3px;
+}
+.herrera-storefront .product-detail-title {
+    margin: 0 0 14px;
+    color: #24353b;
+    font-size: clamp(24px, 1.85vw, 34px);
+    font-weight: 650;
+    line-height: 1.3;
+    letter-spacing: -.035em;
+    overflow-wrap: anywhere;
+}
+.herrera-storefront .product-detail-identifier {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 0 18px 4px 0;
+    font-size: 13px;
+    line-height: 1.6;
+}
+.herrera-storefront .product-detail-identifier span {
+    color: #24353b;
+    font-weight: 500;
+}
+.herrera-storefront .product-detail-brand {
+    margin-top: 8px;
+    font-size: 13px;
+}
+.herrera-storefront .product-detail-brand a {
+    display: inline-flex;
+    padding: 5px 10px;
+    border: 1px solid #dfe8eb;
+    border-radius: 4px;
+    font-weight: 500;
+}
+.herrera-storefront .product-detail-brand a:hover {
+    border-color: var(--herrera-action);
+    color: var(--herrera-action);
+}
+.herrera-storefront [data-product-detail-form] .product-size-label {
+    border-radius: 6px;
+    font-weight: 500;
+}
+.herrera-storefront [data-product-detail-form] .product-size-radio:checked + .product-size-label,
+.herrera-storefront [data-product-detail-form] .product-size-radio:checked + .product-size-label span {
+    border-color: var(--herrera-action);
+    background: var(--herrera-action);
+}
+.herrera-storefront [data-product-detail-form] .product-size-radio:focus-visible + .product-size-label,
+.herrera-storefront [data-product-detail-form] select:focus-visible {
+    outline: 2px solid var(--herrera-action);
+    outline-offset: 3px;
+}
+.herrera-storefront .product-color-variant-link:is(:hover, :focus-visible, [aria-current=true]) {
+    border-color: var(--herrera-action);
+    box-shadow: 0 0 0 2px #007b8b1a;
+}
+.herrera-storefront .product-detail-pricing {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid #e2ecee;
+}
+.herrera-storefront .product-detail-pricing [data-product-price-current] {
+    font-size: 32px;
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: -.035em;
+}
+.herrera-storefront .product-detail-pricing [data-product-price-b2b] {
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 500;
+}
+.herrera-storefront .product-detail-pricing :is([data-price-excludes-tax], .product-detail-tax-note, .product-detail-net-price) {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+.herrera-storefront .product-detail-pricing .b2b-price-access {
+    padding: 18px;
+    border: 1px solid #d6e9ed;
+    border-radius: 8px;
+    background: #edf7f9;
+    font-size: 14px;
+    line-height: 1.65;
+}
+.herrera-storefront .product-detail-pricing .b2b-price-access a {
+    font-weight: 600;
+}
+.herrera-storefront .product-detail-card [data-product-availability] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+.herrera-storefront .product-detail-card [data-product-availability] > div {
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid #e2ecee;
+    border-radius: 6px;
+    background: #f7fafb;
+}
+.herrera-storefront .product-detail-card [data-product-availability] dd {
+    font-size: 14px;
+}
+.herrera-storefront .product-detail-card [data-product-detail-form] {
+    margin-top: 20px;
+}
+.herrera-storefront .product-detail-quantity-control {
+    width: 144px;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    border-color: #cfdee2;
+    border-radius: 6px;
+}
+.herrera-storefront .product-detail-quantity-control input {
+    border-color: #e2ecee;
+    font-size: 15px;
+    font-weight: 500;
+}
+.herrera-storefront .product-detail-quantity-control button:hover {
+    background: #edf7f9;
+    color: var(--herrera-action);
+}
+.herrera-storefront .product-detail-quantity-control:focus-within {
+    outline: 2px solid var(--herrera-action);
+    outline-offset: 3px;
+}
+.herrera-storefront .product-detail-quantity-control button:focus-visible {
+    outline: none;
+    background: #edf7f9;
+    color: var(--herrera-action);
+    box-shadow: inset 0 0 0 2px var(--herrera-action);
+}
+.herrera-storefront .product-detail-action {
+    border-color: var(--herrera-action);
+    background: var(--herrera-action);
+    color: #fff;
+    transition: background-color .16s ease, border-color .16s ease;
+}
+.herrera-storefront .product-detail-action:hover,
+.herrera-storefront .product-detail-action:focus-visible {
+    border-color: #24353b;
+    background: #24353b;
+}
+.herrera-storefront .product-detail-cart-button {
+    font-size: 14px;
+    font-weight: 600;
+}
+.herrera-storefront .product-detail-shell [data-ga4-add-to-cart-form] .product-detail-cart-button,
+.herrera-storefront .product-floating-cart .product-detail-cart-button {
+    border-radius: 6px !important;
+}
+.herrera-storefront .product-detail-wishlist {
+    border: 1px solid #dfe8eb;
+    border-radius: 6px;
+    background: #fff;
+}
+.herrera-storefront .product-detail-wishlist:is(:hover, :focus-visible, .is-active) {
+    border-color: var(--herrera-action);
+    color: var(--herrera-action);
+}
+.herrera-storefront .product-detail-card > .product-detail-wishlist {
+    margin-top: 16px;
+}
+.herrera-storefront .product-purchase-information {
+    margin-top: 24px;
+    border: 0;
+}
+.herrera-storefront .product-purchase-information .legal-warranty-notice--product {
+    margin: 0 0 14px;
+    padding: 13px 16px;
+    border-color: #d6e9ed;
+    border-radius: 8px;
+    background: #edf7f9;
+}
+.herrera-storefront .product-purchase-information .legal-warranty-notice--product a {
+    color: #3c555e;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.5;
+}
+.herrera-storefront .product-purchase-information .legal-warranty-icon {
+    flex-shrink: 0;
+    color: var(--herrera-action);
+}
+.herrera-storefront .product-information-panel {
+    margin-top: 8px;
+    overflow: hidden;
+    border: 1px solid #dfe8eb;
+    border-radius: 8px;
+    background: #fff;
+}
+.herrera-storefront .product-information-summary {
+    min-height: 54px;
+    grid-template-columns: 28px minmax(0, 1fr) 18px;
+    gap: 10px;
+    padding: 12px 16px;
+}
+.herrera-storefront .product-information-summary-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 5px;
+    background: #edf7f9;
+    color: var(--herrera-action);
+}
+.herrera-storefront .product-information-summary-icon svg {
+    width: 16px;
+    height: 16px;
+}
+.herrera-storefront .product-information-summary-label {
+    font-size: 14px;
+    font-weight: 600;
+}
+.herrera-storefront .product-information-summary-toggle {
+    width: 18px;
+    height: 18px;
+    color: #6c858c;
+}
+.herrera-storefront .product-information-content {
+    padding: 2px 16px 16px 54px;
+}
+.herrera-storefront .product-information-row {
+    grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+    gap: 16px;
+    font-size: 13px;
+    line-height: 1.6;
+}
+.herrera-storefront .product-information-row dd {
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+.herrera-storefront .product-method h3 {
+    font-size: 13px;
+    font-weight: 600;
+}
+.herrera-storefront .product-method p,
+.herrera-storefront .product-method-empty,
+.herrera-storefront .product-method-meta {
+    font-size: 12px;
+    line-height: 1.65;
+}
+.herrera-storefront .product-floating-cart {
+    border-color: var(--herrera-action);
+}
+.herrera-storefront :is(.product-detail-cart-button, .product-detail-wishlist, .product-information-summary):focus-visible {
+    outline: 2px solid var(--herrera-action);
+    outline-offset: 3px;
+}
+@media (max-width: 1023px) {
+    .herrera-storefront .product-detail-layout {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 24px;
+    }
+    .herrera-storefront .product-gallery {
+        width: 100%;
+        max-width: 620px;
+        margin-inline: auto;
+    }
+    .herrera-storefront .product-detail-shell {
+        padding-inline: 0;
+    }
+}
+@media (max-width: 479px) {
+    .herrera-storefront .product-detail-breadcrumb {
+        font-size: 11px;
+    }
+    .herrera-storefront .product-detail-title {
+        font-size: 23px;
+    }
+    .herrera-storefront .product-detail-card [data-product-availability] {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 6px;
+    }
+    .herrera-storefront .product-detail-purchase-controls {
+        grid-template-columns: minmax(0, 1fr) 48px;
+        gap: 10px;
+    }
+    .herrera-storefront .product-detail-purchase-controls > .product-detail-quantity-control {
+        grid-column: 1 / -1;
+    }
+    .herrera-storefront .product-detail-wishlist {
+        width: 48px;
+        height: 52px;
+    }
+    .herrera-storefront .product-information-content {
+        padding-left: 16px;
+    }
+    .herrera-storefront .product-floating-cart .product-detail-cart-button {
+        font-size: 12px;
+    }
+}
+@media (max-width: 640px) {
+    .herrera-storefront .product-floating-cart .product-detail-quantity-control {
+        width: 100%;
+        height: 52px;
+        grid-template-columns: 36px minmax(0, 1fr) 36px;
+    }
+    .herrera-storefront .product-floating-cart .product-detail-quantity-control :is(button, input) {
+        height: 50px;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .herrera-storefront .product-detail-action {
+        transition: none;
+    }
+}

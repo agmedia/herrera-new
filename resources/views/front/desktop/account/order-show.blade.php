@@ -22,7 +22,7 @@
         <h1 class="text-3xl font-extrabold tracking-tight text-slate-900">{{ __('ui.account.order_show.title', ['number' => $order->order_number]) }}</h1>
         <p class="mt-2 text-slate-600">{{ __('ui.account.order_show.status') }}: <span class="font-semibold">{{ $order->status?->name ?? __('ui.account.orders.status_new') }}</span></p>
         <p class="mt-1 text-sm text-slate-500">{{ __('ui.account.order_show.placed_at') }}: {{ optional($order->placed_at ?? $order->created_at)->format('Y-m-d H:i') }}</p>
-        @if ($b2bAccount?->contractIsActive())
+        @if ($canViewPrices && $b2bAccount?->contractIsActive())
             <form method="POST" action="{{ route('account.orders.reorder', ['orderNumber' => $order->order_number]) }}" class="mt-4">
                 @csrf
                 <button type="submit" class="commerce-primary-action px-4 py-2.5 text-sm font-semibold">{{ __('Ponovi cijelu narudžbu') }}</button>
@@ -34,6 +34,18 @@
         @include('front.desktop.account.partials.nav', ['current' => 'order_show'])
 
         <div class="min-w-0 space-y-6">
+            <section class="border border-slate-200 bg-white p-6" data-order-billing-address>
+                <h2 class="text-lg font-semibold text-slate-900">{{ __('ui.checkout.sections.billing') }}</h2>
+                <div class="mt-3 space-y-1 text-sm text-slate-700">
+                    @if ($order->billing_company)<p class="font-semibold">{{ $order->billing_company }}</p>@endif
+                    <p>{{ trim(($order->billing_first_name ?? '').' '.($order->billing_last_name ?? '')) ?: $order->customer_name }}</p>
+                    @if ($order->billing_oib)<p>{{ __('ui.account.fields.oib') }}: {{ $order->billing_oib }}</p>@endif
+                    @if ($order->billing_vat_id)<p>VAT ID: {{ $order->billing_vat_id }}</p>@endif
+                    @if ($order->billing_address_line_1)<p>{{ $order->billing_address_line_1 }}</p>@endif
+                    @if ($order->billing_address_line_2)<p>{{ $order->billing_address_line_2 }}</p>@endif
+                    <p>{{ trim(($order->billing_postal_code ?? '').' '.($order->billing_city ?? '')) }} {{ $order->billing_country_code }}</p>
+                </div>
+            </section>
             @php
                 $visitedStatusIds = collect([$order->status_id])
                     ->merge($order->history->pluck('to_status_id'))
@@ -206,9 +218,7 @@
                                     ?? $product?->media?->firstWhere('collection_name', 'product_gallery')
                                     ?? $product?->getFirstMedia('product_main')
                                     ?? $product?->getFirstMedia('product_gallery');
-                                $productImageUrl = $productImage
-                                    ? ($productImage->hasGeneratedConversion('thumb_100x100') ? $productImage->getUrl('thumb_100x100') : $productImage->getUrl())
-                                    : null;
+                                $productImageUrl = $product ? \App\Support\Media\LegacyCatalogImage::first($product, ['thumb_100x100']) : null;
                             @endphp
                             <tr class="border-t border-slate-200">
                                 <td class="px-4 py-4">

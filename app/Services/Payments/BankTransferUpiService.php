@@ -26,7 +26,7 @@ class BankTransferUpiService
         $settings = $this->resolveMethodSettings((string) $order->payment_method_code);
         $next = $this->buildSnapshot($order, $settings, $current);
 
-        if (($next['qr_image_base64'] ?? '') === '' && $this->hasReceiverIdentity($next)) {
+        if (! (bool) config('commerce.local_safe_mode') && ($next['qr_image_base64'] ?? '') === '' && $this->hasReceiverIdentity($next)) {
             $qrResult = $this->generateQrBase64($next);
             if (($qrResult['base64'] ?? '') !== '') {
                 $next['qr_image_base64'] = (string) $qrResult['base64'];
@@ -109,6 +109,7 @@ class BankTransferUpiService
             'model' => trim((string) ($current['model'] ?? $settings['upi_model'] ?? '00')),
             'purpose_code' => trim((string) ($current['purpose_code'] ?? $settings['upi_purpose_code'] ?? 'SUPP')),
             'description' => trim((string) ($current['description'] ?? $settings['upi_description'] ?? 'Web narudzba')),
+            'instructions' => trim((string) ($current['instructions'] ?? $settings['bank_instructions'] ?? '')),
 
             'sender_name' => trim((string) ($order->customer_name ?: trim($order->billing_first_name.' '.$order->billing_last_name))),
             'sender_street' => $shippingAddress,

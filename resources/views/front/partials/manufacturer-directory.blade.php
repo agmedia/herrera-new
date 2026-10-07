@@ -82,7 +82,7 @@
                                 class="brand-directory__card"
                                 aria-label="{{ $item['name'] }} – pregledaj proizvode"
                             >
-                                <span class="brand-directory__logo">
+                                <span class="brand-directory__logo {{ $item['logo_variant'] !== '' ? 'manufacturer-logo--'.$item['logo_variant'] : '' }}">
                                     @if ($item['logo_url'])
                                         <img
                                             src="{{ $item['logo_url'] }}"

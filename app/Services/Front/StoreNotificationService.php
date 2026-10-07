@@ -8,16 +8,15 @@ use App\Models\Sales\Order\Order;
 use App\Models\Sales\Order\OrderItem;
 use App\Services\Payments\BankTransferUpiService;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class StoreNotificationService
 {
     public function __construct(
         private readonly StoreSettingsService $storeSettings
-    ) {
-    }
+    ) {}
 
     public function sendContactNotification(ContactMessage $message): void
     {
@@ -225,6 +224,7 @@ class StoreNotificationService
         return [
             'store_name' => $storeName,
             'logo_url' => $this->absoluteUrl((string) ($brand['logo_url'] ?? '')),
+            'legal_warranty' => $settings['legal_warranty'] ?? [],
             'order_number' => (string) $order->order_number,
             'placed_at' => optional($order->placed_at)->format('d.m.Y H:i') ?: '',
             'payment_method' => (string) ($order->payment_method_name ?? ''),

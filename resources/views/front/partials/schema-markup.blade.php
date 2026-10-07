@@ -342,14 +342,15 @@
             $productImages = $product->media
                 ->whereIn('collection_name', ['product_main', 'product_gallery'])
                 ->sortBy(static fn ($m) => (int) ($m->order_column ?? 0))
+                ->filter(static fn ($m) => \App\Support\Media\MediaUrl::hasUsableOriginal($m))
                 ->map(static fn ($m) => (string) $m->getUrl())
                 ->filter(static fn (string $url): bool => $url !== '')
                 ->values();
         }
         if ($productImages->isEmpty() && method_exists($product, 'getFirstMediaUrl')) {
-            $fallbackImage = (string) ($product->getFirstMediaUrl('product_main') ?: $product->getFirstMediaUrl('product_gallery') ?: '');
-            if ($fallbackImage !== '') {
-                $productImages->push($fallbackImage);
+            $productImages = \App\Support\Media\LegacyCatalogImage::gallery($product);
+            if ($fallbackImage = \App\Support\Media\LegacyCatalogImage::first($product)) {
+                $productImages->prepend($fallbackImage);
             }
         }
 
@@ -360,16 +361,27 @@
             'sku' => (string) ($product->sku ?: $product->code),
             'description' => $text($translation?->meta_description ?: $translation?->excerpt ?: $translation?->description ?: $defaultDescription, 500),
             'url' => $currentUrl,
-            'offers' => [
+        ];
+        if ($canViewPrices) {
+            $schemaPrice = app(\App\Services\Pricing\ProductPricePresentationService::class)->forProduct($product, auth()->user());
+            $productSchema['offers'] = [
                 '@type' => 'Offer',
                 'url' => $currentUrl,
                 'priceCurrency' => strtoupper((string) ($schemaSettings['product_currency'] ?? 'EUR')),
-                'price' => number_format((float) app(\App\Services\Pricing\TaxPricingService::class)->grossFromStored((float) $product->base_price, $product), 2, '.', ''),
+                'price' => number_format((float) ($schemaPrice['display_current'] ?? $schemaPrice['current_gross']), 2, '.', ''),
                 'availability' => (int) $product->stock_qty > 0
                     ? 'https://schema.org/InStock'
                     : 'https://schema.org/OutOfStock',
-            ],
-        ];
+            ];
+            if (($schemaPrice['display_includes_tax'] ?? true) === false) {
+                $productSchema['offers']['priceSpecification'] = [
+                    '@type' => 'UnitPriceSpecification',
+                    'price' => $productSchema['offers']['price'],
+                    'priceCurrency' => $productSchema['offers']['priceCurrency'],
+                    'valueAddedTaxIncluded' => false,
+                ];
+            }
+        }
         if ($manufacturerName) {
             $productSchema['brand'] = ['@type' => 'Brand', 'name' => $manufacturerName];
         }

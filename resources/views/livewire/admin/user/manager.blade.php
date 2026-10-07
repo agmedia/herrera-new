@@ -14,7 +14,7 @@
                         <input
                             type="text"
                             wire:model.live.debounce.300ms="search"
-                            placeholder="{{ __('Name or email...') }}"
+                            placeholder="{{ __('Tvrtka, OIB, ime kontakta ili e-mail...') }}"
                             class="admin-search-input w-full rounded-xl border px-3 py-2 text-sm"
                         />
                     </div>
@@ -53,12 +53,12 @@
                                 {{ __('ID') }} <span class="text-xs">{{ $sortBy === 'id' ? ($sortDir === 'asc' ? '^' : 'v') : '<>' }}</span>
                             </button>
                         </th>
+                        <th class="px-3 py-2 text-left font-semibold">{{ __('Tvrtka / OIB') }}</th>
                         <th class="px-3 py-2 text-left font-semibold">
                             <button type="button" wire:click="sort('name')" class="inline-flex items-center gap-1">
-                                {{ __('Name') }} <span class="text-xs">{{ $sortBy === 'name' ? ($sortDir === 'asc' ? '^' : 'v') : '<>' }}</span>
+                                {{ __('Kontakt') }} <span class="text-xs">{{ $sortBy === 'name' ? ($sortDir === 'asc' ? '^' : 'v') : '<>' }}</span>
                             </button>
-                        </th>
-                        <th class="px-3 py-2 text-left font-semibold">
+                            <span class="mx-1 text-slate-400">/</span>
                             <button type="button" wire:click="sort('email')" class="inline-flex items-center gap-1">
                                 {{ __('Email') }} <span class="text-xs">{{ $sortBy === 'email' ? ($sortDir === 'asc' ? '^' : 'v') : '<>' }}</span>
                             </button>
@@ -88,16 +88,27 @@
                             $roleName = $displayRole?->name ?? 'customer';
                             $roleTitle = $displayRole?->title ?? ucfirst($roleName);
                             $isCurrent = auth()->id() === $row->id;
+                            $billing = $row->addresses->first();
+                            $company = trim((string) $row->b2bAccount?->company_name)
+                                ?: trim((string) $row->profile?->company)
+                                ?: trim((string) $billing?->company);
+                            $oib = trim((string) $row->b2bAccount?->oib)
+                                ?: trim((string) $row->profile?->oib)
+                                ?: trim((string) $billing?->oib);
                         @endphp
                         <tr>
                             <td class="px-3 py-2 text-center font-mono text-xs text-slate-700">{{ $row->id }}</td>
-                            <td class="px-3 py-2 text-slate-800">
+                            <td class="px-3 py-2 text-slate-800" style="min-width: 15rem;">
+                                <a href="{{ route('admin.users.show', ['user' => $row->id]) }}" class="font-semibold text-slate-900 hover:text-cyan-700">{{ $company ?: __('Bez naziva tvrtke') }}</a>
+                                <div class="mt-1 font-mono text-xs text-slate-600">{{ __('OIB') }}: {{ $oib ?: '—' }}</div>
+                            </td>
+                            <td class="px-3 py-2 text-slate-700">
                                 <div class="font-medium">{{ $row->name }}</div>
+                                <div class="mt-1 text-xs text-slate-500">{{ $row->email }}</div>
                                 @if ($isCurrent)
                                     <div class="text-xs text-cyan-700">{{ __('Current user') }}</div>
                                 @endif
                             </td>
-                            <td class="px-3 py-2 text-slate-700">{{ $row->email }}</td>
                             <td class="px-3 py-2 text-center">
                                 <span class="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700">{{ $roleTitle }}</span>
                             </td>
@@ -134,6 +145,7 @@
                             <td class="px-3 py-2 text-center text-slate-600">{{ optional($row->created_at)->format('Y-m-d') }}</td>
                             <td class="px-3 py-2 text-right">
                                 <div class="inline-flex items-center gap-1">
+                                    @include('admin.users.partials.impersonate-button', ['customer' => $row])
                                     <a href="{{ route('admin.users.show', ['user' => $row->id]) }}" class="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100">
                                         {{ __('Show') }}
                                     </a>

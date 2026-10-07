@@ -16,11 +16,24 @@ new #[Layout('layouts.guest')] class extends Component
     public string $password = '';
     public string $password_confirmation = '';
 
+    public function mount(): void
+    {
+        if (config('commerce.b2b_only')) {
+            $this->redirect(route('front.auth.b2b-register'));
+        }
+    }
+
     /**
      * Handle an incoming registration request.
      */
     public function register(): void
     {
+        if (config('commerce.b2b_only')) {
+            $this->redirect(route('front.auth.b2b-register'));
+
+            return;
+        }
+
         $validated = $this->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],

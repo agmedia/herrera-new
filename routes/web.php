@@ -2,7 +2,8 @@
 
 use App\Http\Controllers\Admin\AdminAiController;
 use App\Http\Controllers\Admin\ContractWithdrawalController;
-use App\Http\Controllers\Admin\MsanProductImageController;
+use App\Http\Controllers\Admin\CustomerImpersonationController;
+use App\Http\Controllers\Admin\CustomerStatisticsController;
 use App\Http\Controllers\Admin\OrderGlsController;
 use App\Http\Controllers\Admin\SystemToolsController;
 use App\Http\Controllers\Feed\NabavaNetFeedController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Front\CartController;
 use App\Http\Controllers\Front\CatalogController;
 use App\Http\Controllers\Front\CheckoutController;
 use App\Http\Controllers\Front\ContactController;
+use App\Http\Controllers\Front\EprelDocumentController;
 use App\Http\Controllers\Front\FaqController;
 use App\Http\Controllers\Front\ManufacturerController;
 use App\Http\Controllers\Front\NewsletterController;
@@ -38,7 +40,6 @@ use App\Models\Content\ContentBlockSlot;
 use App\Models\Content\Page\InfoPage;
 use App\Models\Content\Support\Comment;
 use App\Models\Content\Support\Faq;
-use App\Models\Integrations\Msan\MsanSpecificationDefinition;
 use App\Models\Sales\Order\Order as SalesOrder;
 use App\Models\Settings\Local\Language;
 use App\Models\Settings\Local\ShippingMethod;
@@ -55,11 +56,28 @@ use Spatie\Activitylog\Models\Activity;
 Route::get('storefront-settings.css', StorefrontStylesController::class)
     ->name('front.storefront.styles');
 
+Route::get('integrations/stock/{supplier}', \App\Http\Controllers\Integrations\StockSyncController::class)
+    ->where('supplier', implode('|', array_keys(\App\Support\Integrations\Stock\StockSyncRegistry::all())))
+    ->middleware('throttle:30,1')
+    ->name('integrations.stock.run');
+
+Route::get('integrations/eracuni/attributes', \App\Http\Controllers\Integrations\EracuniAttributeSyncController::class)
+    ->middleware('throttle:30,1')->name('integrations.eracuni.attributes');
+
+Route::get('robots.txt', [\App\Http\Controllers\Front\SitemapController::class, 'robots'])->name('seo.robots');
+Route::get('sitemap.xml', [\App\Http\Controllers\Front\SitemapController::class, 'index'])->name('seo.sitemap');
+Route::get('sitemap-{kind}-{page}.xml', [\App\Http\Controllers\Front\SitemapController::class, 'part'])
+    ->where('kind', 'products|categories|manufacturers|pages|blog')->whereNumber('page')->name('seo.sitemap.part');
+
 Route::get('feeds/nabava.xml', NabavaNetFeedController::class)
     ->middleware('throttle:10,1')
     ->name('feeds.nabava');
 
-Route::middleware(['front.locale', 'front.device'])
+Route::post('account/impersonation/stop', [CustomerImpersonationController::class, 'stop'])
+    ->middleware('auth')
+    ->name('front.impersonation.stop');
+
+Route::middleware(['front.locale', 'front.device', 'front.search', 'front.b2b'])
     ->group(function (): void {
         Route::get('locale/{code}', function (string $code, Request $request) {
             $fallback = strtolower((string) config('app.locale', 'en'));
@@ -89,9 +107,13 @@ Route::middleware(['front.locale', 'front.device'])
 
         Route::get('search/autocomplete', [CatalogController::class, 'autocomplete'])->name('search.autocomplete');
         Route::get('shop', [CatalogController::class, 'index'])->name('shop.index');
+        Route::get('akcije', fn () => redirect()->route('shop.index', ['promo_only' => 1]))->name('shop.promotions');
         Route::get('categories', [CatalogController::class, 'categories'])->name('categories.index');
         Route::get('category/{slug}', [CatalogController::class, 'showCategory'])->name('categories.show');
         Route::get('product/{slug}', [ProductController::class, 'show'])->name('products.show');
+        Route::get('product/{product}/energy/{declaration}/{document}', EprelDocumentController::class)
+            ->whereNumber('product')->whereNumber('declaration')->where('document', 'label|sheet')
+            ->middleware('throttle:60,1')->name('products.energy.document');
         Route::post('product/{slug}/comments', [ProductController::class, 'storeComment'])->name('products.comments.store');
         Route::post('product/fit-finder/preferences', [ProductController::class, 'storeFitFinderPreferences'])->name('products.fit_finder.preferences');
 
@@ -232,6 +254,9 @@ Route::middleware(['front.locale', 'front.device'])
                     ->name('b2b.quick-order.search');
                 Route::put('b2b/quick-order/draft', [B2BController::class, 'syncQuickOrder'])
                     ->name('b2b.quick-order.draft');
+                Route::post('b2b/quick-order/resolve', [B2BController::class, 'resolveQuickOrder'])
+                    ->middleware('throttle:30,1')
+                    ->name('b2b.quick-order.resolve');
                 Route::post('b2b/quick-order', [B2BController::class, 'storeQuickOrder'])->name('b2b.quick-order.store');
                 Route::get('loyalty', [AccountController::class, 'loyalty'])->name('loyalty');
 
@@ -392,11 +417,13 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
             })->name('actions.edit');
         });
         Route::view('b2b-prices', 'admin.b2b-prices')->name('b2b-prices');
+        Route::view('b2b-prices/catalogs', 'admin.b2b-prices.catalogs')->name('b2b-prices.catalogs');
         Route::view('b2b-prices/create', 'admin.b2b-prices.create')->name('b2b-prices.create');
         Route::get('b2b-prices/{rule}/edit', function (B2BPriceRule $rule) {
             return view('admin.b2b-prices.edit', compact('rule'));
         })->name('b2b-prices.edit');
         Route::view('users', 'admin.users.index')->name('users');
+        Route::get('users/statistics', CustomerStatisticsController::class)->name('users.statistics');
         Route::view('users/b2b', 'admin.users.b2b')->name('users.b2b');
         Route::view('users/newsletter', 'admin.users.newsletter')->name('users.newsletter');
         Route::view('users/groups', 'admin.users.groups')->name('users.groups');
@@ -409,6 +436,8 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
         Route::middleware('user.feature:user_loyalty_enabled')->group(function (): void {
             Route::view('users/loyalty', 'admin.users.loyalty')->name('users.loyalty');
         });
+        Route::post('users/{user}/impersonate', [CustomerImpersonationController::class, 'start'])
+            ->name('users.impersonate');
         Route::get('users/{user}/show', function (User $user) {
             $current = auth()->user();
             abort_unless($current && ($current->isA('superadmin') || $current->can('users.list.view')), 403);
@@ -458,12 +487,15 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
                     ->get();
             }
 
-            $recentOrders = SalesOrder::query()
-                ->where('user_id', $user->id)
-                ->with('status:id,name,color')
-                ->latest('id')
-                ->limit(10)
-                ->get(['id', 'order_number', 'status_id', 'grand_total', 'currency_code', 'created_at']);
+            $canViewCustomerOrders = $current->isA('superadmin') || $current->can('sales.orders.view');
+            if ($canViewCustomerOrders) {
+                $recentOrders = SalesOrder::query()
+                    ->where('user_id', $user->id)
+                    ->with('status:id,name,color')
+                    ->latest('id')
+                    ->limit(10)
+                    ->get(['id', 'order_number', 'status_id', 'grand_total', 'currency_code', 'created_at']);
+            }
 
             return view('admin.users.show', compact(
                 'user',
@@ -472,6 +504,7 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
                 'loyaltyEnabled',
                 'loyaltyStats',
                 'loyaltyEntries',
+                'canViewCustomerOrders',
                 'recentOrders'
             ));
         })->name('users.show');
@@ -483,23 +516,12 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
         Route::prefix('integrations')
             ->as('integrations.')
             ->group(function (): void {
-                Route::prefix('msan')
-                    ->as('msan.')
-                    ->group(function (): void {
-                        Route::view('/', 'admin.integrations.msan.overview')->name('overview');
-                        Route::view('settings', 'admin.integrations.msan.settings')->name('settings');
-                        Route::view('categories', 'admin.integrations.msan.categories')->name('categories');
-                        Route::view('specifications', 'admin.integrations.msan.specifications')->name('specifications');
-                        Route::get('specifications/{definition}/edit', function (MsanSpecificationDefinition $definition) {
-                            return view('admin.integrations.msan.specification-edit', compact('definition'));
-                        })->name('specifications.edit');
-                        Route::get('products/{product}/image', MsanProductImageController::class)
-                            ->whereNumber('product')
-                            ->middleware('throttle:120,1')
-                            ->name('products.image');
-                        Route::view('products', 'admin.integrations.msan.products')->name('products');
-                        Route::view('runs', 'admin.integrations.msan.runs')->name('runs');
-                    });
+                Route::view('eprel/settings', 'admin.integrations.eprel.settings')->name('eprel.settings');
+                Route::view('eprel/catalog', 'admin.integrations.eprel.catalog')->name('eprel.catalog');
+                Route::view('stock', 'admin.integrations.stock.index')->name('stock.index');
+                Route::view('eracuni', 'admin.integrations.eracuni.index')->name('eracuni.index');
+                Route::view('spreadsheet', 'admin.integrations.spreadsheet.index')->name('spreadsheet.index');
+                Route::view('media', 'admin.integrations.media.index')->name('media.index');
             });
 
         Route::prefix('content')
@@ -642,6 +664,16 @@ Route::redirect('profile', '/admin/profile')
     ->name('profile');
 
 Route::post('logout', function (Request $request) {
+    $impersonation = app(\App\Services\User\CustomerImpersonationService::class);
+    if ($impersonation->isActive($request)) {
+        $customerId = (int) $request->session()->get(\App\Services\User\CustomerImpersonationService::SESSION_KEY.'.customer_id');
+        $admin = $impersonation->stop($request);
+
+        return $admin
+            ? redirect()->route('admin.users.show', ['user' => $customerId])
+            : redirect()->route('login');
+    }
+
     Auth::guard('web')->logout();
 
     $request->session()->invalidate();
@@ -651,3 +683,8 @@ Route::post('logout', function (Request $request) {
 })->middleware('auth')->name('logout');
 
 require __DIR__.'/auth.php';
+
+// Retained OpenCart aliases are resolved before routing by middleware.
+// A registered fallback makes that middleware run for formerly unregistered
+// paths as well; unknown paths still retain the normal 404 semantics.
+Route::fallback(fn () => abort(404))->middleware(['front.locale', 'front.device']);

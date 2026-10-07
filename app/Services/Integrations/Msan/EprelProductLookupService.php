@@ -5,6 +5,7 @@ namespace App\Services\Integrations\Msan;
 use App\Models\Catalog\Product\Product;
 use App\Models\Integrations\Msan\MsanCategoryMapping;
 use App\Models\Integrations\Msan\MsanProduct;
+use App\Services\Integrations\Eprel\EprelSettingsService;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 
@@ -31,7 +32,7 @@ class EprelProductLookupService
     public function __construct(
         private readonly EprelClient $client,
         private readonly EprelDeclarationWriter $declarations,
-        private readonly MsanSettingsService $settings,
+        private readonly EprelSettingsService $settings,
     ) {}
 
     /**
@@ -79,6 +80,8 @@ class EprelProductLookupService
             ...$this->payloadValues($product->payload, [
                 'gtin', 'ean', 'ean13', 'upc', 'barcode',
                 'identifiers.gtin', 'identifiers.ean',
+                // Izvorni EAN ostaje u uvozu i kada je lokalni barkod duplikat.
+                'opencart.ean',
             ]),
         ]);
 
@@ -91,6 +94,8 @@ class EprelProductLookupService
                 ...$this->payloadValues($product->payload, [
                     'model', 'model_identifier', 'modelIdentifier', 'mpn', 'part_number',
                     'manufacturer_part_number', 'identifiers.model', 'identifiers.mpn',
+                    // Šifra u starom katalogu može se razlikovati od SKU-a.
+                    'opencart.model',
                 ]),
                 $overrides['sku'] ?? null,
                 $product->sku,
@@ -160,11 +165,11 @@ class EprelProductLookupService
      */
     public function lookup(Product $product, array $overrides = []): array
     {
-        if (! $this->settings->eprelEnabled()) {
+        if (! $this->settings->enabled()) {
             throw new EprelException('EPREL dohvat nije uključen u postavkama integracije.');
         }
         // Validate the encrypted key before starting a sequence of requests.
-        $this->settings->eprelApiKey();
+        $this->settings->apiKey();
 
         $criteria = $this->criteria($product, $overrides);
         $searchBy = strtoupper(trim((string) ($overrides['search_by'] ?? self::SEARCH_AUTO)));
@@ -344,11 +349,13 @@ class EprelProductLookupService
      */
     private function storeMatch(Product $product, array $data, array $criteria, array $overrides): void
     {
+        $expectedIdentity = EprelProductIdentity::fingerprint($product);
         $freshProduct = Product::query()->find($product->getKey());
         if (! $freshProduct) {
             throw new EprelMatchConflictException('Artikl više ne postoji pa EPREL zapis nije spremljen.');
         }
-        if ($this->criteria($freshProduct, $overrides) !== $criteria) {
+        if (! EprelProductIdentity::matches($freshProduct, $expectedIdentity)
+            || $this->criteria($freshProduct, $overrides) !== $criteria) {
             throw new EprelMatchConflictException('Identifikacijski podaci artikla promijenjeni su tijekom EPREL dohvata. Pokrenite pretragu ponovno.');
         }
         if (! $this->lookupPreferenceMatches($freshProduct, $product, $overrides)) {
@@ -364,6 +371,7 @@ class EprelProductLookupService
                 'sku' => $freshProduct->sku,
                 'barcode' => $freshProduct->barcode,
                 'manufacturer_id' => $freshProduct->manufacturer_id,
+                'product_identity' => $expectedIdentity,
             ],
             fn (Product $lockedProduct): bool => $this->criteria($lockedProduct, $overrides) === $criteria
                 && $this->lookupPreferenceMatches($lockedProduct, $product, $overrides),

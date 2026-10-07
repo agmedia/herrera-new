@@ -9,9 +9,11 @@ use App\Models\Settings\Local\OrderStatus;
 use App\Models\User;
 use App\Models\User\CustomerGroup;
 use App\Models\User\LoyaltyTransaction;
+use App\Services\Integrations\Gls\GlsShipmentService;
 use App\Services\Loyalty\LoyaltyService;
 use App\Services\Settings\SystemSettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Livewire;
 use Silber\Bouncer\BouncerFacade as Bouncer;
 use Spatie\Activitylog\Models\Activity;
@@ -89,6 +91,25 @@ class OrdersFeatureTest extends TestCase
             'event_key' => 'order:'.$order->id.':manual-delete-test',
             'order_id' => null,
         ]);
+    }
+
+    public function test_historical_billing_identity_is_visible_only_to_owner_and_authorized_admin(): void
+    {
+        $buyer = $this->makeUserWithRole('customer');
+        $status = $this->createStatus(code: 'historical', name: 'Historical');
+        $order = $this->createOrder($status, $buyer, 'OC-HERRERA-IDENTITY');
+        $order->update(['billing_company' => 'Historical Herrera Buyer', 'billing_oib' => 'DE123456789', 'billing_vat_id' => 'HR12345678901']);
+        $this->actingAs($buyer)->get('/account/orders/'.$order->order_number)->assertOk()
+            ->assertSee('Historical Herrera Buyer')->assertSee('DE123456789')->assertSee('HR12345678901');
+        $other = $this->makeUserWithRole('customer');
+        $this->actingAs($other)->get('/account/orders/'.$order->order_number)->assertNotFound()
+            ->assertDontSee('Historical Herrera Buyer')->assertDontSee('DE123456789');
+        $this->actingAs($other)->get('/admin/orders/'.$order->id.'/invoice')->assertForbidden();
+        $admin = $this->makeUserWithRole('admin');
+        foreach (['show', 'invoice'] as $view) {
+            $this->actingAs($admin)->get('/admin/orders/'.$order->id.'/'.$view)->assertOk()
+                ->assertSee('Historical Herrera Buyer')->assertSee('DE123456789')->assertSee('HR12345678901');
+        }
     }
 
     public function test_customer_cannot_open_orders_pages(): void
@@ -829,6 +850,328 @@ class OrdersFeatureTest extends TestCase
             'event_key' => 'order:'.$order->id.':settlement',
             'points' => 125,
         ]);
+    }
+
+    public function test_guest_is_redirected_to_login_for_order_pages(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $status = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $order = $this->createOrder($status, $admin, 'AG-GUEST');
+
+        foreach (['/admin/orders', '/admin/orders/'.$order->id.'/show', '/admin/orders/'.$order->id.'/invoice'] as $url) {
+            $this->get($url)->assertRedirect('/login');
+        }
+    }
+
+    public function test_customer_cannot_mount_order_components_directly(): void
+    {
+        $customer = $this->makeUserWithRole('customer');
+        $status = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $order = $this->createOrder($status, $customer, 'AG-FORBIDDEN-COMPONENT');
+
+        Livewire::actingAs($customer)->test(OrderManager::class)->assertForbidden();
+        Livewire::actingAs($customer)->test(OrderShow::class, ['orderId' => $order->id])->assertForbidden();
+    }
+
+    public function test_editor_can_read_orders_but_cannot_change_or_delete_them(): void
+    {
+        $editor = $this->makeUserWithRole('editor');
+        $new = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $paid = $this->createStatus(code: 'paid', name: 'Paid', isPaid: true);
+        $order = $this->createOrder($new, $editor, 'AG-READ-ONLY');
+        $order->update(['payload' => ['internal_tags' => ['keep-tag']]]);
+
+        $this->actingAs($editor)->get('/admin/orders')->assertOk();
+        $this->get('/admin/orders/'.$order->id.'/show')->assertOk();
+        $this->get('/admin/orders/'.$order->id.'/invoice')->assertOk();
+        $this->post('/admin/orders/'.$order->id.'/gls/send')->assertForbidden();
+
+        Livewire::actingAs($editor)->test(OrderManager::class)
+            ->call('delete', $order->id)->assertForbidden();
+        Livewire::actingAs($editor)->test(OrderShow::class, ['orderId' => $order->id])
+            ->set('form.status_id', $paid->id)->call('updateStatus')->assertForbidden();
+        Livewire::actingAs($editor)->test(OrderShow::class, ['orderId' => $order->id])
+            ->call('quickStatusByCode', 'paid')->assertForbidden();
+        Livewire::actingAs($editor)->test(OrderShow::class, ['orderId' => $order->id])
+            ->set('tagInput', 'unauthorized-tag')->call('addInternalTag')->assertForbidden();
+        Livewire::actingAs($editor)->test(OrderShow::class, ['orderId' => $order->id])
+            ->call('removeInternalTag', 'keep-tag')->assertForbidden();
+        Livewire::actingAs($editor)->test(OrderShow::class, ['orderId' => $order->id])
+            ->call('applyLoyaltyRedemption')->assertForbidden();
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status_id' => $new->id]);
+        $this->assertSame(['keep-tag'], $order->fresh()->payload['internal_tags']);
+        $this->assertSame(0, $order->history()->count());
+    }
+
+    public function test_status_update_rejects_missing_unknown_and_inactive_statuses(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $new = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $inactive = $this->createStatus(code: 'archived', name: 'Archived');
+        $inactive->update(['is_active' => false]);
+        $order = $this->createOrder($new, $admin, 'AG-INVALID-STATUS');
+
+        foreach ([null, 999999, $inactive->id] as $statusId) {
+            Livewire::actingAs($admin)->test(OrderShow::class, ['orderId' => $order->id])
+                ->set('form.status_id', $statusId)
+                ->call('updateStatus')
+                ->assertHasErrors(['form.status_id']);
+        }
+
+        $this->assertSame($new->id, $order->fresh()->status_id);
+        $this->assertSame(0, $order->history()->count());
+    }
+
+    public function test_status_update_rejects_an_oversized_comment_without_partial_save(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $new = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $paid = $this->createStatus(code: 'paid', name: 'Paid', isPaid: true);
+        $order = $this->createOrder($new, $admin, 'AG-INVALID-COMMENT');
+
+        Livewire::actingAs($admin)->test(OrderShow::class, ['orderId' => $order->id])
+            ->set('form.status_id', $paid->id)
+            ->set('form.comment', str_repeat('x', 2001))
+            ->call('updateStatus')
+            ->assertHasErrors(['form.comment' => 'max']);
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status_id' => $new->id,
+            'admin_note' => null,
+            'paid_at' => null,
+        ]);
+        $this->assertSame(0, $order->history()->count());
+    }
+
+    public function test_saving_unchanged_status_without_a_note_does_not_create_history(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $new = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $order = $this->createOrder($new, $admin, 'AG-NO-CHANGE');
+
+        Livewire::actingAs($admin)->test(OrderShow::class, ['orderId' => $order->id])
+            ->set('form.comment', '   ')
+            ->call('updateStatus')
+            ->assertHasNoErrors()
+            ->assertDispatched('notify', type: 'info');
+
+        $this->assertSame(0, $order->history()->count());
+        $this->assertNull($order->fresh()->admin_note);
+    }
+
+    public function test_note_only_update_keeps_status_and_records_the_author(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $buyer = $this->makeUserWithRole('customer');
+        $new = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $order = $this->createOrder($new, $buyer, 'AG-NOTE-AUTHOR');
+
+        Livewire::actingAs($admin)->test(OrderShow::class, ['orderId' => $order->id])
+            ->set('form.comment', '  Customer called about delivery.  ')
+            ->call('updateStatus')
+            ->assertHasNoErrors()
+            ->assertSet('form.comment', '');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $order->id,
+            'status_id' => $new->id,
+            'admin_note' => 'Customer called about delivery.',
+            'updated_by' => $admin->id,
+        ]);
+        $history = $order->history()->sole();
+        $this->assertSame($admin->id, $history->changed_by);
+        $this->assertFalse($history->payload['status_changed']);
+        $this->assertSame('admin', $history->payload['origin']);
+    }
+
+    public function test_repeated_quick_status_keeps_original_paid_date_and_does_not_duplicate_history(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $new = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $paid = $this->createStatus(code: 'paid', name: 'Paid', isPaid: true);
+        $order = $this->createOrder($new, $admin, 'AG-QUICK-REPEAT');
+
+        $component = Livewire::actingAs($admin)->test(OrderShow::class, ['orderId' => $order->id])
+            ->call('quickStatusByCode', 'paid')->assertHasNoErrors();
+        $paidAt = $order->fresh()->paid_at;
+
+        $this->travel(1)->hours();
+        $component->call('quickStatusByCode', 'paid')->assertHasNoErrors()
+            ->assertDispatched('notify', type: 'info');
+
+        $this->assertSame($paid->id, $order->fresh()->status_id);
+        $this->assertTrue($paidAt->equalTo($order->fresh()->paid_at));
+        $this->assertSame(1, $order->history()->count());
+        $this->assertSame('quick_action', $order->history()->sole()->payload['origin']);
+    }
+
+    public function test_unavailable_quick_status_does_not_change_order(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $new = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $paid = $this->createStatus(code: 'paid', name: 'Paid', isPaid: true);
+        $paid->update(['is_active' => false]);
+        $order = $this->createOrder($new, $admin, 'AG-QUICK-UNAVAILABLE');
+
+        foreach (['paid', 'does-not-exist'] as $code) {
+            Livewire::actingAs($admin)->test(OrderShow::class, ['orderId' => $order->id])
+                ->call('quickStatusByCode', $code)
+                ->assertHasNoErrors()
+                ->assertDispatched('notify', type: 'warning');
+        }
+
+        $this->assertSame($new->id, $order->fresh()->status_id);
+        $this->assertSame(0, $order->history()->count());
+    }
+
+    public function test_internal_tag_validation_and_deduplication_preserve_other_payload(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $new = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $order = $this->createOrder($new, $admin, 'AG-TAG-VALIDATION');
+        $order->update(['payload' => ['import' => ['legacy_id' => 123]]]);
+
+        foreach ([' ', '<script>', str_repeat('a', 41)] as $tag) {
+            Livewire::actingAs($admin)->test(OrderShow::class, ['orderId' => $order->id])
+                ->set('tagInput', $tag)->call('addInternalTag')->assertHasErrors(['tagInput']);
+        }
+
+        Livewire::actingAs($admin)->test(OrderShow::class, ['orderId' => $order->id])
+            ->set('tagInput', '  priority  ')->call('addInternalTag')
+            ->set('tagInput', 'priority')->call('addInternalTag')
+            ->assertHasNoErrors()->assertSet('tagInput', '');
+
+        $this->assertSame(['priority'], $order->fresh()->payload['internal_tags']);
+        $this->assertSame(123, $order->fresh()->payload['import']['legacy_id']);
+    }
+
+    public function test_order_filters_combine_search_status_and_inclusive_dates(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $new = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $paid = $this->createStatus(code: 'paid', name: 'Paid', isPaid: true);
+
+        foreach ([
+            ['AG-FILTER-START', $new, '2026-10-01 00:00:00'],
+            ['AG-FILTER-END', $new, '2026-10-07 23:59:59'],
+            ['AG-FILTER-PAID', $paid, '2026-10-03 12:00:00'],
+            ['AG-FILTER-OLD', $new, '2026-09-30 23:59:59'],
+            ['OTHER-ORDER', $new, '2026-10-03 12:00:00'],
+        ] as [$number, $status, $placedAt]) {
+            $this->createOrder($status, $admin, $number)->update(['placed_at' => $placedAt]);
+        }
+
+        Livewire::actingAs($admin)->test(OrderManager::class)
+            ->set('search', 'AG-FILTER')
+            ->set('status', (string) $new->id)
+            ->set('dateFrom', '2026-10-01')
+            ->set('dateTo', '2026-10-07')
+            ->assertSee('AG-FILTER-START')->assertSee('AG-FILTER-END')
+            ->assertDontSee('AG-FILTER-PAID')->assertDontSee('AG-FILTER-OLD')->assertDontSee('OTHER-ORDER');
+    }
+
+    public function test_sorting_and_filter_changes_reset_order_pagination(): void
+    {
+        app(SystemSettingsService::class)->put('admin_items_per_page', 5);
+        $admin = $this->makeUserWithRole('admin');
+        $new = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        foreach (range(1, 6) as $index) {
+            $this->createOrder($new, $admin, 'AG-PAGE-'.$index);
+        }
+
+        $component = Livewire::actingAs($admin)->test(OrderManager::class)
+            ->call('setPage', 2, 'adminOrdersPage')
+            ->assertSet('paginators.adminOrdersPage', 2)
+            ->call('sort', 'order_number')
+            ->assertSet('sortBy', 'order_number')->assertSet('sortDir', 'asc')
+            ->assertSet('paginators.adminOrdersPage', 1)
+            ->assertSee('AG-PAGE-1')->assertDontSee('AG-PAGE-6')
+            ->call('sort', 'order_number')->assertSet('sortDir', 'desc')
+            ->assertSee('AG-PAGE-6')->assertDontSee('AG-PAGE-1');
+
+        foreach (['search' => 'AG-PAGE', 'status' => (string) $new->id, 'dateFrom' => '2026-01-01', 'dateTo' => '2026-12-31'] as $field => $value) {
+            $component->call('setPage', 2, 'adminOrdersPage')->set($field, $value)
+                ->assertSet('paginators.adminOrdersPage', 1);
+        }
+
+        $component->call('sort', 'invalid_column')->assertSet('sortBy', 'order_number');
+    }
+
+    public function test_admin_receives_not_found_for_missing_order_pages_and_warning_for_missing_delete(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $this->actingAs($admin)->get('/admin/orders/999999/show')->assertNotFound();
+        $this->get('/admin/orders/999999/invoice')->assertNotFound();
+        Livewire::actingAs($admin)->test(OrderManager::class)
+            ->call('delete', 999999)->assertHasNoErrors()->assertDispatched('notify', type: 'warning');
+    }
+
+    public function test_order_id_cannot_be_changed_from_the_browser(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $new = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $order = $this->createOrder($new, $admin, 'AG-LOCKED');
+        $other = $this->createOrder($new, $admin, 'AG-OTHER');
+
+        $this->expectException(CannotUpdateLockedPropertyException::class);
+        Livewire::actingAs($admin)->test(OrderShow::class, ['orderId' => $order->id])->set('orderId', $other->id);
+    }
+
+    public function test_order_sort_column_cannot_be_changed_from_the_browser(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+
+        $this->expectException(CannotUpdateLockedPropertyException::class);
+        Livewire::actingAs($admin)->test(OrderManager::class)->set('sortBy', 'missing_column');
+    }
+
+    public function test_admin_gls_send_success_returns_to_order_with_confirmation(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $new = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $order = $this->createOrder($new, $admin, 'AG-GLS-SEND');
+        $this->mock(GlsShipmentService::class)->shouldReceive('send')->once()
+            ->withArgs(fn (Order $sentOrder, int $authorId): bool => $sentOrder->is($order) && $authorId === $admin->id)
+            ->andReturn(['parcel_number' => 'GLS-12345']);
+
+        $this->actingAs($admin)->from('/admin/orders/'.$order->id.'/show')
+            ->post('/admin/orders/'.$order->id.'/gls/send')
+            ->assertRedirect('/admin/orders/'.$order->id.'/show')
+            ->assertSessionHas('notify.type', 'success')
+            ->assertSessionHas('notify.message', 'GLS naljepnica je generirana. Broj paketa: GLS-12345');
+    }
+
+    public function test_gls_send_failure_returns_an_actionable_message_without_server_error(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $new = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $order = $this->createOrder($new, $admin, 'AG-GLS-FAILURE');
+        $this->mock(GlsShipmentService::class)->shouldReceive('send')->once()
+            ->andThrow(new \RuntimeException('GLS service is temporarily unavailable.'));
+
+        $this->actingAs($admin)->from('/admin/orders/'.$order->id.'/show')
+            ->post('/admin/orders/'.$order->id.'/gls/send')
+            ->assertRedirect('/admin/orders/'.$order->id.'/show')
+            ->assertSessionHas('notify.type', 'error')
+            ->assertSessionHas('notify.message', 'GLS service is temporarily unavailable.');
+        $this->assertSame($new->id, $order->fresh()->status_id);
+    }
+
+    public function test_gls_label_failure_returns_to_order_without_server_error(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $new = $this->createStatus(code: 'new', name: 'New', isDefault: true);
+        $order = $this->createOrder($new, $admin, 'AG-GLS-LABEL-FAILURE');
+        $this->mock(GlsShipmentService::class)->shouldReceive('downloadLabel')->once()
+            ->andThrow(new \RuntimeException('The shipping label has not been created.'));
+
+        $this->actingAs($admin)->from('/admin/orders/'.$order->id.'/show')
+            ->get('/admin/orders/'.$order->id.'/gls/label')
+            ->assertRedirect('/admin/orders/'.$order->id.'/show')
+            ->assertSessionHas('notify.type', 'error')
+            ->assertSessionHas('notify.message', 'The shipping label has not been created.');
     }
 
     private function makeUserWithRole(string $role): User

@@ -25,20 +25,25 @@ use App\Observers\Sales\OrderLoyaltyObserver;
 use App\Observers\Settings\LocalSettingObserver;
 use App\Services\Catalog\CatalogFeatureService;
 use App\Services\Content\ContentBlockResolver;
+use App\Services\Front\CartService;
 use App\Services\Front\NavigationMenuService;
 use App\Services\Front\StoreSettingsService;
 use App\Services\Front\WishlistService;
 use App\Services\Loyalty\LoyaltyService;
+use App\Services\Pricing\B2BAccessService;
 use App\Services\Settings\LocalSettingsService;
 use App\Services\Settings\SystemSettingsService;
 use App\Services\UserTracking\UserTrackingService;
 use App\Support\AssetVersion;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
@@ -63,6 +68,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(UserTrackingService::class, fn ($app) => new UserTrackingService($app->make(SystemSettingsService::class)));
         $this->app->singleton(LoyaltyService::class, fn ($app) => new LoyaltyService($app->make(SystemSettingsService::class)));
         $this->app->scoped(AssetVersion::class, fn () => new AssetVersion);
+        $this->app->scoped(\App\Services\Pricing\PriceCatalogResolver::class);
     }
 
     /**
@@ -70,6 +76,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // One listener per application; always clear the current request, including
+        // writes made while placing an order or changing stock/pricing directly.
+        DB::listen(static function (QueryExecuted $query): void {
+            if (preg_match('/^\s*(?:insert|update|delete|replace|truncate|alter|drop|create)\b/i', $query->sql) === 1) {
+                CartService::forgetRequestSnapshot();
+            }
+        });
+
+        Auth::provider('opencart-migrating', fn ($app, array $config) => new \App\Auth\OpenCartUserProvider($app['hash'], $config['model']));
+
         Queue::before(static function (JobProcessing $event): void {
             app(SystemSettingsService::class)->clearRuntimeCache();
         });
@@ -86,6 +102,10 @@ class AppServiceProvider extends ServiceProvider
 
             return $url.$separator.'v='.rawurlencode(app(AssetVersion::class)->current());
         });
+
+        Livewire::component('admin.user.b2b-user-profile-editor', \App\Livewire\Admin\User\B2BUserProfileEditor::class);
+        Livewire::component('admin.integrations.eprel.settings-form', \App\Livewire\Admin\Integrations\Eprel\SettingsForm::class);
+        Livewire::component('admin.integrations.eprel.catalog-sync-manager', \App\Livewire\Admin\Integrations\Eprel\CatalogSyncManager::class);
 
         Livewire::addPersistentMiddleware([
             \App\Http\Middleware\EnsureAdminAbility::class,
@@ -141,7 +161,13 @@ class AppServiceProvider extends ServiceProvider
             $view->with('adminLocaleOptions', $localeOptions);
         });
 
-        View::composer('front.*', static function ($view): void {
+        View::composer(['front.*', 'components.front.*'], static function ($view): void {
+            try {
+                $view->with('canViewPrices', app(B2BAccessService::class)->canViewPrices(auth()->user()));
+            } catch (\Throwable) {
+                $view->with('canViewPrices', ! app(B2BAccessService::class)->requiresApprovedAccount());
+            }
+
             static $shared = null;
 
             if ($shared !== null) {
@@ -339,6 +365,12 @@ class AppServiceProvider extends ServiceProvider
 
     private function applyDynamicStoreMailSettings(): void
     {
+        if ((bool) config('commerce.local_safe_mode')) {
+            Config::set('mail.default', 'log');
+
+            return;
+        }
+
         try {
             $settings = app(StoreSettingsService::class)->email();
             if (! (bool) ($settings['enabled'] ?? false)) {

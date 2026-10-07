@@ -18,7 +18,7 @@
             @endphp
 
             @if ($hasChildren)
-                <details class="group/nav desktop-mobile-menu-group" data-mobile-menu-accordion>
+                <details class="group/nav desktop-mobile-menu-group" data-mobile-menu-accordion @if (($item['type'] ?? '') === 'catalog') data-mobile-menu-catalog @endif>
                     <summary class="desktop-mobile-menu-row relative flex min-h-[60px] cursor-pointer list-none items-center px-4 py-3 hover:bg-slate-50">
                         <a
                             href="{{ $item['url'] ?? '#' }}"

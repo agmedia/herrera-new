@@ -2,6 +2,7 @@
 
 namespace App\Services\Integrations\Msan;
 
+use App\Services\Integrations\Eprel\EprelSettingsService;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -9,6 +10,20 @@ use InvalidArgumentException;
 
 class EprelClient
 {
+    private ?\Closure $requestGuard = null;
+
+    private ?int $timeoutLimit = null;
+
+    /** Per-operation guard; cloning never changes another lookup or storefront request. */
+    public function withRequestGuard(\Closure $guard, int $timeoutLimit = 20): self
+    {
+        $client = clone $this;
+        $client->requestGuard = $guard;
+        $client->timeoutLimit = max(5, min(30, $timeoutLimit));
+
+        return $client;
+    }
+
     public const BASE_URL = 'https://eprel.ec.europa.eu';
 
     public const SEARCH_MODEL_IDENTIFIER = 'MODEL_IDENTIFIER';
@@ -73,13 +88,29 @@ class EprelClient
     ];
 
     public function __construct(
-        private readonly MsanSettingsService $settings,
+        private readonly EprelSettingsService $settings,
     ) {}
 
     /** @return array<string, string> URL slug => EPREL API product-group code. */
     public static function productGroupOptions(): array
     {
         return self::PRODUCT_GROUPS;
+    }
+
+    /** Public PDFs never need an API key, a local copy or an arbitrary stored URL. */
+    public static function publicDocumentUrl(string $productGroup, string $registrationNumber, string $document): string
+    {
+        $group = strtolower(trim($productGroup));
+        $registration = trim($registrationNumber);
+        if (! isset(self::PRODUCT_GROUPS[$group])
+            || ! self::isValidRegistrationNumber($registration)
+            || ! in_array($document, ['label', 'sheet'], true)) {
+            throw new InvalidArgumentException('EPREL dokument nije valjan.');
+        }
+
+        return self::BASE_URL.($document === 'label'
+            ? '/labels/'.$group.'/Label_'.$registration.'_big_color.pdf'
+            : '/fiches/'.$group.'/Fiche_'.$registration.'_HR.pdf');
     }
 
     /** @return array<string, string> Admin search mode => Croatian label. */
@@ -431,16 +462,19 @@ class EprelClient
     /** @return array<string, mixed>|null */
     private function get(string $path, array $query = []): ?array
     {
-        if (! $this->settings->eprelEnabled()) {
+        if (! $this->settings->enabled()) {
             throw new EprelException('EPREL dohvat nije uključen.');
         }
 
+        if ($this->requestGuard) {
+            ($this->requestGuard)();
+        }
         try {
             $response = Http::acceptJson()
-                ->withHeaders(['x-api-key' => $this->settings->eprelApiKey()])
+                ->withHeaders(['x-api-key' => $this->settings->apiKey()])
                 ->withOptions(['allow_redirects' => false])
-                ->connectTimeout($this->settings->eprelConnectTimeout())
-                ->timeout($this->settings->eprelTimeout())
+                ->connectTimeout($this->settings->connectTimeout())
+                ->timeout(min($this->settings->timeout(), $this->timeoutLimit ?? 120))
                 ->get(self::BASE_URL.$path, $query);
         } catch (ConnectionException) {
             throw new EprelException('Povezivanje sa službenim EPREL servisom nije uspjelo.');
@@ -466,8 +500,8 @@ class EprelClient
         }
 
         throw match ($response->status()) {
-            401, 403 => new EprelException('EPREL je odbio API ključ ili pristup.'),
-            429 => new EprelException('EPREL je privremeno ograničio broj zahtjeva.'),
+            401, 403 => new EprelHttpException('EPREL je odbio API ključ ili pristup.', $response->status()),
+            429 => new EprelHttpException('EPREL je privremeno ograničio broj zahtjeva.', 429),
             default => new EprelHttpException(
                 'EPREL servis trenutačno nije dostupan (HTTP '.$response->status().').',
                 $response->status(),
@@ -746,11 +780,8 @@ class EprelClient
             $scaleMax ??= $parsedMax;
         }
 
-        $labelUrl = self::BASE_URL.'/api/products/'.$group.'/'.$registration.'/labels?format=PDF';
-        // API document endpoints require the integration key and therefore
-        // cannot be opened by a customer browser. EPREL exposes the fiche
-        // under this public URL instead.
-        $sheetUrl = self::BASE_URL.'/fiches/'.$group.'/Fiche_'.$registration.'_HR.pdf';
+        $labelUrl = self::publicDocumentUrl($group, $registration, 'label');
+        $sheetUrl = self::publicDocumentUrl($group, $registration, 'sheet');
 
         return [
             'eprel_registration_number' => $registration,

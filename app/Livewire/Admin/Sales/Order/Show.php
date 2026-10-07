@@ -8,10 +8,12 @@ use App\Services\Loyalty\LoyaltyService;
 use App\Services\Payments\BankTransferUpiService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Show extends Component
 {
+    #[Locked]
     public int $orderId;
 
     public string $tagInput = '';
@@ -28,14 +30,16 @@ class Show extends Component
 
     public function mount(int $orderId): void
     {
+        $this->authorizeAccess();
         $this->orderId = $orderId;
         $this->loadOrderDefaults();
     }
 
     public function updateStatus(): void
     {
+        $this->authorizeAccess('sales.orders.update');
         $validated = $this->validate([
-            'form.status_id' => ['required', 'integer', Rule::exists('order_statuses', 'id')],
+            'form.status_id' => ['required', 'integer', Rule::exists('order_statuses', 'id')->where('is_active', true)],
             'form.comment' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -52,6 +56,7 @@ class Show extends Component
 
     public function quickStatusByCode(string $code): void
     {
+        $this->authorizeAccess('sales.orders.update');
         $status = OrderStatus::query()
             ->where('is_active', true)
             ->where('code', $code)
@@ -81,6 +86,7 @@ class Show extends Component
 
     public function addInternalTag(): void
     {
+        $this->authorizeAccess('sales.orders.update');
         $this->validate([
             'tagInput' => ['required', 'string', 'max:40', 'regex:/^[a-zA-Z0-9_\-\s]+$/'],
         ]);
@@ -100,6 +106,7 @@ class Show extends Component
 
     public function removeInternalTag(string $tag): void
     {
+        $this->authorizeAccess('sales.orders.update');
         $tag = trim($tag);
         if ($tag === '') {
             return;
@@ -122,6 +129,7 @@ class Show extends Component
 
     public function applyLoyaltyRedemption(): void
     {
+        $this->authorizeAccess('sales.orders.update');
         $validated = $this->validate([
             'redeemPoints' => ['required', 'integer', 'min:0', 'max:1000000'],
         ]);
@@ -176,6 +184,7 @@ class Show extends Component
 
     public function render()
     {
+        $this->authorizeAccess();
         $order = Order::query()
             ->with([
                 'status:id,code,name,color,is_paid,is_cancelled',
@@ -269,7 +278,7 @@ class Show extends Component
             $fromStatusId = $order->status_id ? (int) $order->status_id : null;
             $changed = $fromStatusId !== $toStatusId;
 
-            if (! $changed && $comment === '') {
+            if (! $changed && ($comment === '' || $origin === 'quick_action')) {
                 $saved = false;
 
                 return;
@@ -279,7 +288,6 @@ class Show extends Component
 
             if ($changed) {
                 $order->status_id = $toStatusId;
-                $order->updated_by = auth()->id();
 
                 if ($targetStatus?->is_paid && ! $order->paid_at) {
                     $order->paid_at = now();
@@ -290,6 +298,7 @@ class Show extends Component
                 $order->admin_note = $comment;
             }
 
+            $order->updated_by = auth()->id();
             $order->save();
 
             $order->history()->create([
@@ -366,5 +375,14 @@ class Show extends Component
                 'internal_tags' => $payload['internal_tags'],
             ])
             ->log($message);
+    }
+
+    private function authorizeAccess(string $ability = 'sales.orders.view'): void
+    {
+        $user = auth()->user();
+        abort_unless(
+            $user && ($user->isA('superadmin') || ($user->can('admin.access') && $user->can($ability))),
+            403
+        );
     }
 }

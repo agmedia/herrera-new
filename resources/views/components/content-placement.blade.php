@@ -60,66 +60,28 @@
         }
 
         $categories = collect();
-        if ($categoryIds !== []) {
-            $isFeaturedCategories = (string) $block->type === 'featured_categories';
+        $isFeaturedCategories = (string) $block->type === 'featured_categories';
+        if ($isFeaturedCategories) {
+            $categories = app(\App\Services\Content\FeaturedCategoriesService::class)->forBlock(
+                $block,
+                $locale,
+                $fallbackLocale,
+                $hideOutOfStockProducts,
+            );
+        } elseif ($categoryIds !== []) {
             $categoryRelations = [
                 'translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale]),
             ];
 
-            if ($isFeaturedCategories) {
-                $categoryRelations['media'] = fn ($q) => $q
-                    ->whereIn('collection_name', ['category_icon', 'category_banner'])
-                    ->orderBy('order_column')
-                    ->orderBy('id');
-            }
-
             $categoryQuery = \App\Models\Catalog\Category\Category::query()
                 ->currentlyVisible()
                 ->whereIn('id', $categoryIds)
-                ->when(
-                    $isFeaturedCategories,
-                    fn ($q) => $q->where('scope', \App\Models\Catalog\Category\Category::SCOPE_CATALOG)
-                )
                 ->with($categoryRelations);
-
-            if ($isFeaturedCategories) {
-                $categoryQuery->withCount([
-                    'descendants as subcategories_count' => fn ($q) => $q
-                        ->where('scope', \App\Models\Catalog\Category\Category::SCOPE_CATALOG)
-                        ->currentlyVisible(),
-                ]);
-            }
 
             $categories = $categoryQuery->get()
                 ->sortBy(fn ($row) => array_search((int) $row->id, $categoryIds, true))
                 ->values();
 
-            if ($isFeaturedCategories) {
-                $categories->each(function ($category) use ($hideOutOfStockProducts): void {
-                    $categoryScopeIds = \App\Models\Catalog\Category\Category::query()
-                        ->descendantsAndSelf((int) $category->id)
-                        ->filter(static fn ($scopeCategory): bool => (string) $scopeCategory->scope === \App\Models\Catalog\Category\Category::SCOPE_CATALOG
-                            && $scopeCategory->isCurrentlyVisible())
-                        ->pluck('id')
-                        ->map(static fn ($id): int => (int) $id)
-                        ->values();
-
-                    $productsCount = $categoryScopeIds->isEmpty()
-                        ? 0
-                        : \App\Models\Catalog\Product\Product::query()
-                            ->visibleOnStorefront($hideOutOfStockProducts)
-                            ->whereHas('categories', function ($categoryQuery) use ($categoryScopeIds): void {
-                                $categoryQuery
-                                    ->where('scope', \App\Models\Catalog\Category\Category::SCOPE_CATALOG)
-                                    ->currentlyVisible()
-                                    ->whereIn('categories.id', $categoryScopeIds);
-                            })
-                            ->distinct()
-                            ->count('products.id');
-
-                    $category->setAttribute('products_count', $productsCount);
-                });
-            }
         }
 
         if ((string) $block->type === 'category_products_carousel' && $categories->isNotEmpty()) {

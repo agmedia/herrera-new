@@ -78,8 +78,8 @@
     $carouselMobileGap = $categoryProductsMode ? '0rem' : '0.8rem';
 @endphp
 
-<section class="{{ $categoryProductsMode ? 'w-full' : 'relative left-1/2 w-screen -translate-x-1/2' }} bg-white max-[540px]:py-5 py-8">
-    <div class="mx-auto w-full {{ $categoryProductsMode ? '' : 'px-3 sm:px-4 lg:px-6' }}">
+<section class="{{ $categoryProductsMode ? 'w-full' : 'relative left-1/2 w-screen -translate-x-1/2' }} bg-white max-[540px]:py-5 py-8" data-herrera-aligned-section>
+    <div class="mx-auto w-full {{ $categoryProductsMode ? '' : 'px-3 sm:px-4 lg:px-6' }}" data-herrera-aligned-inner>
         <div class="max-[540px]:mb-5 mb-8 text-center">
             @if ($categoryProductsMode)
                 <div class="storefront-widget-heading--split">
@@ -255,7 +255,7 @@
             <div
                 class="mt-4 {{ $categoryProductsMode ? 'storefront-widget-wide' : '' }}"
             >
-                <div id="products-carousel-{{ $block->id }}" class="splide" data-products-carousel-splide>
+                <div id="products-carousel-{{ $block->id }}" class="splide" data-products-carousel-splide data-continuous-card-carousel>
                     <div class="splide__track">
                         <div class="splide__list">
                             @foreach ($products as $product)
@@ -293,11 +293,12 @@
                                     const count = el.querySelectorAll('.splide__slide').length;
                                     const mobilePerPage = {{ $mobileDefaultCols }};
                                     const preferredDesktopPerPage = {{ $carouselDesktopCols }};
+                                    const continuousCards = document.body.classList.contains('herrera-storefront');
                                     new window.Splide(el, {
                                         type: count > 1 ? 'loop' : 'slide',
                                         perPage: Math.min(Math.max(1, preferredDesktopPerPage), Math.max(1, count)),
                                         perMove: 1,
-                                        gap: '{{ $carouselGap }}',
+                                        gap: continuousCards ? '0rem' : '{{ $carouselGap }}',
                                         drag: count > 1,
                                         snap: true,
                                         pagination: false,
@@ -308,10 +309,10 @@
                                             1536: { perPage: Math.min(Math.min(Math.max(1, preferredDesktopPerPage), 5), Math.max(1, count)) },
                                             1280: { perPage: Math.min(Math.min(Math.max(1, preferredDesktopPerPage), 4), Math.max(1, count)) },
                                             1024: { perPage: Math.min(Math.min(Math.max(1, preferredDesktopPerPage), 3), Math.max(1, count)) },
-                                            860: { perPage: Math.min(mobilePerPage, Math.max(1, count)), gap: '{{ $categoryProductsMode ? '0rem' : '1rem' }}' },
+                                            860: { perPage: Math.min(mobilePerPage, Math.max(1, count)), gap: continuousCards ? '0rem' : '{{ $categoryProductsMode ? '0rem' : '1rem' }}' },
                                             640: {
                                                 perPage: Math.min(mobilePerPage, Math.max(1, count)),
-                                                gap: '{{ $carouselMobileGap }}',
+                                                gap: continuousCards ? '0rem' : '{{ $carouselMobileGap }}',
                                                 arrows: false,
                                                 pagination: count > mobilePerPage,
                                             },

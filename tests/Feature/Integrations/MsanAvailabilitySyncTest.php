@@ -29,6 +29,7 @@ use Tests\TestCase;
 class MsanAvailabilitySyncTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\EnablesLegacyMsanModule;
 
     public function test_lightweight_sync_downloads_prices_and_availability_and_updates_only_msan_owned_products(): void
     {
@@ -427,13 +428,12 @@ class MsanAvailabilitySyncTest extends TestCase
         Queue::assertNothingPushed();
     }
 
-    public function test_price_and_stock_dispatcher_runs_every_minute_and_saved_cron_controls_when_it_is_due(): void
+    public function test_legacy_cron_can_be_validated_but_supplier_dispatcher_is_not_registered_in_herrera(): void
     {
         $event = collect(app(Schedule::class)->events())
             ->first(fn ($scheduledEvent): bool => $scheduledEvent->description === 'msan-prices-stock-sync');
 
-        $this->assertNotNull($event);
-        $this->assertSame('* * * * *', $event->expression);
+        $this->assertNull($event);
 
         $settings = app(MsanSettingsService::class);
         $zone = new DateTimeZone(MsanSettingsService::PRICE_STOCK_SYNC_TIMEZONE);

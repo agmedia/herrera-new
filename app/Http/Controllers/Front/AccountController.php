@@ -26,6 +26,16 @@ class AccountController extends Controller
         $user = $request->user();
         $user->loadMissing(['profile', 'addresses', 'b2bAccount.customerGroup']);
 
+        $userOrders = Order::query()->where('user_id', $user->id);
+        $orderCount = (clone $userOrders)->count();
+        $orderTotals = (clone $userOrders)
+            ->withoutCancelled()
+            ->select('currency_code')
+            ->selectRaw('SUM(grand_total) as total, AVG(grand_total) as average')
+            ->groupBy('currency_code')
+            ->get();
+        $draftItemCount = count($user->b2bAccount?->quick_order_draft ?? []);
+
         $orders = Order::query()
             ->where('user_id', $user->id)
             ->with('status:id,name,color')
@@ -53,6 +63,9 @@ class AccountController extends Controller
         return view($this->frontendView($request, 'account.dashboard'), [
             'user' => $user,
             'orders' => $orders,
+            'orderCount' => $orderCount,
+            'orderTotals' => $orderTotals,
+            'draftItemCount' => $draftItemCount,
             'loyaltyEnabled' => $loyaltyEnabled,
             'loyaltyBalance' => $loyaltyBalance,
             'loyaltyRecent' => $loyaltyRecent,

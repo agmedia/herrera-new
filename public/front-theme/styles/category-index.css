@@ -10,6 +10,15 @@
     padding-bottom: 48px;
 }
 
+.herrera-storefront.category-index-page .category-index-section {
+    padding-top: 24px;
+    padding-bottom: 36px;
+}
+
+.herrera-storefront.category-index-page .herrera-category-module {
+    padding: 0;
+}
+
 .category-index-grid {
     display: grid;
     border-top: 1px solid var(--category-line);

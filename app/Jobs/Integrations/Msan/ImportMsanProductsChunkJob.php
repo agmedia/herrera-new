@@ -30,6 +30,8 @@ class ImportMsanProductsChunkJob implements ShouldQueue
 
     public function handle(MsanProductImportService $importer): void
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $run = MsanSyncRun::query()->find($this->runId);
         if (! $run || in_array($run->status, [
             MsanSyncRun::STATUS_COMPLETED,
@@ -62,6 +64,10 @@ class ImportMsanProductsChunkJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        if (! \App\Support\Integrations\MsanModule::available()) {
+            return;
+        }
+
         $message = $this->sanitizeError($exception?->getMessage() ?: 'M SAN posao uvoza nije dovršen.');
 
         foreach ($this->productIds as $productId) {

@@ -39,6 +39,8 @@ class MsanProductImportService
      */
     public function import(int $msanProductId, ?int $userId = null): string
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $brand = trim((string) MsanProduct::query()
             ->whereKey($msanProductId)
             ->value('brand'));

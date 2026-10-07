@@ -1416,7 +1416,7 @@
     }
 
     .catalog-products-layout {
-        --catalog-sidebar-sticky-top: 96px;
+        --catalog-sidebar-sticky-top: calc(var(--site-header-bottom, 160px) + 12px);
         display: flex;
         align-items: stretch;
         gap: 1rem;

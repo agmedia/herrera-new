@@ -31,6 +31,17 @@ return [
 
     'connections' => [
 
+        // EPREL articles have bounded network budgets and must not be retried
+        // by a second worker while the first still owns the article operation.
+        'eprel' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => 'eprel',
+            'retry_after' => 660,
+            'after_commit' => true,
+        ],
+
         'sync' => [
             'driver' => 'sync',
         ],

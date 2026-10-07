@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Feed;
 
 use App\Http\Controllers\Controller;
 use App\Services\Feeds\NabavaNetFeedService;
+use App\Services\Pricing\B2BAccessService;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -11,6 +12,12 @@ class NabavaNetFeedController extends Controller
 {
     public function __invoke(Request $request, NabavaNetFeedService $feed): StreamedResponse
     {
+        abort_if(
+            app(B2BAccessService::class)->requiresApprovedAccount(),
+            403,
+            'Public price feeds are unavailable for this store.',
+        );
+
         $enabled = (bool) config('services.nabava_net.enabled', false);
         $expectedUsername = trim((string) config('services.nabava_net.username', ''));
         $expectedPassword = (string) config('services.nabava_net.password', '');

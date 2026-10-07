@@ -30,6 +30,8 @@
     };
 
     document.querySelectorAll('[data-quick-order-builder]').forEach((builder) => {
+        const itemPriceText = (item, amount) => currency.format(amount)
+            + (item.display_includes_tax === false ? ` ${builder.dataset.priceExcludesTaxLabel || ''}` : '');
         const searchInput = builder.querySelector('[data-quick-order-search]');
         const results = builder.querySelector('[data-quick-order-results]');
         const spinner = builder.querySelector('[data-quick-order-spinner]');
@@ -41,10 +43,16 @@
         const submit = builder.querySelector('[data-quick-order-submit]');
         const initial = builder.querySelector('[data-quick-order-initial]');
         const csrfToken = builder.querySelector('input[name="_token"]')?.value || '';
+        const draftStatus = builder.querySelector('[data-quick-order-draft-status]');
+        const announcement = builder.querySelector('[data-quick-order-announcement]');
+        const clear = builder.querySelector('[data-quick-order-clear]');
+        const undo = builder.querySelector('[data-quick-order-undo]');
         const selected = new Map();
         let searchTimer = null;
         let request = null;
-        let syncInFlight = false;
+        let syncTask = null;
+        let clearedItems = [];
+        let submitting = false;
         let syncPending = false;
         let selectionVersion = 0;
         let activeResult = -1;
@@ -64,8 +72,9 @@
         const normalizeItem = (item) => {
             const minimum = Math.max(1, Number(item.minimum_quantity || 1));
             const step = Math.max(1, Number(item.quantity_step || 1));
-            const maximum = Math.max(minimum, Math.min(999, Number(item.maximum_quantity || 999)));
-            let quantity = Math.max(minimum, Number(item.quantity || minimum));
+            const available = Math.max(0, Math.min(999, Number(item.maximum_quantity ?? 999)));
+            const maximum = available < minimum ? 0 : minimum + Math.floor((available - minimum) / step) * step;
+            let quantity = Math.max(minimum, Math.floor(Number(item.quantity || minimum)));
             quantity = Math.min(maximum, minimum + Math.ceil((quantity - minimum) / step) * step);
 
             return {
@@ -124,37 +133,46 @@
             }
         };
 
-        const persistSelection = async () => {
-            if (!builder.dataset.syncUrl || !csrfToken) return;
-
+        const persistSelection = () => {
+            if (!builder.dataset.syncUrl || !csrfToken) return Promise.resolve();
             syncPending = true;
-            if (syncInFlight) return;
+            if (syncTask) return syncTask;
 
-            syncPending = false;
-            syncInFlight = true;
-            const syncedVersion = selectionVersion;
+            syncTask = (async () => {
+                do {
+                    syncPending = false;
+                    const syncedVersion = selectionVersion;
+                    const syncController = new AbortController();
+                    const syncTimeout = window.setTimeout(() => syncController.abort(), 10000);
+                    if (draftStatus) draftStatus.textContent = builder.dataset.savingLabel;
+                    try {
+                        const response = await fetch(builder.dataset.syncUrl, {
+                            method: 'PUT',
+                            headers: {
+                                Accept: 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'X-Requested-With': 'XMLHttpRequest'
+                            },
+                            credentials: 'same-origin',
+                            keepalive: true,
+                            signal: syncController.signal,
+                            body: JSON.stringify({items: selectionItems()})
+                        });
+                        if (!response.ok) throw new Error(`Draft sync failed with status ${response.status}`);
+                        if (syncedVersion === selectionVersion) {
+                            clearBrowserFallback();
+                            if (draftStatus) draftStatus.textContent = builder.dataset.savedLabel;
+                        }
+                    } catch (error) {
+                        if (draftStatus) draftStatus.textContent = builder.dataset.saveErrorLabel;
+                    } finally {
+                        window.clearTimeout(syncTimeout);
+                    }
+                } while (syncPending);
+            })().finally(() => { syncTask = null; });
 
-            try {
-                const response = await fetch(builder.dataset.syncUrl, {
-                    method: 'PUT',
-                    headers: {
-                        Accept: 'application/json',
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    credentials: 'same-origin',
-                    keepalive: true,
-                    body: JSON.stringify({items: selectionItems()})
-                });
-                if (!response.ok) throw new Error(`Draft sync failed with status ${response.status}`);
-                if (syncedVersion === selectionVersion) clearBrowserFallback();
-            } catch (error) {
-                // The current selection remains usable even if draft syncing fails.
-            } finally {
-                syncInFlight = false;
-                if (syncPending) persistSelection();
-            }
+            return syncTask;
         };
 
         const hideResults = () => {
@@ -172,6 +190,7 @@
             searchInput.setAttribute('aria-expanded', 'true');
             currentResults = [];
             activeResult = -1;
+            searchInput.removeAttribute('aria-activedescendant');
         };
 
         const activateResult = (index) => {
@@ -187,25 +206,32 @@
             active.scrollIntoView({block: 'nearest'});
         };
 
-        const addItem = (rawItem) => {
+        const addItem = (rawItem, options = {}) => {
             const item = normalizeItem(rawItem);
+            if (item.maximum_quantity < item.minimum_quantity) return false;
             const existing = selected.get(item.key);
+            if (!existing && selected.size >= 100) {
+                if (announcement) announcement.textContent = builder.dataset.limitLabel;
+                return false;
+            }
             if (existing) {
-                existing.quantity = Math.min(
-                    existing.maximum_quantity,
-                    existing.quantity + existing.quantity_step
-                );
+                const addedQuantity = options.combine ? item.quantity : existing.quantity_step;
+                existing.quantity = normalizeItem({...existing, quantity: existing.quantity + addedQuantity}).quantity;
                 selected.set(item.key, existing);
             } else {
                 selected.set(item.key, item);
             }
-
-            searchInput.value = '';
-            hideResults();
-            render();
-            saveBrowserFallback();
-            persistSelection();
-            searchInput.focus();
+            if (announcement) announcement.textContent = `${item.name}: ${builder.dataset.addedLabel}`;
+            if (!options.batch) {
+                searchInput.value = '';
+                if (request) request.abort();
+                hideResults();
+                render();
+                saveBrowserFallback();
+                persistSelection();
+                searchInput.focus();
+            }
+            return true;
         };
 
         const renderSearchResults = (items) => {
@@ -236,7 +262,7 @@
                     .join(' · ');
                 copy.appendChild(element('span', 'quick-order-result-meta', meta));
 
-                const price = element('span', 'quick-order-result-price', currency.format(item.unit_price));
+                const price = element('span', 'quick-order-result-price', itemPriceText(item, item.unit_price));
                 if (item.is_b2b_price) {
                     price.appendChild(element('span', 'quick-order-b2b-badge', labels.b2b));
                 }
@@ -260,7 +286,8 @@
             }
 
             if (request) request.abort();
-            request = new AbortController();
+            const currentRequest = new AbortController();
+            request = currentRequest;
             spinner.hidden = false;
             showMessage(labels.searching);
 
@@ -273,7 +300,7 @@
                         'X-Requested-With': 'XMLHttpRequest'
                     },
                     credentials: 'same-origin',
-                    signal: request.signal
+                    signal: currentRequest.signal
                 });
 
                 if (!response.ok) throw new Error(`Search failed with status ${response.status}`);
@@ -281,9 +308,9 @@
                 if (searchInput.value.trim() !== query) return;
                 renderSearchResults(Array.isArray(payload.items) ? payload.items : []);
             } catch (error) {
-                if (error.name !== 'AbortError') showMessage(labels.emptySearch);
+                if (error.name !== 'AbortError' && searchInput.value.trim() === query) showMessage(builder.dataset.searchErrorLabel);
             } finally {
-                spinner.hidden = true;
+                if (request === currentRequest) spinner.hidden = true;
             }
         };
 
@@ -291,7 +318,8 @@
             const wrapper = element('div', 'quick-order-quantity-control');
             const decrement = element('button', '', '−');
             decrement.type = 'button';
-            decrement.setAttribute('aria-label', 'Smanji količinu');
+            decrement.setAttribute('aria-label', `Smanji količinu: ${item.name}`);
+            decrement.disabled = item.quantity <= item.minimum_quantity;
 
             const input = document.createElement('input');
             input.type = 'number';
@@ -300,11 +328,12 @@
             input.step = String(item.quantity_step);
             input.value = String(item.quantity);
             input.inputMode = 'numeric';
-            input.setAttribute('aria-label', 'Količina');
+            input.setAttribute('aria-label', `Količina: ${item.name}`);
 
             const increment = element('button', '', '+');
             increment.type = 'button';
-            increment.setAttribute('aria-label', 'Povećaj količinu');
+            increment.setAttribute('aria-label', `Povećaj količinu: ${item.name}`);
+            increment.disabled = item.quantity >= item.maximum_quantity;
 
             const setQuantity = (value) => {
                 const normalized = Math.max(
@@ -312,7 +341,7 @@
                     Math.min(item.maximum_quantity, Number(value || item.minimum_quantity))
                 );
                 item.quantity = item.minimum_quantity
-                    + Math.round((normalized - item.minimum_quantity) / item.quantity_step) * item.quantity_step;
+                    + Math.ceil((normalized - item.minimum_quantity) / item.quantity_step) * item.quantity_step;
                 item.quantity = Math.max(item.minimum_quantity, Math.min(item.maximum_quantity, item.quantity));
                 selected.set(item.key, item);
                 render();
@@ -362,7 +391,7 @@
 
                 const unitPrice = element('div', 'quick-order-line-price');
                 unitPrice.appendChild(element('small', '', 'Jedinična cijena'));
-                const unitPriceValue = element('span', '', currency.format(item.unit_price));
+                const unitPriceValue = element('span', '', itemPriceText(item, item.unit_price));
                 if (item.is_b2b_price) {
                     unitPriceValue.appendChild(element('span', 'quick-order-b2b-badge', labels.b2b));
                 }
@@ -374,7 +403,7 @@
 
                 const lineTotal = element('div', 'quick-order-line-total');
                 lineTotal.appendChild(element('small', '', 'Ukupno'));
-                lineTotal.appendChild(element('span', '', currency.format(item.unit_price * item.quantity)));
+                lineTotal.appendChild(element('span', '', itemPriceText(item, item.unit_price * item.quantity)));
 
                 const remove = element('button', 'quick-order-remove', '×');
                 remove.type = 'button';
@@ -402,12 +431,17 @@
             lines.hidden = !hasItems;
             footer.hidden = !hasItems;
             submit.disabled = !hasItems;
-            count.textContent = `${itemQuantity} ${itemQuantity === 1 ? 'artikl' : 'artikala'}`;
+            count.textContent = `${selected.size} ${selected.size === 1 ? 'stavka' : 'stavki'} · ${itemQuantity} kom`;
+            if (clear) clear.hidden = !hasItems;
+            if (undo) undo.hidden = clearedItems.length === 0;
             total.textContent = currency.format(grandTotal);
         };
 
         searchInput.addEventListener('input', () => {
             window.clearTimeout(searchTimer);
+            if (request) request.abort();
+            spinner.hidden = true;
+            hideResults();
             searchTimer = window.setTimeout(performSearch, 250);
         });
 
@@ -416,6 +450,12 @@
         });
 
         searchInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                if (!results.hidden && currentResults.length > 0) addItem(currentResults[Math.max(0, activeResult)]);
+                else performSearch();
+                return;
+            }
             if (results.hidden) return;
 
             if (event.key === 'ArrowDown') {
@@ -424,9 +464,7 @@
             } else if (event.key === 'ArrowUp') {
                 event.preventDefault();
                 activateResult(activeResult <= 0 ? currentResults.length - 1 : activeResult - 1);
-            } else if (event.key === 'Enter' && activeResult >= 0) {
-                event.preventDefault();
-                addItem(currentResults[activeResult]);
+
             } else if (event.key === 'Escape') {
                 hideResults();
             }
@@ -452,6 +490,140 @@
             searchInput.scrollIntoView({behavior: 'smooth', block: 'center'});
         });
 
+        clear?.addEventListener('click', () => {
+            clearedItems = Array.from(selected.values()).map((item) => ({...item}));
+            selected.clear();
+            render();
+            saveBrowserFallback();
+            persistSelection();
+            if (announcement) announcement.textContent = builder.dataset.clearedLabel;
+            undo?.focus();
+        });
+        undo?.addEventListener('click', () => {
+            clearedItems.forEach((item) => {
+                if (selected.has(item.key) || selected.size < 100) selected.set(item.key, item);
+            });
+            clearedItems = [];
+            render();
+            saveBrowserFallback();
+            persistSelection();
+            searchInput.focus();
+        });
+
+        const suggestionData = builder.querySelector('[data-quick-order-suggestions]');
+        const suggestionPanel = builder.querySelector('[data-quick-order-suggestions-panel]');
+        const suggestionItems = builder.querySelector('[data-quick-order-suggestion-items]');
+        const suggestionTabs = Array.from(builder.querySelectorAll('[data-quick-order-suggestion-tab]'));
+        let suggestions = {};
+        try { suggestions = JSON.parse(suggestionData?.textContent || '{}'); } catch (error) { /* Empty suggestions are safe. */ }
+        const renderSuggestions = (key) => {
+            if (!suggestionItems) return;
+            suggestionItems.replaceChildren();
+            suggestionItems.setAttribute('aria-labelledby', `quick-order-tab-${key}`);
+            suggestionTabs.forEach((tab) => {
+                const active = tab.dataset.quickOrderSuggestionTab === key;
+                tab.setAttribute('aria-selected', active ? 'true' : 'false');
+                tab.tabIndex = active ? 0 : -1;
+            });
+            const items = Array.isArray(suggestions[key]) ? suggestions[key] : [];
+            if (items.length === 0) {
+                suggestionItems.appendChild(element('p', 'quick-order-results-message', 'Još nema artikala. Pronađite ih pretraživanjem iznad.'));
+                return;
+            }
+            items.forEach((item) => {
+                const button = element('button', 'quick-order-suggestion');
+                button.type = 'button';
+                const copy = element('span', 'quick-order-suggestion-copy');
+                copy.appendChild(element('strong', '', item.name));
+                if (item.option_label) copy.appendChild(element('small', '', item.option_label));
+                copy.appendChild(element('small', '', item.identifier));
+                const action = element('span', 'quick-order-suggestion-action', item.requires_variant ? 'Odaberi varijantu →' : '+ Dodaj');
+                button.append(imageNode(item, 'quick-order-result-image'), copy, action);
+                button.addEventListener('click', () => {
+                    if (item.requires_variant) {
+                        searchInput.value = item.code;
+                        searchInput.focus();
+                        performSearch();
+                    } else addItem(item);
+                });
+                suggestionItems.appendChild(button);
+            });
+        };
+        suggestionTabs.forEach((tab, index) => {
+            tab.addEventListener('click', () => renderSuggestions(tab.dataset.quickOrderSuggestionTab));
+            tab.addEventListener('keydown', (event) => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                event.preventDefault();
+                const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? suggestionTabs.length - 1
+                    : (index + (event.key === 'ArrowRight' ? 1 : -1) + suggestionTabs.length) % suggestionTabs.length;
+                const next = suggestionTabs[nextIndex];
+                renderSuggestions(next.dataset.quickOrderSuggestionTab);
+                next.focus();
+            });
+        });
+        const firstSuggestionGroup = ['frequent', 'favorites', 'recent'].find((key) => suggestions[key]?.length > 0);
+        if (suggestionPanel && firstSuggestionGroup) {
+            suggestionPanel.hidden = false;
+            renderSuggestions(firstSuggestionGroup);
+        }
+
+        const bulkLines = builder.querySelector('[data-quick-order-bulk-lines]');
+        const importButton = builder.querySelector('[data-quick-order-import]');
+        const importFeedback = builder.querySelector('[data-quick-order-import-feedback]');
+        importButton?.addEventListener('click', async () => {
+            if (!bulkLines?.value.trim() || !builder.dataset.resolveUrl) return;
+            importButton.disabled = true;
+            importFeedback.hidden = false;
+            importFeedback.replaceChildren(element('p', '', builder.dataset.importingLabel));
+            const originalLines = bulkLines.value.split(/\r?\n/).filter((line) => line.trim() !== '');
+            try {
+                const response = await fetch(builder.dataset.resolveUrl, {
+                    method: 'POST',
+                    headers: {Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                    credentials: 'same-origin',
+                    body: JSON.stringify({lines: bulkLines.value})
+                });
+                const payload = await response.json();
+                if (!response.ok) throw new Error(payload.errors?.lines?.[0] || payload.message || builder.dataset.importErrorLabel);
+                let addedCount = 0;
+                const overflow = [];
+                const overflowItems = [];
+                (payload.items || []).forEach((item) => {
+                    if (addItem(item, {batch: true, combine: true})) addedCount++;
+                    else {
+                        overflow.push(`${item.identifier}: ${builder.dataset.limitLabel}`);
+                        overflowItems.push(`${item.identifier}; ${item.quantity}`);
+                    }
+                });
+                render();
+                saveBrowserFallback();
+                persistSelection();
+                importFeedback.replaceChildren(element('p', 'quick-order-import-summary', `${builder.dataset.importSuccessLabel}: ${addedCount}.`));
+                const issues = [...(payload.errors || []), ...(payload.warnings || [])];
+                if (issues.length || overflow.length) {
+                    const list = element('ul');
+                    issues.forEach((issue) => list.appendChild(element('li', '', `${issue.line}. ${issue.identifier}: ${issue.message}`)));
+                    overflow.forEach((message) => list.appendChild(element('li', '', message)));
+                    importFeedback.appendChild(list);
+                }
+                bulkLines.value = [...(payload.errors || []).map((issue) => originalLines[issue.line - 1]).filter(Boolean), ...overflowItems].join('\n');
+            } catch (error) {
+                importFeedback.replaceChildren(element('p', 'quick-order-import-error', error.message || builder.dataset.importErrorLabel));
+            } finally {
+                importButton.disabled = false;
+            }
+        });
+
+        builder.querySelector('[data-quick-order-form]')?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (submitting || selected.size === 0) return;
+            submitting = true;
+            submit.disabled = true;
+            await persistSelection();
+            clearBrowserFallback();
+            event.target.submit();
+        });
+
         const browserFallback = loadBrowserFallback();
 
         try {
@@ -459,7 +631,7 @@
             if (Array.isArray(items)) {
                 items.forEach((item) => {
                     const normalized = normalizeItem(item);
-                    selected.set(normalized.key, normalized);
+                    if (normalized.maximum_quantity >= normalized.minimum_quantity && selected.size < 100) selected.set(normalized.key, normalized);
                 });
             }
         } catch (error) {
@@ -468,5 +640,11 @@
 
         render();
         if (browserFallback !== null) persistSelection();
+        else if (selected.size && draftStatus) draftStatus.textContent = builder.dataset.savedLabel;
+        if (builder.dataset.initialQuery) {
+            searchInput.value = builder.dataset.initialQuery;
+            performSearch();
+            searchInput.focus();
+        }
     });
 })();

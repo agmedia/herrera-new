@@ -23,7 +23,7 @@
             @if ($b2bAccount)
                 @php
                     $b2bStatus = \App\Models\User\B2BAccount::statusOptions()[$b2bAccount->status] ?? $b2bAccount->status;
-                    $b2bApproved = $b2bAccount->contractIsActive();
+                    $b2bApproved = $canViewPrices && $b2bAccount->contractIsActive();
                 @endphp
                 <section class="border {{ $b2bApproved ? 'border-cyan-200 bg-cyan-50' : 'border-amber-200 bg-amber-50' }} p-5">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -40,13 +40,13 @@
                             @endif
                         </div>
                         @if ($b2bApproved)
-                            <a href="{{ route('account.b2b.quick-order') }}" class="commerce-primary-action shrink-0 px-4 py-2.5 text-sm font-semibold">{{ __('Brza kupnja') }}</a>
+                            <a href="{{ route('account.b2b.quick-order') }}" class="commerce-primary-action shrink-0 px-4 py-2.5 text-sm font-semibold">{{ __('Brza narudžba') }}</a>
                         @endif
                     </div>
                 </section>
             @endif
 
-            <div class="{{ $loyaltyEnabled ? 'grid gap-5 md:grid-cols-2 xl:grid-cols-3' : 'grid gap-5 md:grid-cols-2' }}">
+            <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 <article class="border border-slate-200 bg-white p-5">
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.dashboard.cards.user') }}</p>
                     <h2 class="mt-2 text-xl font-bold text-slate-900">{{ $user->name }}</h2>
@@ -56,8 +56,19 @@
 
                 <article class="border border-slate-200 bg-white p-5">
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.dashboard.cards.orders') }}</p>
-                    <h2 class="mt-2 text-xl font-bold text-slate-900">{{ $orders->count() }}</h2>
+                    <h2 class="mt-2 text-xl font-bold text-slate-900">{{ $orderCount }}</h2>
                     <a href="{{ route('account.orders') }}" class="mt-3 inline-flex border-b border-slate-900 text-sm font-semibold text-slate-900 hover:text-slate-700">{{ __('ui.account.dashboard.cards.view_orders') }}</a>
+                </article>
+
+                <article class="border border-slate-200 bg-white p-5">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Vrijednost narudžbi') }}</p>
+                    @forelse ($orderTotals as $orderTotal)
+                        <h2 class="mt-2 text-xl font-bold text-slate-900">{{ number_format((float) $orderTotal->total, 2, ',', '.') }} {{ \App\Support\Currency::symbol($orderTotal->currency_code) }}</h2>
+                        <p class="mt-1 text-sm text-slate-600">{{ __('Prosječna narudžba') }}: {{ number_format((float) $orderTotal->average, 2, ',', '.') }} {{ \App\Support\Currency::symbol($orderTotal->currency_code) }}</p>
+                    @empty
+                        <h2 class="mt-2 text-xl font-bold text-slate-900">0,00 €</h2>
+                    @endforelse
+                    <p class="mt-2 text-xs text-slate-500">{{ __('Ukupno s PDV-om. Otkazane narudžbe nisu uključene.') }}</p>
                 </article>
 
                 @if ($loyaltyEnabled)
@@ -69,6 +80,30 @@
                     </article>
                 @endif
             </div>
+
+            @if ($b2bAccount && $b2bApproved)
+                <section class="border border-slate-200 bg-white p-5" data-account-order-shortcuts>
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-xl font-bold text-slate-900">{{ __('Naručite brže') }}</h2>
+                            <p class="mt-1 text-sm text-slate-600">{{ __('Nastavite pripremljenu narudžbu ili odaberite artikle koje već poznajete.') }}</p>
+                        </div>
+                        <a href="{{ route('account.b2b.quick-order') }}" class="commerce-primary-action px-4 py-2.5 text-sm font-semibold">
+                            {{ $draftItemCount ? __('Nastavi narudžbu').' ('.$draftItemCount.' '.($draftItemCount === 1 ? __('stavka') : __('stavki')).')' : __('Nova brza narudžba') }}
+                        </a>
+                    </div>
+                    <div class="mt-4 flex flex-wrap gap-3">
+                        <a href="{{ route('account.b2b.frequent-products') }}" class="commerce-secondary-action px-4 py-2 text-sm font-semibold">{{ __('Često naručivani artikli') }}</a>
+                        <a href="{{ route('account.b2b.favorite-products') }}" class="commerce-secondary-action px-4 py-2 text-sm font-semibold">{{ __('Favoriti') }}</a>
+                        @if ($orders->isNotEmpty())
+                            <form method="POST" action="{{ route('account.orders.reorder', ['orderNumber' => $orders->first()->order_number]) }}">
+                                @csrf
+                                <button type="submit" class="commerce-secondary-action px-4 py-2 text-sm font-semibold">{{ __('Ponovi zadnju narudžbu') }}</button>
+                            </form>
+                        @endif
+                    </div>
+                </section>
+            @endif
 
             <section>
                 <h2 class="text-2xl font-bold text-slate-900">{{ __('ui.account.dashboard.recent_orders.title') }}</h2>

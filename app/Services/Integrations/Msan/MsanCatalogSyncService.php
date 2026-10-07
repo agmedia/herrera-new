@@ -28,6 +28,8 @@ class MsanCatalogSyncService
 
     public function sync(MsanSyncRun $run): MsanSyncRun
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $run->forceFill([
             'status' => MsanSyncRun::STATUS_RUNNING,
             'started_at' => $run->started_at ?: now(),

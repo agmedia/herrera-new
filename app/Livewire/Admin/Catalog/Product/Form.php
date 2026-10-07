@@ -15,19 +15,21 @@ use App\Models\Integrations\Msan\MsanProduct;
 use App\Models\Settings\Local\TaxRate;
 use App\Models\User\CustomerGroup;
 use App\Services\Catalog\CatalogFeatureService;
+use App\Services\Integrations\Eprel\EprelSettingsService;
 use App\Services\Integrations\Msan\EprelClient;
 use App\Services\Integrations\Msan\EprelException;
 use App\Services\Integrations\Msan\EprelProductLookupService;
-use App\Services\Integrations\Msan\MsanSettingsService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Throwable;
 
 class Form extends Component
 {
+    #[Locked]
     public ?int $productId = null;
 
     public string $activeTab = 'content';
@@ -220,6 +222,12 @@ class Form extends Component
 
     public function save()
     {
+        foreach (['code', 'sku', 'barcode'] as $field) {
+            if (is_string($this->form[$field] ?? null)) {
+                $this->form[$field] = trim($this->form[$field]);
+            }
+        }
+
         if ($this->useAttributes()) {
             $resolvedAttributeIds = $this->resolveAttributeIdsForSave();
             if ($resolvedAttributeIds === false) {
@@ -758,9 +766,9 @@ class Form extends Component
             return false;
         }
 
-        $settings = app(MsanSettingsService::class);
+        $settings = app(EprelSettingsService::class);
 
-        return $settings->eprelEnabled() && $settings->hasEprelApiKey();
+        return $settings->enabled() && $settings->hasApiKey();
     }
 
     public function render()
@@ -777,6 +785,51 @@ class Form extends Component
             'eprelProductGroupOptions' => EprelClient::productGroupOptions(),
             'eprelSearchByOptions' => EprelClient::searchByOptions(),
         ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function validationAttributes(): array
+    {
+        return [
+            'form.code' => __('Code'),
+            'form.sku' => __('SKU'),
+            'form.barcode' => __('Barkod proizvoda'),
+            'form.locale' => __('admin.common.locale'),
+            'form.name' => __('Name'),
+            'form.slug' => __('Slug'),
+            'form.base_price' => __('Base Price'),
+            'form.stock_qty' => __('Stock Qty'),
+            'form.tax_rate_id' => __('Tax Class'),
+            'form.manufacturer_id' => __('Manufacturer'),
+            'form.unit_of_measure' => __('Jedinica mjere'),
+            'form.minimum_order_quantity' => __('Minimalna količina'),
+            'form.order_quantity_step' => __('Korak količine'),
+            'form.weight_kg' => __('Težina (kg)'),
+            'form.length_cm' => __('Duljina (cm)'),
+            'form.width_cm' => __('Širina (cm)'),
+            'form.height_cm' => __('Visina (cm)'),
+            'form.shipping_labels' => __('Dostavne oznake'),
+            'form.shipping_labels.*' => __('Dostavne oznake'),
+            'form.category_ids' => __('Kategorije'),
+            'form.category_ids.*' => __('Kategorije'),
+            'packages.*.id' => __('Pakiranje'),
+            'packages.*.code' => __('Šifra'),
+            'packages.*.name' => __('Naziv'),
+            'packages.*.barcode' => __('Barkod'),
+            'packages.*.package_type' => __('Vrsta'),
+            'packages.*.unit_of_measure' => __('Jedinica mjere'),
+            'packages.*.quantity' => __('Količina u pakiranju'),
+            'groupPrices.*.id' => __('B2B cijene'),
+            'groupPrices.*.customer_group_id' => __('Grupa kupaca'),
+            'groupPrices.*.package_code' => __('Pakiranje'),
+            'groupPrices.*.minimum_quantity' => __('Minimalna količina'),
+            'groupPrices.*.price' => __('Cijena'),
+            'groupPrices.*.currency_code' => __('Valuta'),
+            'groupPrices.*.starts_at' => __('Vrijedi od'),
+            'groupPrices.*.ends_at' => __('Vrijedi do'),
+        ];
     }
 
     /**
@@ -844,7 +897,11 @@ class Form extends Component
             ],
             'form.attribute_ids' => ['nullable', 'array'],
             'packages' => ['array'],
-            'packages.*.id' => ['nullable', 'integer'],
+            'packages.*.id' => [
+                'nullable', 'integer', 'min:1',
+                Rule::exists('catalog_product_packages', 'id')
+                    ->where('product_id', $this->productId ?: 0),
+            ],
             'packages.*.code' => ['required', 'string', 'max:120'],
             'packages.*.name' => ['required', 'string', 'max:120'],
             'packages.*.barcode' => ['nullable', 'string', 'max:80'],
@@ -858,7 +915,11 @@ class Form extends Component
             'packages.*.is_default' => ['boolean'],
             'packages.*.is_active' => ['boolean'],
             'groupPrices' => ['array'],
-            'groupPrices.*.id' => ['nullable', 'integer'],
+            'groupPrices.*.id' => [
+                'nullable', 'integer', 'min:1',
+                Rule::exists('catalog_product_group_prices', 'id')
+                    ->where('product_id', $this->productId ?: 0),
+            ],
             'groupPrices.*.customer_group_id' => ['required', 'integer', Rule::exists('customer_groups', 'id')],
             'groupPrices.*.package_code' => ['nullable', 'string', 'max:120'],
             'groupPrices.*.minimum_quantity' => ['required', 'integer', 'min:1'],
@@ -1395,6 +1456,10 @@ class Form extends Component
 
             $id = (int) ($row['id'] ?? 0);
             if ($id > 0) {
+                if (in_array($id, $packageIds, true)) {
+                    $this->addError("packages.{$index}.id", __('The same package cannot appear more than once.'));
+                    $valid = false;
+                }
                 $packageIds[] = $id;
             }
         }
@@ -1415,7 +1480,17 @@ class Form extends Component
             }
         }
 
+        $priceIds = [];
         foreach ($validated['groupPrices'] ?? [] as $index => $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                if (in_array($id, $priceIds, true)) {
+                    $this->addError("groupPrices.{$index}.id", __('The same price cannot appear more than once.'));
+                    $valid = false;
+                }
+                $priceIds[] = $id;
+            }
+
             $packageCode = Str::upper(trim((string) ($row['package_code'] ?? '')));
             if ($packageCode !== '' && ! isset($packageCodes[$packageCode])) {
                 $this->addError("groupPrices.{$index}.package_code", __('Selected package does not exist.'));

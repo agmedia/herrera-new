@@ -121,7 +121,11 @@
                         <input type="checkbox" name="terms_accepted" value="1" class="mt-0.5" @checked(old('terms_accepted')) required @error('terms_accepted') aria-invalid="true" aria-describedby="auth-register-terms-error" @enderror>
                         <span>
                             {{ __('ui.auth.register.terms_prefix') }}
-                            <a href="{{ route('pages.show', ['slug' => 'uvjeti-koristenja']) }}" class="font-semibold text-blue-700 underline underline-offset-2" target="_blank" rel="noopener noreferrer">{{ __('ui.auth.register.terms_link') }}</a>.
+                            @if (!empty($storeSettings['legal']['terms']['url']))
+                                <a href="{{ $storeSettings['legal']['terms']['url'] }}" class="font-semibold text-blue-700 underline underline-offset-2" target="_blank" rel="noopener noreferrer">{{ $storeSettings['legal']['terms']['title'] }}</a>.
+                            @else
+                                {{ __('ui.auth.register.terms_link') }}.
+                            @endif
                         </span>
                     </label>
                     @error('terms_accepted')

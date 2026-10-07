@@ -8,12 +8,15 @@ use App\Models\Catalog\Category\Category;
 use App\Models\Catalog\Option\Option;
 use App\Models\Content\Page\InfoPage;
 use App\Models\Settings\Local\Language;
+use App\Services\Catalog\CatalogFeatureService;
 use App\Services\Settings\SystemSettingsService;
 use App\Support\Media\MediaProfileRegistry;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
@@ -479,7 +482,7 @@ class StoreSettings extends Component
 
             'form.store_announcement_enabled' => ['required', 'boolean'],
             'form.store_announcement_text' => ['nullable', 'string', 'max:191'],
-            'form.store_announcement_url' => ['nullable', 'url', 'max:2048'],
+            'form.store_announcement_url' => ['nullable', 'string', $this->storeLinkRule(), 'max:2048'],
             'form.store_announcement_new_tab' => ['required', 'boolean'],
             'form.store_announcement_scroll_enabled' => ['required', 'boolean'],
             'form.store_announcement_scroll_duration_seconds' => ['required', 'integer', 'min:6', 'max:60'],
@@ -521,7 +524,7 @@ class StoreSettings extends Component
             'form.store_cookie_consent_message' => ['nullable', 'string', 'max:2000'],
             'form.store_cookie_consent_accept_label' => ['nullable', 'string', 'max:60'],
             'form.store_cookie_consent_policy_label' => ['nullable', 'string', 'max:60'],
-            'form.store_cookie_consent_policy_url' => ['nullable', 'url', 'max:2048'],
+            'form.store_cookie_consent_policy_url' => ['nullable', 'string', $this->storeLinkRule(), 'max:2048'],
             'form.store_cookie_preferences_title' => ['nullable', 'string', 'max:120'],
             'form.store_cookie_preferences_accept_all_label' => ['nullable', 'string', 'max:60'],
             'form.store_cookie_preferences_accept_necessary_label' => ['nullable', 'string', 'max:60'],
@@ -566,6 +569,23 @@ class StoreSettings extends Component
 
             return false;
         }, ARRAY_FILTER_USE_BOTH);
+    }
+
+    private function storeLinkRule(): Closure
+    {
+        return static function (string $attribute, mixed $value, Closure $fail): void {
+            if (is_string($value)
+                && str_starts_with($value, '/')
+                && ! str_starts_with($value, '//')
+                && ! str_contains($value, '\\')
+                && preg_match('/\s/u', $value) === 0) {
+                return;
+            }
+
+            if (Validator::make(['url' => $value], ['url' => 'url:http,https'])->fails()) {
+                $fail('validation.url')->translate();
+            }
+        };
     }
 
     public function render()
@@ -636,7 +656,8 @@ class StoreSettings extends Component
             ->values()
             ->all();
 
-        $optionFilterOptions = Option::query()
+        $features = app(CatalogFeatureService::class);
+        $optionFilterOptions = $features->useOptions() ? Option::query()
             ->where('is_active', true)
             ->withCount('values')
             ->with(['translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale])])
@@ -655,9 +676,9 @@ class StoreSettings extends Component
                 ];
             })
             ->values()
-            ->all();
+            ->all() : [];
 
-        $attributeFilterGroupOptions = Attribute::query()
+        $attributeFilterGroupOptions = $features->useAttributes() ? Attribute::query()
             ->where('is_active', true)
             ->with(['translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale])])
             ->orderBy('group_code')
@@ -682,7 +703,7 @@ class StoreSettings extends Component
                 ];
             })
             ->values()
-            ->all();
+            ->all() : [];
 
         return view('livewire.admin.settings.system.store-settings', [
             'catalogCategoryOptions' => $catalogCategoryOptions,
@@ -752,6 +773,8 @@ class StoreSettings extends Component
 
     public function processWebpGenerationStep(): void
     {
+        $this->authorizeAccess();
+
         $cacheKey = $this->webpGenerationCacheKey();
         $state = Cache::get($cacheKey, []);
         if (! ((bool) ($state['running'] ?? false))) {
@@ -1279,6 +1302,8 @@ class StoreSettings extends Component
             return;
         }
 
+        $fallbackLocale = $this->defaultContentLocale();
+
         foreach (self::LOCALIZED_SETTING_KEYS as $key) {
             $translations = $this->normalizeTranslations($this->localizedValues[$key] ?? []);
             $value = trim((string) ($this->form[$key] ?? ''));
@@ -1290,6 +1315,10 @@ class StoreSettings extends Component
             }
 
             $this->localizedValues[$key] = $translations;
+
+            if ($locale === $fallbackLocale) {
+                $this->baseLocalizedValues[$key] = $value;
+            }
         }
     }
 

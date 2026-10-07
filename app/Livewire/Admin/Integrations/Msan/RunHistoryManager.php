@@ -125,6 +125,8 @@ class RunHistoryManager extends Component
 
     private function authorizeView(): void
     {
+        abort_unless(\App\Support\Integrations\MsanModule::available(), 404);
+
         $user = auth()->user();
 
         abort_unless(

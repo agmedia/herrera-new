@@ -7,6 +7,7 @@
     @php
         $boxNow = is_array($order->payload['shipping']['boxnow'] ?? null) ? $order->payload['shipping']['boxnow'] : null;
         $glsPoint = is_array($order->payload['shipping']['gls_dpm'] ?? null) ? $order->payload['shipping']['gls_dpm'] : null;
+        $bankInstructions = trim((string) ($bankTransfer['instructions'] ?? ''));
     @endphp
 
     @push('styles')
@@ -29,19 +30,26 @@
             </div>
         </dl>
 
-        @if (!empty($bankTransfer) && !empty($bankTransfer['receiver_iban']))
+        @if (!empty($bankTransfer) && (!empty($bankTransfer['receiver_iban']) || $bankInstructions !== ''))
             <section class="mt-6 border border-slate-200 bg-slate-50 p-4">
                 <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-700">{{ __('ui.checkout.success.bank_transfer_title') }}</h2>
-                <p class="mt-2 text-sm text-slate-600">{{ __('ui.checkout.success.bank_transfer_note') }}</p>
+                @if ($bankInstructions !== '')
+                    <p class="mt-2 whitespace-pre-line text-sm text-slate-700">{{ $bankInstructions }}</p>
+                @endif
+                @if (!empty($bankTransfer['qr_image_base64']))
+                    <p class="mt-2 text-sm text-slate-600">{{ __('ui.checkout.success.bank_transfer_note') }}</p>
+                @endif
 
-                <div class="mt-3 grid gap-2 text-sm text-slate-800 md:grid-cols-2">
-                    <p><strong>{{ __('ui.checkout.success.bank_recipient') }}:</strong> {{ $bankTransfer['receiver_name'] ?? '-' }}</p>
-                    <p><strong>{{ __('ui.checkout.success.bank_iban') }}:</strong> {{ $bankTransfer['receiver_iban'] ?? '-' }}</p>
-                    <p><strong>{{ __('ui.checkout.success.bank_model') }}:</strong> {{ $bankTransfer['model'] ?? '-' }}</p>
-                    <p><strong>{{ __('ui.checkout.success.bank_reference') }}:</strong> {{ $bankTransfer['reference'] ?? '-' }}</p>
-                    <p><strong>{{ __('ui.checkout.success.bank_amount') }}:</strong> {{ $order->currency_code }} {{ number_format((float) ($bankTransfer['amount'] ?? 0), 2) }}</p>
-                    <p><strong>{{ __('ui.checkout.success.bank_description') }}:</strong> {{ $bankTransfer['description'] ?? '-' }}</p>
-                </div>
+                @if (!empty($bankTransfer['receiver_iban']))
+                    <div class="mt-3 grid gap-2 text-sm text-slate-800 md:grid-cols-2">
+                        <p><strong>{{ __('ui.checkout.success.bank_recipient') }}:</strong> {{ $bankTransfer['receiver_name'] ?? '-' }}</p>
+                        <p><strong>{{ __('ui.checkout.success.bank_iban') }}:</strong> {{ $bankTransfer['receiver_iban'] ?? '-' }}</p>
+                        <p><strong>{{ __('ui.checkout.success.bank_model') }}:</strong> {{ $bankTransfer['model'] ?? '-' }}</p>
+                        <p><strong>{{ __('ui.checkout.success.bank_reference') }}:</strong> {{ $bankTransfer['reference'] ?? '-' }}</p>
+                        <p><strong>{{ __('ui.checkout.success.bank_amount') }}:</strong> {{ $order->currency_code }} {{ number_format((float) ($bankTransfer['amount'] ?? 0), 2) }}</p>
+                        <p><strong>{{ __('ui.checkout.success.bank_description') }}:</strong> {{ $bankTransfer['description'] ?? '-' }}</p>
+                    </div>
+                @endif
 
                 @if (!empty($bankTransfer['qr_image_base64']))
                     <div class="mt-4">

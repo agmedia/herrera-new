@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1\Wholesale;
 
+use App\Services\Pricing\B2BAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -28,7 +29,7 @@ class ManufacturerResource extends JsonResource
             'description' => $translation?->description,
             'meta_title' => $translation?->meta_title,
             'meta_description' => $translation?->meta_description,
-            'payload' => $this->payload,
+            'payload' => app(B2BAccessService::class)->requiresApprovedAccount() ? null : $this->payload,
             'created_at' => optional($this->created_at)?->toISOString(),
             'updated_at' => optional($this->updated_at)?->toISOString(),
         ];

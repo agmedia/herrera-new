@@ -71,7 +71,7 @@
                 {{ __('ui.wishlist.empty') }}
             </div>
         @else
-            <div class="catalog-lined-grid {{ $gridClass }}">
+            <div class="catalog-lined-grid {{ $gridClass }}" data-continuous-card-grid>
                 @foreach ($products as $product)
                     @include('front.desktop.partials.product-card', [
                         'product' => $product,

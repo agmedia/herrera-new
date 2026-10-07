@@ -6,6 +6,7 @@ use App\Models\Catalog\Product\Product;
 use App\Services\Front\WishlistService;
 use App\Services\Pricing\ProductPricePresentationService;
 use App\Services\Settings\SystemSettingsService;
+use App\Support\Media\LegacyCatalogImage;
 use App\Support\Media\MediaUrl;
 use App\Support\ProductEnergyLabelPresenter;
 use App\Support\ProductMaterialLabel;
@@ -14,7 +15,7 @@ use Illuminate\View\View;
 
 class ProductCard extends Component
 {
-    /** @var array{current_gross:float,current_price:string,old_price:?string,discount_percent:?int,lowest_30_days_price:?string,is_b2b_price:bool}|null */
+    /** @var array{display_current:float,current_price:string,old_price:?string,discount_percent:?int,lowest_30_days_price:?string,is_b2b_price:bool,display_includes_tax:bool}|null */
     private ?array $priceData = null;
 
     public function __construct(
@@ -89,6 +90,12 @@ class ProductCard extends Component
         $imageOriginalUrl = $mainMedia ? (string) $mainMedia->getUrl() : null;
         $hoverImageOriginalUrl = $hoverMedia ? (string) $hoverMedia->getUrl() : null;
 
+        if (! $imageUrl) {
+            $legacyImages = LegacyCatalogImage::gallery($this->product);
+            $imageUrl = $imageOriginalUrl = $legacyImages->first();
+            $hoverImageUrl = $hoverImageOriginalUrl = $legacyImages->get(1);
+        }
+
         $imageSrcset = collect([
             $imageUrl320 ? $imageUrl320.' 320w' : null,
             $imageUrl480 ? $imageUrl480.' 480w' : null,
@@ -138,16 +145,20 @@ class ProductCard extends Component
         $authUser = auth()->user();
         if ($this->priceData === null) {
             $priceData = app(ProductPricePresentationService::class)->forProduct($this->product, $authUser);
+            $displayCurrent = $priceData['display_current'] ?? $priceData['current_gross'];
+            $displayOld = $priceData['display_old'] ?? $priceData['old_gross'];
+            $displayLowest = $priceData['display_lowest_30_days'] ?? $priceData['lowest_30_days_gross'];
 
             $this->priceData = [
-                'current_gross' => (float) $priceData['current_gross'],
-                'current_price' => number_format((float) $priceData['current_gross'], 2).' €',
-                'old_price' => $priceData['old_gross'] !== null ? number_format((float) $priceData['old_gross'], 2).' €' : null,
+                'display_current' => (float) $displayCurrent,
+                'current_price' => number_format((float) $displayCurrent, 2).' €',
+                'old_price' => $displayOld !== null ? number_format((float) $displayOld, 2).' €' : null,
                 'discount_percent' => $priceData['discount_percent'],
-                'lowest_30_days_price' => $priceData['lowest_30_days_gross'] !== null
-                    ? number_format((float) $priceData['lowest_30_days_gross'], 2).' €'
+                'lowest_30_days_price' => $displayLowest !== null
+                    ? number_format((float) $displayLowest, 2).' €'
                     : null,
                 'is_b2b_price' => (bool) ($priceData['is_b2b_price'] ?? false),
+                'display_includes_tax' => (bool) ($priceData['display_includes_tax'] ?? true),
             ];
         }
 
@@ -175,7 +186,11 @@ class ProductCard extends Component
             'productName' => $translation?->name ?? $this->product->code,
             'materialLabel' => ProductMaterialLabel::resolve($this->product, $locale, $fallbackLocale),
             'productSku' => (string) ($this->product->sku ?: $this->product->id),
-            'productPriceValue' => round((float) ($priceData['current_gross'] ?? 0), 2),
+            'productDisplayCode' => trim((string) data_get($this->product->payload, 'opencart.model')) ?: (string) ($this->product->sku ?: $this->product->code),
+            'productEanCode' => trim((string) $this->product->barcode) ?: trim((string) data_get($this->product->payload, 'opencart.ean')),
+            'localStockQuantity' => max(0, (int) $this->product->stock_qty),
+            'supplierStockQuantity' => max(0, (int) ($this->product->supplier_stock_qty ?? 0)),
+            'productPriceValue' => round((float) ($priceData['display_current'] ?? 0), 2),
             'productBrand' => $manufacturerName,
             'productCategory' => $categoryName,
             'imageUrl' => $imageUrl,
@@ -200,6 +215,7 @@ class ProductCard extends Component
             'discountPercent' => $priceData['discount_percent'],
             'lowest30DaysPrice' => $priceData['lowest_30_days_price'],
             'isB2BPrice' => $priceData['is_b2b_price'],
+            'displayIncludesTax' => $priceData['display_includes_tax'],
             'reviewSummary' => $this->product->approvedCommentSummary([$locale, $fallbackLocale]),
             'energyDeclaration' => $energyDeclaration,
             'flat' => $this->flat,

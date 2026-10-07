@@ -26,6 +26,7 @@ use Tests\TestCase;
 class EprelEnergySyncTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\EnablesLegacyMsanModule;
 
     private const GROUP = 'refrigeratingappliances2019';
 
@@ -71,7 +72,7 @@ class EprelEnergySyncTest extends TestCase
         $this->assertSame('G', $result['scale_max']);
         $this->assertSame('C-Left-LightOrange-WithAGScale.svg', $result['energy_label_image']);
         $this->assertSame(
-            EprelClient::BASE_URL.'/api/products/'.self::GROUP.'/1234567/labels?format=PDF',
+            EprelClient::BASE_URL.'/labels/'.self::GROUP.'/Label_1234567_big_color.pdf',
             $result['energy_label_url'],
         );
         $this->assertSame(

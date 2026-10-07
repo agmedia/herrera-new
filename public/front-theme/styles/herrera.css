@@ -1,0 +1,908 @@
+/* Herrera's original cyan/charcoal identity, layered over the existing shop UI. */
+body.herrera-storefront {
+    --herrera-cyan: #00b5cc;
+    --herrera-dark: #32373b;
+    --herrera-soft: #f3f7f8;
+    --herrera-layout-width: var(--header-content-width, 1400px);
+    --herrera-wide-layout-width: var(--storefront-container-width, 1860px);
+    --herrera-layout-gutter: 16px;
+    --reading-slate-900: #32373b;
+    --reading-slate-800: #32373b;
+    --category-ink: #32373b;
+    --category-muted: #57666d;
+    --category-line: #e2eaec;
+    --category-blue: #008b9d;
+    --navigation-background-color: #00b5cc;
+    --store-announcement-background-color: #00b5cc;
+    background: #fff;
+    color: var(--herrera-dark);
+    /* Clip horizontal spill without creating a scroll container for sticky filters. */
+    overflow-x: clip;
+}
+
+.herrera-storefront .herrera-layout-container {
+    width: 100%;
+    max-width: var(--herrera-layout-width);
+    margin-right: auto;
+    margin-left: auto;
+    padding-right: var(--herrera-layout-gutter);
+    padding-left: var(--herrera-layout-gutter);
+}
+
+.herrera-storefront .herrera-home-main,
+.herrera-storefront .herrera-wide-catalog-main,
+.herrera-storefront .site-footer-shell {
+    max-width: var(--herrera-wide-layout-width);
+}
+
+.herrera-storefront .herrera-main .storefront-container {
+    width: 100%;
+    max-width: none;
+    padding-right: 0;
+    padding-left: 0;
+}
+
+.herrera-storefront .herrera-main .storefront-widget-wide,
+.herrera-storefront .herrera-main .full-width-image-slider-shell,
+.herrera-storefront .herrera-main [data-herrera-aligned-section] {
+    left: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    transform: none !important;
+}
+
+.herrera-storefront [data-herrera-aligned-inner] {
+    padding-right: 0;
+    padding-left: 0;
+}
+
+@media (min-width: 640px) {
+    body.herrera-storefront {
+        --herrera-layout-gutter: 24px;
+    }
+}
+
+body.herrera-storefront,
+.herrera-storefront input,
+.herrera-storefront button,
+.herrera-storefront select,
+.herrera-storefront textarea {
+    font-family: Inter, Arial, Helvetica, sans-serif;
+}
+
+.herrera-storefront .site-main-header {
+    box-shadow: 0 1px 0 rgb(50 55 59 / 8%), 0 7px 24px rgb(50 55 59 / 4%);
+}
+
+.herrera-storefront .site-main-logo {
+    max-width: 190px;
+    height: 58px;
+}
+
+.herrera-storefront .site-top-bar {
+    display: block !important;
+    background: var(--herrera-dark);
+    color: #fff;
+}
+
+.herrera-storefront .site-top-bar-shell {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    min-height: 34px;
+    margin: 0;
+    border: 0;
+    background: var(--herrera-dark);
+    color: #fff;
+}
+
+.herrera-storefront .site-top-bar-inner {
+    min-height: 34px;
+    height: auto;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+}
+
+.herrera-storefront .site-top-bar-links {
+    flex-wrap: wrap;
+    gap: 4px 24px;
+    padding: 0;
+    overflow: visible;
+    white-space: normal;
+}
+
+.herrera-storefront .site-top-bar-link {
+    line-height: 1.5;
+}
+
+.herrera-storefront .site-top-bar-socials {
+    align-self: center;
+    justify-content: flex-end;
+    gap: 2px;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+}
+
+.herrera-storefront .site-top-bar-social-link {
+    min-height: 28px;
+}
+
+.herrera-storefront .site-top-bar-social-label {
+    display: none;
+}
+
+.herrera-storefront .site-top-bar-announcement {
+    display: none;
+}
+
+@media (min-width: 1440px) {
+    .herrera-storefront .site-top-bar-inner {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        column-gap: 24px;
+    }
+
+    .herrera-storefront .site-top-bar-links {
+        grid-column: 1;
+    }
+
+    .herrera-storefront .site-top-bar-announcement {
+        display: block;
+        grid-column: 2;
+        min-width: 0;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.5;
+        letter-spacing: .04em;
+        text-align: center;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .herrera-storefront .site-top-bar-announcement a:hover,
+    .herrera-storefront .site-top-bar-announcement a:focus-visible {
+        text-decoration: underline;
+    }
+
+    .herrera-storefront .site-top-bar-socials {
+        grid-column: 3;
+        justify-self: end;
+        margin-left: 0;
+    }
+
+    .herrera-storefront .herrera-announcement-in-topbar {
+        display: none;
+    }
+}
+
+@media (min-width: 1024px) {
+    .herrera-storefront .site-top-bar-social-link {
+        width: auto;
+        gap: 7px;
+        padding: 0 10px;
+    }
+
+    .herrera-storefront .site-top-bar-social-link:last-child {
+        padding-right: 0;
+    }
+
+    .herrera-storefront .site-top-bar-social-label {
+        display: inline;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1.5;
+    }
+}
+
+.herrera-storefront .site-top-bar-link,
+.herrera-storefront .site-top-bar-social-link {
+    color: #fff;
+}
+
+.herrera-storefront .site-top-bar-link:hover,
+.herrera-storefront .site-top-bar-social-link:hover,
+.herrera-storefront .site-top-bar-link:focus-visible,
+.herrera-storefront .site-top-bar-social-link:focus-visible {
+    background: transparent;
+    color: var(--herrera-cyan);
+}
+
+.herrera-storefront .site-top-bar-link:focus-visible,
+.herrera-storefront .site-top-bar-social-link:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+.herrera-storefront .header-search-form {
+    border-color: #d8e4e7;
+    border-radius: 5px;
+    background: #f6f9fa;
+}
+
+.herrera-storefront .header-search-submit {
+    color: var(--herrera-dark);
+}
+
+.herrera-storefront .header-search-submit:hover {
+    background: var(--herrera-cyan);
+    color: #fff;
+}
+
+.herrera-storefront .store-benefits-shell {
+    background: var(--herrera-dark);
+}
+
+.herrera-storefront .store-benefits-shell {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+}
+
+.herrera-storefront .store-announcement-shell.herrera-layout-container {
+    max-width: var(--herrera-wide-layout-width);
+    background: transparent;
+}
+
+.herrera-storefront .store-announcement-bar {
+    padding-right: var(--herrera-layout-gutter);
+    padding-left: var(--herrera-layout-gutter);
+    background: var(--herrera-cyan);
+}
+
+.herrera-storefront .herrera-home-main {
+    padding-top: 24px;
+}
+
+.herrera-storefront [data-herrera-home-hero-placement] {
+    margin-top: 0;
+}
+
+.herrera-storefront .site-main-nav-row {
+    height: auto;
+    min-height: 62px;
+}
+
+.herrera-storefront .site-main-nav-link {
+    min-height: 62px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: clamp(12px, .95vw, 14px);
+    line-height: 1.25;
+    text-align: center;
+}
+
+.herrera-primary-navigation,
+.herrera-catalog-navigation {
+    display: none;
+}
+
+@media (min-width: 1280px) {
+    .herrera-storefront .herrera-header-layout,
+    .herrera-storefront .site-main-header.is-sticky .herrera-header-layout {
+        display: grid;
+        grid-template-areas: "brand navigation actions" "catalog search search";
+        grid-template-columns: 260px minmax(0, 1fr) auto;
+        grid-template-rows: 70px 56px;
+        align-items: center;
+        gap: 12px 24px;
+        height: auto;
+        padding: 12px var(--herrera-layout-gutter) 20px;
+    }
+
+    .herrera-storefront .herrera-header-layout .responsive-header-brand {
+        grid-area: brand;
+        width: auto;
+        padding: 0;
+    }
+
+    .herrera-storefront .herrera-header-layout .site-main-logo {
+        width: auto;
+        max-width: 220px;
+        height: 62px;
+    }
+
+    .herrera-storefront .herrera-header-layout .desktop-header-actions {
+        grid-area: actions;
+        align-items: center;
+        height: 48px;
+    }
+
+    .herrera-storefront .herrera-header-layout .desktop-header-actions > a,
+    .herrera-storefront .herrera-header-layout .desktop-header-actions > div:not(.header-cart-hover),
+    .herrera-storefront .herrera-header-layout .header-cart-trigger {
+        border: 0;
+    }
+
+    .herrera-storefront .herrera-header-layout .desktop-header-actions > a {
+        min-width: 0;
+        padding: 0 12px;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .herrera-storefront .herrera-header-layout .header-cart-hover {
+        width: 48px;
+        flex-basis: 48px;
+    }
+
+    .herrera-storefront .herrera-header-layout .header-cart-count {
+        top: 2px;
+        right: 0;
+        min-width: 17px;
+        height: 17px;
+        background: var(--herrera-cyan);
+        font-size: 10px;
+    }
+
+    .herrera-primary-navigation {
+        display: flex;
+        grid-area: navigation;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(16px, 1.8vw, 28px);
+        min-width: 0;
+    }
+
+    .herrera-primary-navigation a {
+        padding: 12px 0;
+        color: var(--herrera-dark);
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        white-space: nowrap;
+    }
+
+    .herrera-primary-navigation a:hover,
+    .herrera-primary-navigation a[aria-current=page] {
+        color: #007d8e;
+    }
+
+    .herrera-primary-navigation a:focus-visible {
+        outline: 2px solid #008b9d;
+        outline-offset: 5px;
+    }
+
+    .herrera-catalog-navigation {
+        display: block;
+        grid-area: catalog;
+        height: 56px;
+    }
+
+    .herrera-storefront .herrera-catalog-navigation .site-main-nav-link {
+        min-height: 56px;
+        gap: 12px;
+        padding: 0 18px;
+        border-radius: 5px;
+        background: var(--herrera-cyan);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .herrera-storefront .herrera-catalog-navigation .site-main-nav-link:hover,
+    .herrera-storefront .herrera-catalog-navigation .site-main-nav-link:focus-visible {
+        background: #008b9d;
+        color: #fff;
+    }
+
+    .herrera-storefront .herrera-catalog-navigation .site-main-nav-link:focus-visible {
+        outline: 2px solid var(--herrera-dark);
+        outline-offset: 3px;
+    }
+
+    .herrera-storefront .herrera-catalog-navigation .site-main-nav-mega {
+        top: calc(100% - 20px);
+        left: var(--herrera-layout-gutter);
+        width: calc(100% - 2 * var(--herrera-layout-gutter));
+    }
+
+    .herrera-storefront .herrera-header-layout .header-search-panel-shell {
+        position: relative;
+        inset: auto;
+        display: flex;
+        grid-area: search;
+        height: 56px;
+        border: 0;
+    }
+
+    .herrera-storefront .herrera-header-layout .header-search-form {
+        padding: 0;
+        border: 1px solid var(--herrera-cyan);
+        border-radius: 5px;
+        background: #fff;
+    }
+
+    .herrera-storefront .herrera-header-layout .header-search-input {
+        height: 54px;
+        padding: 0 18px;
+        border: 0;
+        background: transparent;
+        font-size: 15px;
+    }
+
+    .herrera-storefront .herrera-header-layout .header-search-submit {
+        height: 54px;
+        flex-basis: 64px;
+        border: 0;
+        border-radius: 0 4px 4px 0;
+        background: #fff;
+        color: var(--herrera-dark);
+    }
+
+    .herrera-storefront .herrera-header-layout .header-search-submit:hover {
+        background: #edf7f9;
+    }
+}
+
+.herrera-storefront .commerce-primary-action,
+.herrera-storefront [data-product-card-form] button[type=submit],
+.herrera-storefront [data-product-add-to-cart] {
+    border-color: var(--herrera-dark);
+    background: var(--herrera-dark);
+    color: #fff;
+}
+
+.herrera-storefront .commerce-primary-action:hover,
+.herrera-storefront [data-product-card-form] button[type=submit]:hover,
+.herrera-storefront [data-product-add-to-cart]:hover {
+    border-color: #008da0;
+    background: #008da0;
+}
+
+.herrera-storefront [data-product-card] {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    transition: none;
+}
+
+.herrera-storefront [data-product-card]:hover {
+    box-shadow: none;
+}
+
+.herrera-storefront [data-product-card] > div:first-child,
+.herrera-storefront [data-product-card-image-frame] {
+    border-radius: 0;
+}
+
+/* Each cell draws only its right/bottom divider. The outer frame overlays the
+   same edge, keeping every line 1px even when the final row is incomplete. */
+.herrera-storefront [data-continuous-card-grid] {
+    position: relative;
+    gap: 0;
+    border: 0;
+    border-radius: 0;
+    background: #fff;
+    box-shadow: none;
+}
+
+.herrera-storefront [data-continuous-card-grid]::after,
+.herrera-storefront [data-continuous-card-carousel] .splide__track::after {
+    position: absolute;
+    z-index: 2;
+    inset: 0;
+    border: 1px solid #e2eaec;
+    border-radius: 0;
+    content: '';
+    pointer-events: none;
+}
+
+.herrera-storefront [data-continuous-card-grid] > [data-product-card],
+.herrera-storefront [data-continuous-card-grid] > .category-index-card,
+.herrera-storefront [data-continuous-card-grid] > .featured-category-card,
+.herrera-storefront [data-continuous-card-grid] > article {
+    margin: 0;
+    border: 0;
+    border-right: 1px solid #e2eaec;
+    border-bottom: 1px solid #e2eaec;
+    border-radius: 0;
+    background: #fff;
+    box-shadow: none;
+}
+
+.herrera-storefront [data-continuous-card-carousel] .splide__track {
+    position: relative;
+    border: 0 !important;
+    border-radius: 0;
+    background: #fff;
+}
+
+.herrera-storefront [data-continuous-card-carousel] .splide__list {
+    gap: 0 !important;
+}
+
+.herrera-storefront [data-continuous-card-carousel] .splide__slide {
+    border: 0;
+    border-right: 1px solid #e2eaec;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.herrera-storefront [data-product-card-image-frame] {
+    background: #fff;
+    aspect-ratio: 1 / 1;
+}
+
+.herrera-storefront [data-product-card-image-frame] img {
+    padding: 14px;
+}
+
+.herrera-storefront .category-index-card,
+.herrera-storefront .featured-category-card {
+    border-color: #e2eaec;
+    border-radius: 0;
+}
+
+.herrera-storefront .brand-directory__card {
+    border-color: #e2eaec;
+    border-radius: 5px;
+}
+
+.herrera-storefront .product-gallery-slide-image {
+    object-fit: contain;
+}
+
+.herrera-storefront .site-footer-accent::before {
+    background: var(--herrera-cyan);
+}
+
+.herrera-storefront .site-footer-newsletter,
+.herrera-storefront .site-footer-benefits,
+.herrera-storefront .site-footer-links,
+.herrera-storefront .site-footer-payments,
+.herrera-storefront .site-footer .store-footer-bottom,
+.herrera-storefront .site-footer-mobile-links > details > summary,
+.herrera-storefront .site-footer-mobile-links > details > div {
+    padding-right: 0;
+    padding-left: 0;
+}
+
+.herrera-storefront .site-footer-mobile-section {
+    margin-right: 0;
+    margin-left: 0;
+}
+
+.herrera-storefront .site-footer-contact-title,
+.herrera-storefront .site-footer-contact-details,
+.herrera-storefront .site-footer-contact-intro,
+.herrera-storefront .site-footer-contact-phone {
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.herrera-storefront .header-cart-popover {
+    top: calc(100% + 8px);
+    right: 0;
+    width: min(390px, calc(100vw - 2 * var(--herrera-layout-gutter)));
+    border-top: 2px solid var(--herrera-cyan);
+}
+
+.herrera-storefront .header-cart-popover::before {
+    top: -8px;
+    right: 17px;
+    width: 14px;
+    height: 14px;
+    border-top: 2px solid var(--herrera-cyan);
+    border-left: 2px solid var(--herrera-cyan);
+}
+
+.herrera-storefront .header-cart-empty--b2b {
+    min-height: 0;
+    align-items: stretch;
+    padding: 24px;
+    text-align: left;
+}
+
+.herrera-storefront .header-cart-empty--b2b p {
+    margin: 0;
+}
+
+.herrera-storefront .header-cart-empty--b2b .b2b-price-access > div {
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.herrera-storefront .header-cart-empty--b2b .b2b-price-access a {
+    display: inline-flex;
+    min-height: 40px;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 14px;
+    border: 1px solid var(--herrera-dark);
+    color: var(--herrera-dark);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.4;
+    text-align: center;
+    text-decoration: none;
+}
+
+.herrera-storefront .header-cart-empty--b2b .b2b-price-access a:first-of-type {
+    background: var(--herrera-dark);
+    color: #fff;
+}
+
+.herrera-storefront .header-cart-item,
+.herrera-storefront .header-cart-summary {
+    padding-right: 24px;
+    padding-left: 24px;
+}
+
+.herrera-storefront .site-footer-newsletter h3 {
+    color: var(--herrera-dark);
+}
+
+.herrera-storefront .site-footer-benefits {
+    background: var(--herrera-soft);
+    box-shadow: 0 0 0 100vmax var(--herrera-soft);
+}
+
+.herrera-hero {
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    gap: 2rem;
+    align-items: center;
+    padding: clamp(2rem, 5vw, 4.5rem);
+    margin: 0;
+    background: #edf7f9;
+    border-bottom: 1px solid #d8eaee;
+}
+
+.herrera-hero::before {
+    position: absolute;
+    inset: 0 0 0 55%;
+    background: linear-gradient(135deg, transparent 20%, rgb(0 181 204 / 8%) 20%, rgb(0 181 204 / 8%) 45%, transparent 45%);
+    content: '';
+    pointer-events: none;
+}
+
+.herrera-hero-copy,
+.herrera-hero-panel {
+    position: relative;
+    z-index: 1;
+}
+
+.herrera-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    color: #007d8e;
+    font-size: .7rem;
+    font-weight: 800;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+}
+
+.herrera-eyebrow::before {
+    width: 24px;
+    height: 3px;
+    background: var(--herrera-cyan);
+    content: '';
+}
+
+.herrera-hero h1 {
+    max-width: 650px;
+    margin-top: 1.25rem;
+    color: var(--herrera-dark);
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -.035em;
+}
+
+.herrera-hero-description {
+    max-width: 550px;
+    margin-top: 1.3rem;
+    color: #57666d;
+    font-size: 1rem;
+    line-height: 1.8;
+}
+
+.herrera-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .8rem;
+    margin-top: 1.8rem;
+}
+
+.herrera-hero-actions a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .8rem;
+    min-height: 46px;
+    padding: .8rem 1.3rem;
+    border: 1px solid var(--herrera-dark);
+    border-radius: 4px;
+    font-size: .82rem;
+    font-weight: 700;
+}
+
+.herrera-hero-actions a:first-child {
+    background: var(--herrera-dark);
+    color: #fff;
+}
+
+.herrera-hero-actions svg {
+    width: 14px;
+    height: 14px;
+    flex: 0 0 14px;
+}
+
+.herrera-hero-panel {
+    padding: 1.8rem;
+    border: 1px solid #d8eaee;
+    border-top: 3px solid var(--herrera-cyan);
+    border-radius: 5px;
+    background: #fff;
+    box-shadow: 0 15px 50px rgb(50 55 59 / 5%);
+}
+
+.herrera-hero-panel h2 {
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.herrera-hero-panel p {
+    margin-top: .65rem;
+    color: #57666d;
+    font-size: .86rem;
+    line-height: 1.7;
+}
+
+.herrera-hero-panel ul {
+    display: grid;
+    gap: .9rem;
+    margin-top: 1.25rem;
+    border-top: 1px solid #e7eef0;
+    padding-top: 1.25rem;
+    list-style: none;
+}
+
+.herrera-hero-panel li {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    font-size: .83rem;
+    font-weight: 600;
+}
+
+.herrera-hero-panel li svg {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+    color: #008b9d;
+}
+
+.herrera-home-section {
+    margin-top: 2.6rem;
+    margin-bottom: 2.6rem;
+}
+
+.herrera-home-section .category-index-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.herrera-home-product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 768px) {
+    .herrera-home-product-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.herrera-home-section .category-index-card-media {
+    aspect-ratio: 1 / 1;
+    padding: 20px;
+}
+
+.herrera-home-section .category-index-card-media img {
+    object-fit: contain;
+}
+
+.herrera-home-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.3rem;
+}
+
+.herrera-home-heading h2 {
+    font-size: 1.45rem;
+    font-weight: 800;
+    letter-spacing: -.02em;
+}
+
+.herrera-home-heading a {
+    color: #007d8e;
+    font-size: .8rem;
+    font-weight: 700;
+}
+
+@media (min-width: 1024px) {
+    .herrera-home-section .category-index-grid,
+    .herrera-home-product-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+
+    .herrera-hero {
+        grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 1279px) {
+    .herrera-storefront .site-main-header-row {
+        padding-right: var(--herrera-layout-gutter);
+        padding-left: var(--herrera-layout-gutter);
+    }
+
+    .herrera-storefront .header-search-panel-shell {
+        border: 0;
+        background: #fff;
+    }
+
+    .herrera-storefront .header-search-form {
+        padding-right: var(--herrera-layout-gutter);
+        padding-left: var(--herrera-layout-gutter);
+        border: 0;
+        background: #fff;
+    }
+
+    .herrera-storefront .header-search-input {
+        border: 1px solid var(--herrera-cyan);
+        border-right: 0;
+        border-radius: 5px 0 0 5px;
+    }
+
+    .herrera-storefront .header-search-submit {
+        border: 1px solid var(--herrera-cyan);
+        border-left: 0;
+        border-radius: 0 5px 5px 0;
+        background: #fff;
+        color: var(--herrera-dark);
+    }
+}
+
+@media (max-width: 639px) {
+    .herrera-storefront .site-top-bar-links {
+        flex-basis: 100%;
+        justify-content: space-between;
+        column-gap: 12px;
+    }
+
+    .herrera-storefront .responsive-header-action {
+        width: 44px !important;
+    }
+
+    .herrera-storefront .store-announcement-bar:not(.is-scrolling) {
+        padding-right: 12px;
+        padding-left: 12px;
+        white-space: normal;
+        line-height: 1.5;
+    }
+
+    .herrera-home-section .category-index-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .herrera-storefront .responsive-header-brand .site-main-logo {
+        max-width: min(100%, 145px);
+        height: auto;
+        max-height: 48px;
+    }
+
+    .herrera-hero-panel {
+        padding: 1.3rem;
+    }
+}

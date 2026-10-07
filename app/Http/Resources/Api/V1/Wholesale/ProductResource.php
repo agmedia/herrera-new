@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources\Api\V1\Wholesale;
 
+use App\Services\Pricing\B2BAccessService;
+use App\Services\Pricing\ProductGroupPriceResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,6 +11,11 @@ class ProductResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $b2bOnly = app(B2BAccessService::class)->requiresApprovedAccount();
+        if ($b2bOnly) {
+            app(B2BAccessService::class)->ensureCanPurchase($request->user());
+        }
+
         $locale = strtolower((string) $request->query('locale', config('app.locale', 'en')));
         $fallbackLocale = strtolower((string) config('app.fallback_locale', config('app.locale', 'en')));
 
@@ -82,7 +89,9 @@ class ProductResource extends JsonResource
             'sku' => $this->sku,
             'barcode' => $this->barcode,
             'is_active' => (bool) $this->is_active,
-            'base_price' => (float) $this->base_price,
+            'base_price' => $b2bOnly
+                ? app(ProductGroupPriceResolver::class)->storedPrice($this->resource, $request->user())
+                : (float) $this->base_price,
             'stock_qty' => (int) $this->stock_qty,
             'unit_of_measure' => $this->unit_of_measure,
             'minimum_order_quantity' => (int) $this->minimum_order_quantity,
@@ -102,7 +111,7 @@ class ProductResource extends JsonResource
             'description' => $translation?->description,
             'meta_title' => $translation?->meta_title,
             'meta_description' => $translation?->meta_description,
-            'payload' => $this->payload,
+            'payload' => $b2bOnly ? null : $this->payload,
             'manufacturer' => $manufacturer,
             'categories' => $categories,
             'created_at' => optional($this->created_at)?->toISOString(),

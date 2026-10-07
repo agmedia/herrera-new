@@ -1,5 +1,9 @@
 <div class="header-cart-content" data-header-cart-content>
-    @if ($cartLines->isEmpty())
+    @if (! $canViewPrices)
+        <div class="header-cart-empty header-cart-empty--b2b">
+            @include('front.partials.b2b-price-access')
+        </div>
+    @elseif ($cartLines->isEmpty())
         <div class="header-cart-empty">
             <span class="header-cart-empty-icon" aria-hidden="true">
                 <x-fa-icon name="bag-shopping" />
@@ -24,16 +28,13 @@
                     $productUrl = route('products.show', ['slug' => $translation?->slug ?? $product->id]);
                     $productImage = $product->getFirstMedia('product_main')
                         ?? $product->getFirstMedia('product_gallery');
-                    $productImageUrl = $productImage
-                        ? ($productImage->hasGeneratedConversion('thumb_100x100')
-                            ? $productImage->getUrl('thumb_100x100')
-                            : $productImage->getUrl())
-                        : null;
+                    $productImageUrl = \App\Support\Media\LegacyCatalogImage::first($product, ['thumb_100x100']);
                     $unitPrice = (float) ($line['display_unit_price'] ?? $line['unit_price'] ?? 0);
                     $lineTotal = (float) ($line['display_line_total'] ?? $line['line_total'] ?? 0);
+                    $lineKey = (string) ($line['key'] ?? $line['line_key'] ?? ($product->id.':'.(int) ($line['product_option_value_id'] ?? 0)));
                 @endphp
 
-                <article class="header-cart-item" role="listitem">
+                <article class="header-cart-item" role="listitem" data-cart-line-key="{{ $lineKey }}">
                     <a href="{{ $productUrl }}" class="header-cart-item-image">
                         @if ($productImageUrl)
                             <img
@@ -60,6 +61,7 @@
                             <span>{{ (int) $line['quantity'] }} × {{ number_format($unitPrice, 2, ',', '.') }} €</span>
                             <strong>{{ number_format($lineTotal, 2, ',', '.') }} €</strong>
                         </div>
+                        @include('front.partials.b2b-tax-note', ['includesTax' => $line['display_includes_tax'] ?? true])
                         <x-front.energy-label-arrow :declaration="$line['energy_declaration'] ?? null" class="mt-1" />
                         <x-front.energy-information-sheet-link :declaration="$line['energy_declaration'] ?? null" class="mt-1" />
                     </div>

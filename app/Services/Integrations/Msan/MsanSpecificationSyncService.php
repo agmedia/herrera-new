@@ -35,6 +35,8 @@ class MsanSpecificationSyncService
 
     public function sync(MsanSyncRun $run): MsanSyncRun
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $run->forceFill([
             'status' => MsanSyncRun::STATUS_RUNNING,
             'started_at' => $run->started_at ?: now(),
@@ -130,6 +132,8 @@ class MsanSpecificationSyncService
 
     public function recoverFailedRun(int $runId): void
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         /** @var MsanSpecificationSnapshot|null $snapshot */
         $snapshot = MsanSpecificationSnapshot::query()
             ->where('msan_sync_run_id', $runId)

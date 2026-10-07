@@ -21,10 +21,15 @@ class ProductPricePresentationService
 
     /**
      * @return array{
-     *   current_gross: float,
-     *   current_net: float,
-     *   base_gross: float,
-     *   catalog_gross: float,
+     *   can_view_price: bool,
+     *   current_gross: float|null,
+     *   current_net: float|null,
+     *   display_current: float|null,
+     *   display_old: float|null,
+     *   display_lowest_30_days: float|null,
+     *   display_includes_tax: bool|null,
+     *   base_gross: float|null,
+     *   catalog_gross: float|null,
      *   old_gross: float|null,
      *   has_discount: bool,
      *   has_promotional_discount: bool,
@@ -50,10 +55,15 @@ class ProductPricePresentationService
 
     /**
      * @return array{
-     *   current_gross: float,
-     *   current_net: float,
-     *   base_gross: float,
-     *   catalog_gross: float,
+     *   can_view_price: bool,
+     *   current_gross: float|null,
+     *   current_net: float|null,
+     *   display_current: float|null,
+     *   display_old: float|null,
+     *   display_lowest_30_days: float|null,
+     *   display_includes_tax: bool|null,
+     *   base_gross: float|null,
+     *   catalog_gross: float|null,
      *   old_gross: float|null,
      *   has_discount: bool,
      *   has_promotional_discount: bool,
@@ -69,6 +79,32 @@ class ProductPricePresentationService
         int $quantity = 1,
         ?ProductPackage $package = null,
     ): array {
+        if (! app(B2BAccessService::class)->canViewPrices($user)) {
+            return [
+                'can_view_price' => false,
+                'current_gross' => null,
+                'current_net' => null,
+                'display_current' => null,
+                'display_old' => null,
+                'display_lowest_30_days' => null,
+                'display_includes_tax' => null,
+                'base_gross' => null,
+                'catalog_gross' => null,
+                'old_gross' => null,
+                'has_discount' => false,
+                'has_promotional_discount' => false,
+                'is_b2b_price' => false,
+                'discount_percent' => null,
+                'lowest_30_days_gross' => null,
+                'price_source' => null,
+                'group_price_id' => null,
+                'b2b_rule_id' => null,
+                'b2b_source_type' => null,
+                'price_catalog_id' => null,
+                'price_catalog_entry_id' => null,
+            ];
+        }
+
         $groupPrice = $this->groupPriceResolver->resolve(
             $product,
             $user,
@@ -76,31 +112,48 @@ class ProductPricePresentationService
             $package,
             $storedBase,
         );
-        $audienceStoredBase = (float) ($groupPrice?->price ?? $storedBase);
-        $resolvedAction = $this->actionResolver->resolveProductAction($product, $user);
-        $storedCurrent = $resolvedAction
-            ? $this->actionResolver->applyToPrice($audienceStoredBase, $resolvedAction)
-            : $audienceStoredBase;
-        $catalogGross = (float) $this->taxPricing->grossFromStored($storedBase, $product);
-        $audienceBaseGross = (float) $this->taxPricing->grossFromStored($audienceStoredBase, $product);
-        $currentGross = (float) $this->taxPricing->grossFromStored($storedCurrent, $product);
-        $hasPromotionalDiscount = $resolvedAction !== null
-            && $currentGross < ($audienceBaseGross - 0.0001);
+        $snapshotSpecial = $groupPrice?->is_final
+            && $groupPrice->source_type === 'price_catalog_special'
+            && $groupPrice->previous_price !== null
+            && $groupPrice->price < ($groupPrice->previous_price - 0.0001);
+        $audienceStoredBase = (float) ($snapshotSpecial ? $groupPrice->previous_price : ($groupPrice?->price ?? $storedBase));
+        $resolvedAction = $groupPrice?->is_final ? null : $this->actionResolver->resolveProductAction($product, $user);
+        $storedCurrent = $groupPrice?->is_final
+            ? $groupPrice->price
+            : ($resolvedAction ? $this->actionResolver->applyToPrice($audienceStoredBase, $resolvedAction) : $audienceStoredBase);
+        $catalogGross = (float) $this->taxPricing->grossFromStored($storedBase, $product, user: $user);
+        $audienceBaseGross = (float) $this->taxPricing->grossFromStored($audienceStoredBase, $product, user: $user);
+        $currentGross = (float) $this->taxPricing->grossFromStored($storedCurrent, $product, user: $user);
+        $hasPromotionalDiscount = $snapshotSpecial || ($resolvedAction !== null
+            && $currentGross < ($audienceBaseGross - 0.0001));
 
         $lowest30DaysGross = null;
-        if ($hasPromotionalDiscount) {
+        if ($hasPromotionalDiscount && ! $snapshotSpecial) {
             $lowest30DaysStored = $this->lowestStoredPriceInLast30Days(
                 $product,
                 $audienceStoredBase,
                 $user,
                 $groupPrice,
             );
-            $lowest30DaysGross = (float) $this->taxPricing->grossFromStored($lowest30DaysStored, $product);
+            $lowest30DaysGross = (float) $this->taxPricing->grossFromStored($lowest30DaysStored, $product, user: $user);
         }
 
+        $displayNet = app(B2BAccessService::class)->requiresApprovedAccount()
+            && (bool) config('commerce.b2b_display_net', true);
+        $currentNet = (float) $this->taxPricing->normalizeNetPrice($storedCurrent, $product, user: $user);
+
         return [
+            'can_view_price' => true,
             'current_gross' => $currentGross,
-            'current_net' => (float) $this->taxPricing->netFromGross($currentGross, $product),
+            'current_net' => $currentNet,
+            'display_current' => $displayNet ? $currentNet : $currentGross,
+            'display_old' => $hasPromotionalDiscount
+                ? ($displayNet ? (float) $this->taxPricing->normalizeNetPrice($audienceStoredBase, $product, user: $user) : $audienceBaseGross)
+                : null,
+            'display_lowest_30_days' => $lowest30DaysGross !== null
+                ? ($displayNet ? (float) $this->taxPricing->normalizeNetPrice($lowest30DaysStored, $product, user: $user) : $lowest30DaysGross)
+                : null,
+            'display_includes_tax' => ! $displayNet,
             'base_gross' => $audienceBaseGross,
             'catalog_gross' => $catalogGross,
             'old_gross' => $hasPromotionalDiscount ? $audienceBaseGross : null,
@@ -120,6 +173,8 @@ class ProductPricePresentationService
             'group_price_id' => $groupPrice?->group_price_id,
             'b2b_rule_id' => $groupPrice?->rule_id,
             'b2b_source_type' => $groupPrice?->source_type,
+            'price_catalog_id' => $groupPrice?->catalog_id,
+            'price_catalog_entry_id' => $groupPrice?->catalog_entry_id,
         ];
     }
 

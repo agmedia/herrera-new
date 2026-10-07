@@ -4,11 +4,16 @@ namespace App\Models\Sales\Order;
 
 use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Product\ProductOptionValue;
+use App\Models\Concerns\HasB2BMonetaryPrecision;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class OrderItem extends Model
 {
+    use HasB2BMonetaryPrecision;
+
+    protected array $b2bMonetaryAttributes = ['unit_price', 'discount_amount', 'tax_amount', 'line_total'];
+
     protected $fillable = [
         'order_id',
         'product_id',

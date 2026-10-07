@@ -4,12 +4,17 @@ namespace App\Models\Catalog\Product;
 
 use App\Models\Catalog\Option\Option;
 use App\Models\Catalog\Option\OptionValue;
+use App\Models\Concerns\HasB2BMonetaryPrecision;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProductOptionValue extends Model
 {
+    use HasB2BMonetaryPrecision;
+
+    protected array $b2bMonetaryAttributes = ['price_override'];
+
     protected $table = 'catalog_product_option_values';
 
     protected $fillable = [

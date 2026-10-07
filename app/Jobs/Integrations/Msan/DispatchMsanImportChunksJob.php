@@ -32,6 +32,8 @@ class DispatchMsanImportChunksJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $run = MsanSyncRun::query()->find($this->runId);
         if (! $run || ! in_array($run->status, [MsanSyncRun::STATUS_PENDING, MsanSyncRun::STATUS_RUNNING], true)) {
             return;
@@ -62,6 +64,10 @@ class DispatchMsanImportChunksJob implements ShouldBeUnique, ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        if (! \App\Support\Integrations\MsanModule::available()) {
+            return;
+        }
+
         $message = $this->sanitizeError($exception?->getMessage() ?: 'M SAN raspoređivanje uvoza nije dovršeno.');
 
         DB::transaction(function () use ($message): void {

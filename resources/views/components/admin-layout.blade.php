@@ -1212,17 +1212,32 @@
                     $contentNavigationActive = request()->routeIs('admin.content.navigation*');
                     $contentSlotsActive = request()->routeIs('admin.content.slots*');
                     $contentOpen = $contentBlogActive || $contentPagesActive || $contentFaqsActive || $contentCommentsActive || $contentBlocksActive || $contentNavigationActive || $contentSlotsActive;
-                    $integrationsMsanActive = request()->routeIs('admin.integrations.msan.*');
-                    $integrationsOpen = $integrationsMsanActive;
-                    $canViewMsanIntegration = auth()->user() && (
+                    $integrationsEprelActive = request()->routeIs('admin.integrations.eprel.*');
+                    $integrationsStockActive = request()->routeIs('admin.integrations.stock.*');
+                    $integrationsEracuniActive = request()->routeIs('admin.integrations.eracuni.*');
+                    $integrationsSpreadsheetActive = request()->routeIs('admin.integrations.spreadsheet.*');
+                    $integrationsMediaActive = request()->routeIs('admin.integrations.media.*');
+                    $integrationsOpen = $integrationsEprelActive || $integrationsStockActive || $integrationsEracuniActive || $integrationsSpreadsheetActive || $integrationsMediaActive;
+                    $canManageEprel = auth()->user() && (
                         auth()->user()->isA('superadmin')
-                        || auth()->user()->can('integrations.msan.view')
+                        || auth()->user()->can('integrations.eprel.settings.manage')
                     );
-                    $canManageMsanSettings = auth()->user() && (
+                    $canManageStock = auth()->user() && (
                         auth()->user()->isA('superadmin')
-                        || auth()->user()->can('integrations.msan.settings.manage')
+                        || auth()->user()->can('integrations.stock.manage')
                     );
-                    $canAccessMsanIntegration = $canViewMsanIntegration || $canManageMsanSettings;
+                    $canManageEracuni = auth()->user() && (
+                        auth()->user()->isA('superadmin')
+                        || auth()->user()->can('integrations.eracuni.manage')
+                    );
+                    $canManageSpreadsheet = auth()->user() && (
+                        auth()->user()->isA('superadmin')
+                        || auth()->user()->can('integrations.spreadsheet.manage')
+                    );
+                    $canManageMedia = auth()->user() && (
+                        auth()->user()->isA('superadmin')
+                        || auth()->user()->can('integrations.media.manage')
+                    );
                     $settingsOpen = request()->routeIs('admin.settings.*') || request()->routeIs('admin.shipping.*');
                     $settingsLocalOpen = request()->routeIs('admin.settings.local.*') || request()->routeIs('admin.shipping.*');
                     $settingsSystemOpen = request()->routeIs('admin.settings.system.*');
@@ -1248,6 +1263,7 @@
                     $showSettingsApiMenu = $canManageApiSettings && $catalogUseApi;
                     $usersListActive = request()->routeIs('admin.users') || request()->routeIs('admin.users.edit') || request()->routeIs('admin.users.show');
                     $usersB2BActive = request()->routeIs('admin.users.b2b');
+                    $usersStatisticsActive = request()->routeIs('admin.users.statistics');
                     $usersGroupsActive = request()->routeIs('admin.users.groups*');
                     $usersAccessActive = $canManageUsersAccess && request()->routeIs('admin.users.access');
                     $usersActivityActive = request()->routeIs('admin.users.activity');
@@ -1264,7 +1280,7 @@
                     $canViewUserLoyalty = $userLoyaltyEnabled
                         && auth()->user()
                         && (auth()->user()->isA('superadmin') || auth()->user()->can('users.loyalty.view'));
-                    $usersOpen = $usersListActive || $usersB2BActive || $usersGroupsActive || $usersAccessActive || $usersActivityActive || $usersNewsletterActive || ($userLoyaltyEnabled && $usersLoyaltyActive);
+                    $usersOpen = $usersListActive || $usersB2BActive || $usersStatisticsActive || $usersGroupsActive || $usersAccessActive || $usersActivityActive || $usersNewsletterActive || ($userLoyaltyEnabled && $usersLoyaltyActive);
                     $settingsResource = request()->routeIs('admin.shipping.*')
                         ? 'shipping-methods'
                         : request()->route('resource');
@@ -1515,7 +1531,7 @@
                                 </a>
                             @endif
                             <a
-                                href="{{ route('admin.b2b-prices') }}"
+                                href="{{ route(app(\App\Services\Pricing\PriceCatalogResolver::class)->activeCatalog() ? 'admin.b2b-prices.catalogs' : 'admin.b2b-prices') }}"
                                 class="sidebar-dropdown-link block rounded-lg font-medium {{ $catalogB2bPricesActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
                             >
                                 <span class="flex items-center gap-2">
@@ -1630,7 +1646,7 @@
                         </div>
                     </details>
 
-                    @if ($canAccessMsanIntegration)
+                    @if ($canManageEprel || $canManageStock || $canManageEracuni || $canManageSpreadsheet || $canManageMedia)
                         <details class="group rounded-lg" @if($integrationsOpen) open @endif>
                             <summary class="sidebar-dropdown-summary flex cursor-pointer list-none items-center justify-between rounded-lg font-medium [&::-webkit-details-marker]:hidden [&::marker]:content-[''] {{ $integrationsOpen ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100' }}">
                                 <span class="flex items-center gap-2">
@@ -1641,15 +1657,34 @@
                                 </span>
                             </summary>
                             <div class="ml-3 mt-1 space-y-1 border-l border-slate-200 pl-4">
-                                <a
-                                    href="{{ route($canViewMsanIntegration ? 'admin.integrations.msan.overview' : 'admin.integrations.msan.settings') }}"
-                                    class="sidebar-dropdown-link block rounded-lg font-medium {{ $integrationsMsanActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
-                                >
-                                    <span class="flex items-center gap-2">
-                                        <span class="sidebar-dot"></span>
-                                        <span>{{ __('M SAN') }}</span>
-                                    </span>
+                                @if ($canManageStock)
+                                    <a href="{{ route('admin.integrations.stock.index') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ $integrationsStockActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
+                                        <span class="flex items-center gap-2"><span class="sidebar-dot"></span><span>{{ __('Zalihe i cronovi') }}</span></span>
+                                    </a>
+                                @endif
+                                @if ($canManageEracuni)
+                                    <a href="{{ route('admin.integrations.eracuni.index') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ $integrationsEracuniActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
+                                        <span class="flex items-center gap-2"><span class="sidebar-dot"></span><span>{{ __('e-Računi katalog') }}</span></span>
+                                    </a>
+                                @endif
+                                @if ($canManageSpreadsheet)
+                                    <a href="{{ route('admin.integrations.spreadsheet.index') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ $integrationsSpreadsheetActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
+                                        <span class="flex items-center gap-2"><span class="sidebar-dot"></span><span>{{ __('Excel i CSV uvoz') }}</span></span>
+                                    </a>
+                                @endif
+                                @if ($canManageMedia)
+                                    <a href="{{ route('admin.integrations.media.index') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ $integrationsMediaActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
+                                        <span class="flex items-center gap-2"><span class="sidebar-dot"></span><span>{{ __('Uvoz slika') }}</span></span>
+                                    </a>
+                                @endif
+                                @if ($canManageEprel)
+                                <a href="{{ route('admin.integrations.eprel.catalog') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ request()->routeIs('admin.integrations.eprel.catalog') ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
+                                    <span class="flex items-center gap-2"><span class="sidebar-dot"></span><span>EPREL katalog</span></span>
                                 </a>
+                                <a href="{{ route('admin.integrations.eprel.settings') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ request()->routeIs('admin.integrations.eprel.settings') ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
+                                    <span class="flex items-center gap-2"><span class="sidebar-dot"></span><span>EPREL postavke</span></span>
+                                </a>
+                                @endif
                             </div>
                         </details>
                     @endif
@@ -1829,6 +1864,14 @@
                                         <span class="flex items-center gap-2">
                                             <span class="sidebar-dot"></span>
                                             <span>{{ __('B2B zahtjevi') }}</span>
+                                        </span>
+                                    </a>
+                                @endif
+                                @if ($canViewUsersList && (auth()->user()->isA('superadmin') || auth()->user()->can('sales.orders.view')))
+                                    <a href="{{ route('admin.users.statistics') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ $usersStatisticsActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
+                                        <span class="flex items-center gap-2">
+                                            <span class="sidebar-dot"></span>
+                                            <span>{{ __('Statistike kupaca i artikala') }}</span>
                                         </span>
                                     </a>
                                 @endif

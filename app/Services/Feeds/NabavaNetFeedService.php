@@ -6,6 +6,7 @@ use App\Models\Catalog\Action\CatalogAction;
 use App\Models\Catalog\Category\Category;
 use App\Models\Catalog\Product\Product;
 use App\Services\Catalog\ActionResolverService;
+use App\Services\Pricing\B2BAccessService;
 use App\Services\Pricing\TaxPricingService;
 use App\Support\Media\MediaUrl;
 use Illuminate\Support\Collection;
@@ -20,6 +21,12 @@ class NabavaNetFeedService
 
     public function stream(string $locale = 'hr'): void
     {
+        abort_if(
+            app(B2BAccessService::class)->requiresApprovedAccount(),
+            403,
+            'Public price feeds are unavailable for this store.',
+        );
+
         $fallbackLocale = trim((string) config('app.fallback_locale', config('app.locale', 'hr'))) ?: 'hr';
         $categoryPaths = $this->categoryPaths($locale, $fallbackLocale);
         $publicActions = $this->publicActions();

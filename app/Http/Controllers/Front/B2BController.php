@@ -11,12 +11,14 @@ use App\Models\Sales\Order\OrderItem;
 use App\Models\User\B2BAccount;
 use App\Services\Front\B2BQuickOrderSearchService;
 use App\Services\Front\CartService;
+use App\Services\Pricing\B2BAccessService;
 use App\Services\Pricing\ProductPricePresentationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class B2BController extends Controller
@@ -39,11 +41,18 @@ class B2BController extends Controller
             $account->quick_order_draft ?? [],
         ));
         $requestedCode = trim((string) $request->query('code', ''));
-        if ($initialItems->isEmpty() && $requestedCode !== '') {
-            $initialItems->push([
-                'identifier' => $requestedCode,
-                'quantity' => 1,
-            ]);
+        $initialQuickOrderQuery = '';
+        if ($requestedCode !== '') {
+            $resolved = $this->quickOrderSearch->resolve($requestedCode, $user);
+            if (isset($resolved['item'])) {
+                $requestedItem = $resolved['item'];
+                if (! $initialItems->contains(fn (array $item) => (int) ($item['product_id'] ?? 0) === $requestedItem['product_id']
+                    && (int) ($item['product_option_value_id'] ?? 0) === (int) $requestedItem['product_option_value_id'])) {
+                    $initialItems->push($requestedItem);
+                }
+            } else {
+                $initialQuickOrderQuery = $requestedCode;
+            }
         }
 
         $initialQuickOrderItems = $initialItems
@@ -68,7 +77,7 @@ class B2BController extends Controller
                         : null;
                 }
 
-                if (! $product) {
+                if (! $product || ($optionId > 0 && ! $option) || ! $this->quickOrderSearch->canSelect($product, $option)) {
                     return null;
                 }
 
@@ -85,6 +94,9 @@ class B2BController extends Controller
         return view($this->frontendView($request, 'account.b2b-quick-order'), [
             'b2bAccount' => $account,
             'initialQuickOrderItems' => $initialQuickOrderItems,
+            'initialQuickOrderQuery' => $initialQuickOrderQuery,
+            'unavailableDraftCount' => max(0, $initialItems->count() - $initialQuickOrderItems->count()),
+            'quickOrderSuggestions' => $this->quickOrderSearch->suggestions($user),
         ]);
     }
 
@@ -96,7 +108,7 @@ class B2BController extends Controller
             ->select('product_id')
             ->selectRaw('SUM(quantity) as ordered_quantity')
             ->whereNotNull('product_id')
-            ->whereHas('order', fn ($query) => $query->where('user_id', $user->getKey()))
+            ->whereHas('order', fn ($query) => $query->where('user_id', $user->getKey())->withoutCancelled())
             ->groupBy('product_id')
             ->orderByDesc('ordered_quantity')
             ->limit(12)
@@ -147,6 +159,53 @@ class B2BController extends Controller
             'query' => $search,
             'items' => $items->all(),
         ]);
+    }
+
+    public function resolveQuickOrder(Request $request): JsonResponse
+    {
+        $this->approvedAccount($request);
+        $validated = $request->validate(['lines' => ['required', 'string', 'max:20000']]);
+        $lines = array_values(array_filter(preg_split('/\R/u', $validated['lines']), fn ($line) => trim($line) !== ''));
+        if (count($lines) > 100) {
+            throw ValidationException::withMessages(['lines' => __('Unesite najviše 100 redaka odjednom.')]);
+        }
+
+        $items = [];
+        $errors = [];
+        $warnings = [];
+        foreach ($lines as $index => $line) {
+            $parts = preg_split('/[;\t,]/', trim($line));
+            $identifier = trim($parts[0] ?? '');
+            $quantityText = trim($parts[1] ?? '1');
+            if ($identifier === '' || mb_strlen($identifier) > 191 || count($parts) > 2 || ! preg_match('/^[0-9]{1,3}$/', $quantityText) || (int) $quantityText < 1) {
+                $errors[] = ['line' => $index + 1, 'identifier' => $identifier, 'message' => __('Koristite format šifra; količina, s količinom od 1 do 999.')];
+
+                continue;
+            }
+
+            $resolved = $this->quickOrderSearch->resolve($identifier, $request->user(), (int) $quantityText);
+            if (isset($resolved['error'])) {
+                $errors[] = ['line' => $index + 1, 'identifier' => $identifier, 'message' => $resolved['error']];
+
+                continue;
+            }
+            $item = $resolved['item'];
+            if (isset($items[$item['key']])) {
+                $combined = $items[$item['key']]['quantity'] + $item['quantity'];
+                $combinedResolved = $this->quickOrderSearch->resolve($identifier, $request->user(), $combined);
+                $item = $combinedResolved['item'];
+                $resolved['warning'] = $combinedResolved['warning'];
+                if ($combined > $item['maximum_quantity']) {
+                    $resolved['warning'] = __('Ukupna količina ograničena je raspoloživom zalihom: :quantity.', ['quantity' => $item['quantity']]);
+                }
+            }
+            $items[$item['key']] = $item;
+            if ($resolved['warning']) {
+                $warnings[] = ['line' => $index + 1, 'identifier' => $identifier, 'message' => $resolved['warning']];
+            }
+        }
+
+        return response()->json(['items' => array_values($items), 'errors' => $errors, 'warnings' => $warnings]);
     }
 
     public function syncQuickOrder(Request $request): JsonResponse
@@ -208,7 +267,7 @@ class B2BController extends Controller
 
     public function storeQuickOrder(Request $request): RedirectResponse
     {
-        $this->approvedAccount($request);
+        $account = $this->approvedAccount($request);
 
         $validated = $request->validate([
             'items' => ['required', 'array', 'max:100'],
@@ -236,6 +295,7 @@ class B2BController extends Controller
 
         $added = 0;
         $skipped = [];
+        $remainingItems = [];
 
         foreach ($items as $item) {
             if ($item['product_id'] > 0) {
@@ -262,12 +322,14 @@ class B2BController extends Controller
             }
 
             if (! $product) {
+                $remainingItems[] = $item;
                 $skipped[] = ($item['identifier'] ?: '#'.$item['product_id']).' — '.__('artikl nije pronađen');
 
                 continue;
             }
 
             if (! $this->cart->add($product, $item['quantity'], $optionValueId)) {
+                $remainingItems[] = $item;
                 $skipped[] = ($item['identifier'] ?: $product->code).' — '.__('nije dostupan ili zahtijeva odabir varijante');
 
                 continue;
@@ -281,6 +343,8 @@ class B2BController extends Controller
                 ->with('warning', __('Nijedan artikl nije dodan.').' '.implode('; ', $skipped))
                 ->withInput();
         }
+
+        $account->update(['quick_order_draft' => $remainingItems === [] ? null : $remainingItems]);
 
         $response = redirect()
             ->route('cart.index')
@@ -351,6 +415,13 @@ class B2BController extends Controller
 
     private function approvedAccount(Request $request): B2BAccount
     {
+        if (app(B2BAccessService::class)->requiresApprovedAccount()) {
+            $account = app(B2BAccessService::class)->approvedAccount($request->user());
+            abort_unless($account, 403, __('ui.b2b.pricing.access_required'));
+
+            return $account;
+        }
+
         $request->user()->loadMissing('b2bAccount');
         $account = $request->user()->b2bAccount;
 

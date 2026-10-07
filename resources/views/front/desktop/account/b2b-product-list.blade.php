@@ -36,15 +36,22 @@
                                     <td class="px-4 py-3 font-semibold text-slate-900">{{ $row['name'] }}</td>
                                     <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ $row['identifier'] }}</td>
                                     <td class="px-4 py-3 text-right font-semibold text-slate-900">
-                                        {{ \App\Support\Currency::format((float) $row['price']['current_gross'], 'EUR') }}
+                                        @if ($canViewPrices)
+                                        {{ \App\Support\Currency::format((float) ($row['price']['display_current'] ?? $row['price']['current_gross']), 'EUR') }}
+                                        @include('front.partials.b2b-tax-note', ['includesTax' => $row['price']['display_includes_tax'] ?? true])
                                         @if (! empty($row['price']['is_b2b_price']))
                                             <span class="ml-1 rounded-full bg-cyan-50 px-2 py-0.5 text-[10px] uppercase text-cyan-800">B2B</span>
                                         @endif
+                                        @else
+                                            {{ __('ui.b2b.pricing.access_required') }}
+                                        @endif
                                     </td>
                                     <td class="px-4 py-3 text-right">
+                                        @if ($canViewPrices)
                                         <a href="{{ route('account.b2b.quick-order', ['code' => $row['identifier']]) }}" class="inline-flex rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">
                                             {{ __('Dodaj u brzu kupnju') }}
                                         </a>
+                                        @endif
                                     </td>
                                 </tr>
                             @empty

@@ -106,7 +106,7 @@
         </section>
     @endguest
 
-    <div class="mb-4 hidden border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700" role="alert" aria-live="polite" data-checkout-top-error></div>
+    <div class="mb-4 {{ $errors->has('cart') ? '' : 'hidden' }} border border-rose-300 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700" role="alert" aria-live="polite" data-checkout-top-error>{{ $errors->first('cart') }}</div>
 
     <form method="POST" action="{{ route('checkout.store') }}" class="checkout-layout" novalidate data-address-autofill data-address-source="{{ $placesAssetUrl }}" data-checkout-form data-checkout-options-url="{{ route('checkout.options') }}" data-ga4-checkout-form data-ga4-currency="EUR" data-ga4-value="{{ number_format((float) ($checkoutTotals['grand_total'] ?? $summary['grand_total'] ?? 0), 2, '.', '') }}" data-ga4-items='@json($ga4Items, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT)' data-success-fallback="{{ route('checkout.success.latest') }}">
         @csrf
@@ -256,8 +256,8 @@
                         <legend class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.checkout.labels.shipping_method') }}</legend>
                         <div class="grid gap-2" data-checkout-shipping-options>
                             @foreach ($shippingMethods as $method)
-                                <label class="checkout-option-card flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-sm">
-                                    <span class="inline-flex items-center gap-2">
+                                <label class="checkout-option-card flex cursor-pointer items-start justify-between gap-3 px-3 py-2.5 text-sm">
+                                    <span class="inline-flex min-w-0 items-start gap-2">
                                         <input
                                             type="radio"
                                             name="shipping_method_code"
@@ -267,12 +267,17 @@
                                             data-is-gls-dpm="{{ \App\Support\GlsShipping::isGlsDpmShippingMethod($method) ? '1' : '0' }}"
                                             data-gls-dpm-filter-type="{{ \App\Support\GlsShipping::glsDpmFilterType($method) ?? '' }}"
                                             @checked($selectedShippingCode === (string) $method->code)
-                                            class="h-4 w-4 border-slate-300 text-slate-900 focus:ring-0"
+                                            class="mt-0.5 h-4 w-4 shrink-0 border-slate-300 text-slate-900 focus:ring-0"
                                             required
                                         >
-                                        <span class="font-semibold text-slate-900">{{ $method->name }}</span>
+                                        <span class="min-w-0">
+                                            <span class="font-semibold text-slate-900">{{ $method->name }}</span>
+                                            @if (trim((string) $method->description) !== '')
+                                                <span class="mt-1 block whitespace-pre-line text-xs leading-relaxed text-slate-600">{{ trim((string) $method->description) }}</span>
+                                            @endif
+                                        </span>
                                     </span>
-                                    <span class="text-slate-600">
+                                    <span class="shrink-0 whitespace-nowrap text-slate-600">
                                         {{ (string) $method->pricing_type === 'quote'
                                             ? __('Cijena na upit')
                                             : \App\Support\Currency::format((float) ($method->resolved_price ?? $method->price)) }}
@@ -338,17 +343,22 @@
                         <legend class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.checkout.labels.payment_method') }}</legend>
                         <div class="grid gap-2" data-checkout-payment-options>
                             @foreach ($paymentMethods as $method)
-                                <label class="checkout-option-card flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-sm">
-                                    <span class="inline-flex items-center gap-2">
-                                        <input type="radio" name="payment_method_code" value="{{ $method->code }}" @checked($selectedPaymentCode === (string) $method->code) class="h-4 w-4 border-slate-300 text-slate-900 focus:ring-0" required>
-                                        @if (in_array(strtolower((string) $method->code), ['keks', 'keks_pay', 'kekspay'], true))
-                                            <span class="inline-flex items-center gap-2">
-                                                <img src="{{ asset('assets/payments/keks-logo.svg') }}" alt="KEKS Pay" class="h-5 w-auto max-w-[110px]">
+                                <label class="checkout-option-card flex cursor-pointer items-start justify-between gap-3 px-3 py-2.5 text-sm">
+                                    <span class="inline-flex min-w-0 items-start gap-2">
+                                        <input type="radio" name="payment_method_code" value="{{ $method->code }}" @checked($selectedPaymentCode === (string) $method->code) class="mt-0.5 h-4 w-4 shrink-0 border-slate-300 text-slate-900 focus:ring-0" required>
+                                        <span class="min-w-0">
+                                            @if (in_array(strtolower((string) $method->code), ['keks', 'keks_pay', 'kekspay'], true))
+                                                <span class="inline-flex items-center gap-2">
+                                                    <img src="{{ asset('assets/payments/keks-logo.svg') }}" alt="KEKS Pay" class="h-5 w-auto max-w-[110px]">
+                                                    <span class="font-semibold text-slate-900">{{ $method->name }}</span>
+                                                </span>
+                                            @else
                                                 <span class="font-semibold text-slate-900">{{ $method->name }}</span>
-                                            </span>
-                                        @else
-                                            <span class="font-semibold text-slate-900">{{ $method->name }}</span>
-                                        @endif
+                                            @endif
+                                            @if (trim((string) $method->description) !== '')
+                                                <span class="mt-1 block whitespace-pre-line text-xs leading-relaxed text-slate-600">{{ trim((string) $method->description) }}</span>
+                                            @endif
+                                        </span>
                                     </span>
                                 </label>
                             @endforeach
@@ -361,12 +371,18 @@
                     <textarea id="customer-note" name="customer_note" rows="3" class="w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0">{{ old('customer_note') }}</textarea>
                 </div>
 
+                @include('front.partials.legal-warranty-notice', ['warrantyVariant' => 'checkout'])
+
                 <div class="mt-4 flex flex-wrap items-center justify-start gap-x-4 gap-y-2 lg:justify-between">
                     <label for="accept-terms" class="inline-flex items-center gap-2 text-sm text-slate-700">
                         <input id="accept-terms" type="checkbox" name="accept_terms" value="1" class="h-4 w-4 border-slate-300 text-slate-900 focus:ring-0" required @checked((bool) old('accept_terms')) @error('accept_terms') aria-invalid="true" aria-describedby="accept-terms-error" @enderror>
                         <span>
                             {{ __('ui.checkout.options.accept_terms_prefix') }}
-                            <a href="{{ route('pages.show', ['slug' => 'uvjeti-koristenja']) }}" class="font-semibold text-blue-700 underline underline-offset-2" target="_blank" rel="noopener noreferrer">{{ __('ui.auth.register.terms_link') }}</a>.
+                            @if (!empty($storeSettings['legal']['terms']['url']))
+                                <a href="{{ $storeSettings['legal']['terms']['url'] }}" class="font-semibold text-blue-700 underline underline-offset-2" target="_blank" rel="noopener noreferrer">{{ $storeSettings['legal']['terms']['title'] }}</a>.
+                            @else
+                                {{ __('ui.auth.register.terms_link') }}.
+                            @endif
                         </span>
                     </label>
 
@@ -375,6 +391,13 @@
                         {{ __('ui.checkout.options.newsletter_opt_in') }}
                     </label>
                 </div>
+                <p class="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600" data-checkout-legal-links>
+                    @foreach (['shipping_payment', 'privacy', 'withdrawal'] as $legalPageType)
+                        @if (!empty($storeSettings['legal'][$legalPageType]['url']))
+                            <a href="{{ $storeSettings['legal'][$legalPageType]['url'] }}" class="underline underline-offset-2" target="_blank" rel="noopener noreferrer">{{ $storeSettings['legal'][$legalPageType]['title'] }}</a>
+                        @endif
+                    @endforeach
+                </p>
                 @error('accept_terms')
                     <p id="accept-terms-error" class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                 @enderror
@@ -382,20 +405,22 @@
         </div>
 
         <aside class="checkout-summary h-fit self-start">
-            <h2 class="text-lg font-semibold text-slate-900">{{ __('ui.checkout.summary_title') }}</h2>
+            <div class="checkout-summary-heading">
+                <h2 class="text-lg font-semibold text-slate-900">{{ __('ui.checkout.summary_title') }}</h2>
+                <span class="checkout-summary-line-count">{{ __('ui.checkout.labels.lines') }}: {{ $summary['line_count'] }}</span>
+            </div>
+            @include('front.partials.b2b-tax-note', ['taxNoteLabel' => __('ui.b2b.pricing.items_excludes_tax')])
 
-            <div class="mt-4 space-y-3">
+            <div class="checkout-summary-items mt-4 space-y-3" role="region" tabindex="0" aria-label="{{ __('ui.cart.preview.items_label') }}" @if ($summary['line_count'] > 3) aria-describedby="checkout-summary-scroll-hint" @endif>
                 @foreach ($lines as $line)
                     @php
                         $translation = $line['translation'];
                         $product = $line['product'];
                         $productImage = $product->getFirstMedia('product_main') ?? $product->getFirstMedia('product_gallery');
-                        $productImageUrl = $productImage
-                            ? ($productImage->hasGeneratedConversion('thumb_100x100') ? $productImage->getUrl('thumb_100x100') : $productImage->getUrl())
-                            : null;
+                        $productImageUrl = \App\Support\Media\LegacyCatalogImage::first($product, ['thumb_100x100']);
                     @endphp
                     <div class="checkout-summary-line flex items-start gap-3">
-                        <div class="w-16 shrink-0 border border-slate-200 bg-slate-50 p-1">
+                        <div class="checkout-summary-image w-16 shrink-0 border border-slate-200 bg-slate-50 p-1">
                             @if ($productImageUrl)
                                 <img
                                     src="{{ $productImageUrl }}"
@@ -408,7 +433,7 @@
                                 <span class="flex h-full w-full items-center justify-center text-[10px] font-semibold uppercase text-slate-500">{{ __('ui.product.no_image') }}</span>
                             @endif
                         </div>
-                        <div class="min-w-0 flex-1">
+                        <div class="checkout-summary-item-details min-w-0 flex-1">
                             <div class="font-semibold text-slate-900">{{ $translation?->name ?? $line['product']->code }}</div>
                             @if (!empty($line['sku']))
                                 <div class="mt-0.5 text-xs text-slate-500">{{ __('ui.checkout.labels.sku') }}: {{ $line['sku'] }}</div>
@@ -419,9 +444,9 @@
                             @if (!empty($line['is_b2b_price']))
                                 <div class="mt-0.5 text-[11px] font-semibold text-cyan-800">{{ __('ui.product.b2b_contract_price') }}</div>
                             @endif
-                            <div class="mt-1 flex items-center justify-between text-sm">
+                            <div class="mt-1 flex items-center justify-between gap-2 text-sm">
                                 <span class="text-slate-600">{{ __('ui.checkout.labels.qty') }} {{ $line['quantity'] }}</span>
-                                <span class="font-semibold text-slate-900">{{ \App\Support\Currency::format((float) ($line['display_line_total'] ?? $line['line_total'])) }}</span>
+                                <span class="checkout-summary-line-total font-semibold text-slate-900">{{ \App\Support\Currency::format((float) ($line['display_line_total'] ?? $line['line_total'])) }}</span>
                             </div>
                             <x-front.energy-label-arrow :declaration="$line['energy_declaration'] ?? null" class="mt-1" />
                             <x-front.energy-information-sheet-link :declaration="$line['energy_declaration'] ?? null" class="mt-1" />
@@ -429,6 +454,9 @@
                     </div>
                 @endforeach
             </div>
+            @if ($summary['line_count'] > 3)
+                <p id="checkout-summary-scroll-hint" class="checkout-summary-scroll-hint">{{ __('ui.checkout.labels.scroll_items') }}</p>
+            @endif
 
             <div class="mt-4 border-t border-slate-200 pt-4 text-sm">
                 <div class="flex items-center justify-between">
@@ -436,7 +464,7 @@
                     <span class="font-semibold text-slate-900">{{ $summary['item_qty'] }}</span>
                 </div>
                 <div class="mt-2 flex items-center justify-between">
-                    <span class="text-slate-600">{{ __('ui.checkout.labels.subtotal') }}</span>
+                    <span class="text-slate-600">{{ ((bool) config('commerce.b2b_only') && (bool) config('commerce.b2b_display_net', true)) ? __('ui.b2b.pricing.net_subtotal') : __('ui.checkout.labels.subtotal') }}</span>
                     <span class="font-semibold text-slate-900">{{ \App\Support\Currency::format((float) $summary['subtotal']) }}</span>
                 </div>
                 @if ((float) ($summary['discount_total'] ?? 0) > 0)
@@ -592,12 +620,16 @@
                     const partnerId = escapeHtml(method.boxnow_partner_id || '');
                     const isGlsDpm = method.is_gls_dpm ? '1' : '0';
                     const glsDpmFilterType = escapeHtml(method.gls_dpm_filter_type || '');
-                    return '<label class="checkout-option-card flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-sm">'
-                        + '<span class="inline-flex items-center gap-2">'
-                        + '<input type="radio" name="shipping_method_code" value="' + escapeHtml(method.code) + '" data-is-boxnow="' + isBoxNow + '" data-boxnow-partner-id="' + partnerId + '" data-is-gls-dpm="' + isGlsDpm + '" data-gls-dpm-filter-type="' + glsDpmFilterType + '" class="h-4 w-4 border-slate-300 text-slate-900 focus:ring-0" required ' + (checked ? 'checked' : '') + '>'
-                        + '<span class="font-semibold text-slate-900">' + escapeHtml(method.name) + '</span>'
+                    const description = String(method.description || '').trim();
+                    const descriptionHtml = description
+                        ? '<span class="mt-1 block whitespace-pre-line text-xs leading-relaxed text-slate-600">' + escapeHtml(description) + '</span>'
+                        : '';
+                    return '<label class="checkout-option-card flex cursor-pointer items-start justify-between gap-3 px-3 py-2.5 text-sm">'
+                        + '<span class="inline-flex min-w-0 items-start gap-2">'
+                        + '<input type="radio" name="shipping_method_code" value="' + escapeHtml(method.code) + '" data-is-boxnow="' + isBoxNow + '" data-boxnow-partner-id="' + partnerId + '" data-is-gls-dpm="' + isGlsDpm + '" data-gls-dpm-filter-type="' + glsDpmFilterType + '" class="mt-0.5 h-4 w-4 shrink-0 border-slate-300 text-slate-900 focus:ring-0" required ' + (checked ? 'checked' : '') + '>'
+                        + '<span class="min-w-0"><span class="font-semibold text-slate-900">' + escapeHtml(method.name) + '</span>' + descriptionHtml + '</span>'
                         + '</span>'
-                        + '<span class="text-slate-600">' + escapeHtml(method.price_formatted || '') + '</span>'
+                        + '<span class="shrink-0 whitespace-nowrap text-slate-600">' + escapeHtml(method.price_formatted || '') + '</span>'
                         + '</label>';
                 }).join('');
 
@@ -625,10 +657,14 @@
                     const methodLabel = isKeks
                         ? '<span class="inline-flex items-center gap-2"><img src="{{ asset('assets/payments/keks-logo.svg') }}" alt="KEKS Pay" class="h-5 w-auto max-w-[110px]"><span class="font-semibold text-slate-900">' + escapeHtml(method.name) + '</span></span>'
                         : '<span class="font-semibold text-slate-900">' + escapeHtml(method.name) + '</span>';
-                    return '<label class="checkout-option-card flex cursor-pointer items-center justify-between gap-3 px-3 py-2.5 text-sm">'
-                        + '<span class="inline-flex items-center gap-2">'
-                        + '<input type="radio" name="payment_method_code" value="' + escapeHtml(method.code) + '" class="h-4 w-4 border-slate-300 text-slate-900 focus:ring-0" required ' + (checked ? 'checked' : '') + '>'
-                        + methodLabel
+                    const description = String(method.description || '').trim();
+                    const descriptionHtml = description
+                        ? '<span class="mt-1 block whitespace-pre-line text-xs leading-relaxed text-slate-600">' + escapeHtml(description) + '</span>'
+                        : '';
+                    return '<label class="checkout-option-card flex cursor-pointer items-start justify-between gap-3 px-3 py-2.5 text-sm">'
+                        + '<span class="inline-flex min-w-0 items-start gap-2">'
+                        + '<input type="radio" name="payment_method_code" value="' + escapeHtml(method.code) + '" class="mt-0.5 h-4 w-4 shrink-0 border-slate-300 text-slate-900 focus:ring-0" required ' + (checked ? 'checked' : '') + '>'
+                        + '<span class="min-w-0">' + methodLabel + descriptionHtml + '</span>'
                         + '</span>'
                         + '</label>';
                 }).join('');
@@ -1114,7 +1150,7 @@
                                 if (firstErrorField === null) {
                                     firstErrorField = field;
                                 }
-                                if (field === 'accept_terms') {
+                                if (field === 'accept_terms' || field === 'cart') {
                                     showTopError(firstMessage);
                                 }
                             }

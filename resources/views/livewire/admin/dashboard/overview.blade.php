@@ -199,6 +199,13 @@
                 <h1 id="dashboard-title" class="mt-1 text-2xl font-bold tracking-tight text-slate-900">{{ __('Sales Overview') }}</h1>
                 <p class="mt-1 text-sm text-slate-600">{{ __('Sales, orders, and recent activity at a glance.') }}</p>
             </div>
+            <div class="flex flex-wrap items-center gap-2">
+            @if (auth()->user()?->isA('superadmin') || (auth()->user()?->can('users.list.view') && auth()->user()?->can('sales.orders.view')))
+                <a href="{{ route('admin.users.statistics') }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-200 bg-white px-4 py-2.5 text-sm font-semibold text-cyan-800 transition hover:bg-cyan-50">
+                    <x-fa-icon name="chart-line" class="h-4 w-4" />
+                    {{ __('Statistika kupaca i artikala') }}
+                </a>
+            @endif
             <a
                 href="{{ route('admin.orders') }}"
                 class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2"
@@ -207,6 +214,7 @@
                 <span>{{ __('View All Orders') }}</span>
                 <x-fa-icon name="arrow-right" class="h-3.5 w-3.5" />
             </a>
+            </div>
         </div>
     </section>
 

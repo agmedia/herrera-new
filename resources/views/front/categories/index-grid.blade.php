@@ -1,7 +1,21 @@
 @if ($categories->isEmpty())
     <div class="category-index-empty">{{ __('ui.category_index.empty') }}</div>
+@elseif (str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera'))
+    @php
+        // The Croatian slug identifies the shared photography and icon in every locale.
+        $categories->load(['translations' => fn ($query) => $query
+            ->where('scope', \App\Models\Catalog\Category\Category::SCOPE_CATALOG)
+            ->whereIn('locale', array_unique([$locale, $fallbackLocale, 'hr']))]);
+    @endphp
+    @include('front.partials.herrera-home-categories', [
+        'categories' => $categories,
+        'locale' => $locale,
+        'fallbackLocale' => $fallbackLocale,
+        'showCategoryHeading' => false,
+        'showCategorySupport' => true,
+    ])
 @else
-    <div class="category-index-grid">
+    <div class="category-index-grid" data-continuous-card-grid>
         @foreach ($categories as $category)
             @php
                 $translation = $category->translations->firstWhere('locale', $locale)
@@ -9,8 +23,10 @@
                     ?? $category->translations->first();
                 $categoryName = trim((string) ($translation?->name ?? $category->code));
                 $categoryUrl = route('categories.show', ['slug' => $translation?->slug ?? $category->id]);
-                $categoryMedia = $category->getFirstMedia('category_banner')
-                    ?? $category->getFirstMedia('category_icon');
+                $categoryMedia = collect([
+                    $category->getFirstMedia('category_banner'),
+                    $category->getFirstMedia('category_icon'),
+                ])->first(fn ($media) => \App\Support\Media\MediaUrl::hasUsableSource($media, ['card_360x240', 'icon_96x96', 'card_192w', 'card_320w', 'square_540w']));
                 $preferWebp = (bool) ($storeSettings['images']['use_webp'] ?? false);
                 $categoryImageUrl = null;
                 $categoryImageSrcset = '';
@@ -38,6 +54,15 @@
                         $categoryImageHeight = 540;
                     }
                 }
+                if (! $categoryImageUrl) {
+                    $categoryImageUrl = \App\Support\Media\HerreraCategoryImage::url($category, $locale, $fallbackLocale,
+                        (string) ($storeSettings['branding']['store_name'] ?? config('app.name', 'AG Shop')));
+                    if ($categoryImageUrl) {
+                        $categoryImageWidth = 768;
+                        $categoryImageHeight = 768;
+                    }
+                }
+                $categoryImageUrl ??= \App\Support\Media\LegacyCatalogImage::first($category);
                 $categoryImageAlt = $categoryMedia
                     ? trim((string) $categoryMedia->getCustomProperty('alt.'.$locale))
                     : '';
@@ -62,7 +87,7 @@
                         <img
                             src="{{ $categoryImageUrl }}"
                             @if ($categoryImageSrcset !== '') srcset="{{ $categoryImageSrcset }}" @endif
-                            sizes="(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 33vw"
+                            sizes="{{ $categoryImageSizes ?? '(max-width: 639px) 100vw, (max-width: 1023px) 50vw, 33vw' }}"
                             alt="{{ $categoryImageAlt }}"
                             width="{{ $categoryImageWidth }}"
                             height="{{ $categoryImageHeight }}"

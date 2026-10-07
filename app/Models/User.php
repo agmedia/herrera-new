@@ -76,7 +76,7 @@ class User extends Authenticatable implements HasMedia
 
     public function addresses(): HasMany
     {
-        return $this->hasMany(\App\Models\User\UserAddress::class);
+        return $this->hasMany(\App\Models\User\UserAddress::class)->orderByDesc('is_default')->orderBy('id');
     }
 
     public function customerGroups(): BelongsToMany

@@ -1307,5 +1307,7 @@
     "Selected statistics period": "Odabrano razdoblje statistike",
     "All Orders": "Sve narudžbe",
     "Latest store orders": "Najnovije narudžbe trgovine",
-    "View All": "Prikaži sve"
+    "View All": "Prikaži sve",
+    "The same package cannot appear more than once.": "Isto pakiranje ne može biti dodano više puta.",
+    "The same price cannot appear more than once.": "Ista cijena ne može biti dodana više puta."
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Wholesale;
 
 use App\Models\Catalog\Product\Product;
 use App\Services\Api\Wholesale\ProductSkuFeedService;
+use App\Services\Pricing\B2BAccessService;
 use App\Services\Pricing\ProductGroupPriceResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,6 +41,7 @@ class ProductPriceController extends BaseWholesaleController
             'sort' => (string) ($validated['sort'] ?? 'sku_asc'),
         ]);
         $quantity = (int) ($validated['quantity'] ?? 1);
+        $b2bOnly = app(B2BAccessService::class)->requiresApprovedAccount();
         $user = $request->user()?->loadMissing('customerGroups');
         $products = Product::query()
             ->whereIn(
@@ -50,7 +52,7 @@ class ProductPriceController extends BaseWholesaleController
             ->keyBy('id');
 
         return response()->json([
-            'data' => collect($rows->items())->map(function ($row) use ($products, $user, $quantity): array {
+            'data' => collect($rows->items())->map(function ($row) use ($products, $user, $quantity, $b2bOnly): array {
                 $product = $products->get((int) $row->product_id);
                 $groupPrice = $product
                     ? $this->groupPriceResolver->resolve(
@@ -64,7 +66,7 @@ class ProductPriceController extends BaseWholesaleController
                 return [
                     'sku' => $row->sku,
                     'price' => (float) ($groupPrice?->price ?? $row->price),
-                    'retail_price' => (float) $row->price,
+                    ...($b2bOnly ? [] : ['retail_price' => (float) $row->price]),
                     'price_source' => $groupPrice ? 'b2b' : 'base',
                     'group_price_id' => $groupPrice?->group_price_id,
                     'b2b_rule_id' => $groupPrice?->rule_id,

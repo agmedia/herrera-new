@@ -8,6 +8,17 @@
     $ctaUrl = trim((string) ($translation?->cta_url ?: route('categories.index')));
 @endphp
 
+@if (str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera'))
+    @include('front.partials.herrera-home-categories', [
+        'categories' => $categories,
+        'locale' => $locale,
+        'fallbackLocale' => $fallbackLocale,
+        'title' => $title,
+        'subtitle' => $subtitle,
+        'ctaLabel' => $ctaLabel,
+        'ctaUrl' => $ctaUrl,
+    ])
+@else
 <section class="featured-categories storefront-widget-wide" data-featured-categories>
     @if ($title !== '' || $subtitle !== '' || ($ctaLabel !== '' && $ctaUrl !== ''))
         <header class="featured-categories-heading storefront-widget-heading--split">
@@ -28,7 +39,7 @@
     @endif
 
     @if ($categories->isNotEmpty())
-        <div class="featured-categories-grid">
+        <div class="featured-categories-grid" data-continuous-card-grid>
             @foreach ($categories as $category)
                 @php
                     $categoryTranslation = $category->translations->firstWhere('locale', $locale)
@@ -44,6 +55,10 @@
                     $categoryImageSrcset = '';
                     $categoryImageWidth = 360;
                     $categoryImageHeight = 240;
+
+                    if (! \App\Support\Media\MediaUrl::hasUsableSource($categoryMedia, ['card_360x240', 'icon_96x96', 'card_192w', 'card_320w', 'square_540w'])) {
+                        $categoryMedia = null;
+                    }
 
                     if ($categoryMedia) {
                         if ($categoryMedia->collection_name === 'category_banner') {
@@ -67,6 +82,7 @@
                         }
                     }
 
+                    $categoryImageUrl ??= \App\Support\Media\LegacyCatalogImage::first($category);
                     $categoryImageAlt = $categoryMedia
                         ? trim((string) $categoryMedia->getCustomProperty('alt.'.$locale))
                         : '';
@@ -127,3 +143,4 @@
         <div class="featured-categories-empty">{{ __('ui.featured_categories.empty') }}</div>
     @endif
 </section>
+@endif

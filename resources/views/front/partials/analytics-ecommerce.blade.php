@@ -7,12 +7,13 @@
     $hasMetaPixel = $metaPixelId !== '';
 @endphp
 
-@if ($hasGa4 || $hasMetaPixel)
+@if ($canViewPrices && ($hasGa4 || $hasMetaPixel))
     @php
         $locale = app()->getLocale();
         $fallbackLocale = (string) config('app.locale');
         $currency = 'EUR';
-        $taxPricing = app(\App\Services\Pricing\TaxPricingService::class);
+        $analyticsPricing = app(\App\Services\Pricing\ProductPricePresentationService::class);
+        $analyticsViewer = auth()->user();
         $routeName = (string) (request()->route()?->getName() ?? '');
     @endphp
 
@@ -25,15 +26,16 @@
                 ?? $firstCategory?->translations?->firstWhere('locale', $fallbackLocale);
             $manufacturerTranslation = $product->manufacturer?->translations?->firstWhere('locale', $locale)
                 ?? $product->manufacturer?->translations?->firstWhere('locale', $fallbackLocale);
+            $analyticsProductPrice = $analyticsPricing->forProduct($product, $analyticsViewer);
             $viewItemPayload = [
                 'currency' => $currency,
-                'value' => round((float) $taxPricing->grossFromStored((float) $product->base_price, $product), 2),
+                'value' => round((float) ($analyticsProductPrice['display_current'] ?? $analyticsProductPrice['current_gross']), 2),
                 'items' => [[
                     'item_id' => (string) ($product->sku ?: $product->id),
                     'item_name' => (string) ($productTranslation?->name ?: $product->code),
                     'item_brand' => (string) ($manufacturerTranslation?->name ?? ''),
                     'item_category' => (string) ($firstCategoryTranslation?->name ?? ''),
-                    'price' => round((float) $taxPricing->grossFromStored((float) $product->base_price, $product), 2),
+                    'price' => round((float) ($analyticsProductPrice['display_current'] ?? $analyticsProductPrice['current_gross']), 2),
                     'quantity' => 1,
                 ]],
             ];
@@ -84,15 +86,16 @@
             $viewListItems = collect($products instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator ? $products->items() : (array) $products)
                 ->take(30)
                 ->values()
-                ->map(function ($row, $index) use ($locale, $fallbackLocale, $taxPricing) {
+                ->map(function ($row, $index) use ($locale, $fallbackLocale, $analyticsPricing, $analyticsViewer) {
                     $translation = $row->translations?->firstWhere('locale', $locale)
                         ?? $row->translations?->firstWhere('locale', $fallbackLocale)
                         ?? $row->translations?->first();
+                    $analyticsProductPrice = $analyticsPricing->forProduct($row, $analyticsViewer);
 
                     return [
                         'item_id' => (string) ($row->sku ?: $row->id),
                         'item_name' => (string) ($translation?->name ?: $row->code),
-                        'price' => round((float) $taxPricing->grossFromStored((float) $row->base_price, $row), 2),
+                        'price' => round((float) ($analyticsProductPrice['display_current'] ?? $analyticsProductPrice['current_gross']), 2),
                         'index' => $index + 1,
                     ];
                 })

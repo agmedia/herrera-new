@@ -1,4 +1,13 @@
 @php
+    $canViewPrices = $canViewPrices ?? app(\App\Services\Pricing\B2BAccessService::class)->canViewPrices(auth()->user());
+    $isPurchasable = $canViewPrices && $isPurchasable;
+    if (! $canViewPrices) {
+        $price = '';
+        $oldPrice = null;
+        $discountPercent = null;
+        $lowest30DaysPrice = null;
+        $isB2BPrice = false;
+    }
     $hasOptionErrorForCard = (int) old('product_id', 0) === $productId && $errors->has('product_option_value_id');
 @endphp
 
@@ -166,7 +175,13 @@
             @if ($materialLabel !== '')
                 <p class="mt-1 text-[10px] leading-tight text-slate-500 sm:text-[11px]">{{ $materialLabel }}</p>
             @endif
+            @include('front.partials.product-identifiers')
             <div class="product-card-lined-price mt-auto pt-4">
+                @if (! $canViewPrices)
+                    @include('front.partials.b2b-price-access', ['compact' => true])
+                    <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
+                    <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                @else
                 <p class="text-[11px] leading-none {{ $isB2BPrice ? 'font-semibold text-cyan-800' : 'text-slate-700' }}">
                     {{ $isB2BPrice ? __('ui.product.b2b_contract_price') : __('ui.shop.filters.price') }}
                 </p>
@@ -178,10 +193,14 @@
                     <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
                     <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
                 </div>
+                @include('front.partials.b2b-tax-note', ['includesTax' => $displayIncludesTax ?? true])
                 @if (! empty($lowest30DaysPrice))
                     <p class="mt-1 text-[9px] leading-tight text-slate-500 sm:text-[10px]">{{ __('ui.product.lowest_price_30_days', ['price' => $lowest30DaysPrice]) }}</p>
                 @endif
+                @endif
             </div>
+
+            @include('front.partials.product-availability')
 
             @if ($isPurchasable)
                 <form
@@ -249,7 +268,7 @@
                         </button>
                     </div>
                 </form>
-            @else
+            @elseif ($canViewPrices)
                 <span class="mt-3 inline-flex min-h-12 items-center justify-center border border-slate-200 bg-slate-100 px-3 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                     {{ __('ui.product.unavailable') }}
                 </span>
@@ -277,6 +296,7 @@
             @if ($materialLabel !== '')
                 <p class="mt-1 pr-12 text-[11px] leading-tight text-slate-500 sm:text-[12px]">{{ $materialLabel }}</p>
             @endif
+            @include('front.partials.product-identifiers')
             @if ($isPurchasable)
                 <button
                     type="button"
@@ -287,12 +307,17 @@
                 >
                     <x-fa-icon name="bag-shopping" class="h-4 w-4 sm:h-5 sm:w-5" />
                 </button>
-            @else
+            @elseif ($canViewPrices)
                 <span class="absolute right-2 top-0 inline-flex min-h-8 items-center justify-center border border-slate-200 bg-slate-100 px-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:min-h-9">
                     {{ __('ui.product.unavailable') }}
                 </span>
             @endif
             <div class="mt-1.5 flex flex-col gap-1">
+                @if (! $canViewPrices)
+                    @include('front.partials.b2b-price-access', ['compact' => true])
+                    <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
+                    <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                @else
                 @if ($isB2BPrice)
                     <p class="text-[10px] font-semibold leading-tight text-cyan-800 sm:text-[11px]">{{ __('ui.product.b2b_contract_price') }}</p>
                 @endif
@@ -304,10 +329,13 @@
                     <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
                     <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
                 </div>
+                @include('front.partials.b2b-tax-note', ['includesTax' => $displayIncludesTax ?? true])
                 @if (! empty($lowest30DaysPrice))
                     <p class="text-[10px] leading-tight text-slate-500 sm:text-[11px]">{{ __('ui.product.lowest_price_30_days', ['price' => $lowest30DaysPrice]) }}</p>
                 @endif
+                @endif
             </div>
+            @include('front.partials.product-availability')
         </div>
     @else
         @if ((int) ($reviewSummary['count'] ?? 0) > 0)
@@ -330,8 +358,14 @@
         @if ($materialLabel !== '')
             <p class="mt-1 text-[11px] leading-tight text-slate-500 sm:text-[12px]">{{ $materialLabel }}</p>
         @endif
+        @include('front.partials.product-identifiers')
         <div class="mt-2 flex items-end justify-between">
             <div class="flex flex-col gap-1">
+                @if (! $canViewPrices)
+                    @include('front.partials.b2b-price-access', ['compact' => true])
+                    <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
+                    <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                @else
                 @if ($isB2BPrice)
                     <p class="text-[10px] font-semibold leading-tight text-cyan-800 sm:text-[11px]">{{ __('ui.product.b2b_contract_price') }}</p>
                 @endif
@@ -343,8 +377,10 @@
                     <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
                     <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
                 </div>
+                @include('front.partials.b2b-tax-note', ['includesTax' => $displayIncludesTax ?? true])
                 @if (! empty($lowest30DaysPrice))
                     <p class="text-[10px] leading-tight text-slate-500 sm:text-[11px]">{{ __('ui.product.lowest_price_30_days', ['price' => $lowest30DaysPrice]) }}</p>
+                @endif
                 @endif
             </div>
             @if ($isPurchasable)
@@ -357,12 +393,13 @@
                 >
                     <x-fa-icon name="bag-shopping" class="h-4 w-4 sm:h-5 sm:w-5" />
                 </button>
-            @else
+            @elseif ($canViewPrices)
                 <span class="inline-flex min-h-8 shrink-0 items-center justify-center self-end border border-slate-200 bg-slate-100 px-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:min-h-9">
                     {{ __('ui.product.unavailable') }}
                 </span>
             @endif
         </div>
+        @include('front.partials.product-availability')
     @endif
 
 </article>

@@ -16,7 +16,11 @@ use App\Models\Content\Blog\BlogPost;
 use App\Models\User;
 use App\Services\Catalog\CatalogFeatureService;
 use App\Services\Content\ContentBlockResolver;
+use App\Services\Front\StorefrontProductSearch;
+use App\Services\Front\StorefrontSearchCountCache;
 use App\Services\Front\WishlistService;
+use App\Services\Pricing\B2BAccessService;
+use App\Services\Pricing\PriceCatalogQuery;
 use App\Services\Pricing\ProductPricePresentationService;
 use App\Services\Settings\SystemSettingsService;
 use App\Support\Media\MediaUrl;
@@ -28,6 +32,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -41,6 +46,10 @@ class CatalogController extends Controller
 
     private ?bool $hideOutOfStockProductsCache = null;
 
+    private bool $localAvailabilityOnly = false;
+
+    private ?int $priceBoundsPaginationTotal = null;
+
     public function autocomplete(Request $request): JsonResponse
     {
         $settings = app(SystemSettingsService::class);
@@ -50,6 +59,8 @@ class CatalogController extends Controller
         $fallbackLocale = (string) config('app.locale');
         $search = trim((string) $request->query('q', ''));
         $configuration = $this->autocompleteConfiguration($settings);
+        $configuration['show_product_price'] = $configuration['show_product_price']
+            && app(B2BAccessService::class)->canViewPrices($request->user());
 
         if (mb_strlen($search) < 2) {
             return $this->autocompleteResponse($search, $this->emptyAutocompleteGroups());
@@ -114,7 +125,9 @@ class CatalogController extends Controller
 
         $this->applyProductSearch($query, $locale, $fallbackLocale, $search);
 
-        $total = (clone $query)->count('products.id');
+        app(StorefrontProductSearch::class)->orderByRelevance($query, $search);
+
+        $total = app(StorefrontSearchCountCache::class)->total($query, $request->user()?->id);
         $viewer = $request->user();
         $pricing = app(ProductPricePresentationService::class);
         $preferWebp = (bool) app(SystemSettingsService::class)->get('store_images_use_webp', true);
@@ -139,7 +152,10 @@ class CatalogController extends Controller
                 $price = $configuration['show_product_price']
                     ? $pricing->forProduct($product, $viewer)
                     : null;
-                $oldGross = $price['old_gross'] ?? null;
+                $displayCurrent = $price['display_current'] ?? $price['current_gross'] ?? 0;
+                $displayOld = $price['display_old'] ?? $price['old_gross'] ?? null;
+                $taxSuffix = ($price['display_includes_tax'] ?? true) === false
+                    ? ' '.__('ui.b2b.pricing.excludes_tax') : '';
                 $imageUrl = null;
                 $brand = null;
 
@@ -150,7 +166,7 @@ class CatalogController extends Controller
                         ?? $product->getFirstMedia('product_gallery');
                     $imageUrl = MediaUrl::conversionOrNull($mainMedia, 'card_320w', $preferWebp)
                         ?? MediaUrl::conversionOrNull($mainMedia, 'card_480w', $preferWebp)
-                        ?? ($mainMedia ? (string) $mainMedia->getUrl() : null);
+                        ?? \App\Support\Media\LegacyCatalogImage::first($product, ['card_320w', 'card_480w'], $preferWebp);
                 }
 
                 if ($configuration['show_product_brand'] && $product->manufacturer) {
@@ -171,14 +187,14 @@ class CatalogController extends Controller
                     'url' => route('products.show', ['slug' => $slug]),
                     'image_url' => $imageUrl,
                     'price' => $price !== null
-                        ? number_format((float) ($price['current_gross'] ?? 0), 2).' €'
+                        ? number_format((float) $displayCurrent, 2).' €'.$taxSuffix
                         : null,
-                    'old_price' => $price !== null && $oldGross !== null
-                        ? number_format((float) $oldGross, 2).' €'
+                    'old_price' => $price !== null && $displayOld !== null
+                        ? number_format((float) $displayOld, 2).' €'
                         : null,
                     'has_discount' => $price !== null
-                        && $oldGross !== null
-                        && (float) $oldGross > (float) ($price['current_gross'] ?? 0),
+                        && $displayOld !== null
+                        && (float) $displayOld > (float) $displayCurrent,
                     'is_b2b_price' => (bool) ($price['is_b2b_price'] ?? false),
                 ];
             })
@@ -207,7 +223,7 @@ class CatalogController extends Controller
                 $translationQuery
                     ->where('scope', Category::SCOPE_CATALOG)
                     ->whereIn('locale', [$locale, $fallbackLocale])
-                    ->where('name', 'like', '%'.$search.'%');
+                    ->whereRaw("name LIKE ? ESCAPE '!'", ['%'.app(StorefrontProductSearch::class)->literalLike($search).'%']);
             })
             ->with([
                 'translations' => fn ($translationQuery) => $translationQuery
@@ -259,7 +275,7 @@ class CatalogController extends Controller
             ->whereHas('translations', function ($translationQuery) use ($locale, $fallbackLocale, $search): void {
                 $translationQuery
                     ->whereIn('locale', [$locale, $fallbackLocale])
-                    ->where('name', 'like', '%'.$search.'%');
+                    ->whereRaw("name LIKE ? ESCAPE '!'", ['%'.app(StorefrontProductSearch::class)->literalLike($search).'%']);
             })
             ->with([
                 'translations' => fn ($translationQuery) => $translationQuery
@@ -316,8 +332,8 @@ class CatalogController extends Controller
                     ->whereIn('locale', [$locale, $fallbackLocale])
                     ->where(function ($copyQuery) use ($search): void {
                         $copyQuery
-                            ->where('title', 'like', '%'.$search.'%')
-                            ->orWhere('excerpt', 'like', '%'.$search.'%');
+                            ->whereRaw("title LIKE ? ESCAPE '!'", ['%'.app(StorefrontProductSearch::class)->literalLike($search).'%'])
+                            ->orWhereRaw("excerpt LIKE ? ESCAPE '!'", ['%'.app(StorefrontProductSearch::class)->literalLike($search).'%']);
                     });
             })
             ->with([
@@ -418,8 +434,9 @@ class CatalogController extends Controller
         $manufacturerSlug = $isManufacturerPage
             ? (string) ($catalogManufacturerTranslation?->slug ?? '')
             : trim((string) $request->query('manufacturer', ''));
-        $sort = (string) $request->query('sort', 'newest');
+        $sort = (string) $request->query('sort', $search !== '' ? 'relevance' : 'newest');
         $availableOnly = $this->normalizeBooleanFilterValue($request->query('available_only'));
+        $this->localAvailabilityOnly = $availableOnly && str_contains(strtolower((string) app(SystemSettingsService::class)->get('store_brand_name', config('app.name', 'AG Shop'))), 'herrera');
         $promoOnly = $this->normalizeBooleanFilterValue($request->query('promo_only'));
         [$priceMin, $priceMax] = $this->normalizedPriceRange(
             $request->query('price_min'),
@@ -491,11 +508,14 @@ class CatalogController extends Controller
                 'products.id',
                 'products.code',
                 'products.sku',
+                'products.barcode',
                 'products.base_price',
                 'products.stock_qty',
+                'products.supplier_stock_qty',
                 'products.tax_rate_id',
                 'products.manufacturer_id',
                 'products.is_active',
+                'products.payload',
             ])
             ->withApprovedCommentSummary([$locale, $fallbackLocale])
             ->visibleOnStorefront($this->hideOutOfStockProducts())
@@ -572,7 +592,7 @@ class CatalogController extends Controller
         }
 
         if ($availableOnly) {
-            $query->visibleOnStorefront(true);
+            $query->visibleOnStorefront(true)->availableWithin48Hours($this->localAvailabilityOnly);
         }
 
         $promoAvailabilityQuery = clone $query;
@@ -588,26 +608,41 @@ class CatalogController extends Controller
 
         $this->applyBasePriceFilter($query, $priceMin, $priceMax);
 
+        if ($search !== '' && $sort === 'relevance') {
+            app(StorefrontProductSearch::class)->orderByRelevance($query, $search);
+        }
+
         match ($sort) {
             'price_low' => $this->applyPriceSort($query, 'asc'),
             'price_high' => $this->applyPriceSort($query, 'desc'),
-            'stock_high' => $query->orderByDesc('products.stock_qty')->orderByDesc('products.id'),
+            'stock_high' => $query->orderByRaw($this->availableStockSql().' DESC')->orderByDesc('products.id'),
             'oldest' => $query->orderBy('products.id'),
             default => $query->orderByDesc('products.id'),
         };
 
         $products = $query
-            ->paginate($this->shopPerPage($request))
+            ->paginate($this->shopPerPage($request), total: $this->searchPaginationTotal($request, $query, $search))
             ->withQueryString();
 
-        $categories = $manufacturerId && $manufacturerId > 0
-            ? $this->cachedManufacturerCatalogCategories(
-                $manufacturerId,
+        if ($promoOnly) {
+            $categories = $this->promotionCatalogCategories(
+                Category::query()->whereNull('parent_id'),
                 $locale,
                 $fallbackLocale,
-                $availableOnly
-            )
-            : $this->cachedShopCatalogCategories($locale, $fallbackLocale, $availableOnly);
+                $request->user(),
+                $availableOnly,
+                $manufacturerId
+            );
+        } else {
+            $categories = $manufacturerId && $manufacturerId > 0
+                ? $this->cachedManufacturerCatalogCategories(
+                    $manufacturerId,
+                    $locale,
+                    $fallbackLocale,
+                    $availableOnly
+                )
+                : $this->cachedShopCatalogCategories($locale, $fallbackLocale, $availableOnly);
+        }
         $manufacturers = $isManufacturerPage
             ? collect()
             : $this->cachedCatalogManufacturers(
@@ -700,8 +735,9 @@ class CatalogController extends Controller
         $search = trim((string) $request->query('q', ''));
         $categorySlug = $slug;
         $manufacturerSlug = trim((string) $request->query('manufacturer', ''));
-        $sort = (string) $request->query('sort', 'default');
+        $sort = (string) $request->query('sort', $search !== '' ? 'relevance' : 'default');
         $availableOnly = $this->normalizeBooleanFilterValue($request->query('available_only'));
+        $this->localAvailabilityOnly = $availableOnly && str_contains(strtolower((string) app(SystemSettingsService::class)->get('store_brand_name', config('app.name', 'AG Shop'))), 'herrera');
         $promoOnly = $this->normalizeBooleanFilterValue($request->query('promo_only'));
         [$priceMin, $priceMax] = $this->normalizedPriceRange(
             $request->query('price_min'),
@@ -839,7 +875,7 @@ class CatalogController extends Controller
             }
 
             if ($availableOnly) {
-                $productsQuery->visibleOnStorefront(true);
+                $productsQuery->visibleOnStorefront(true)->availableWithin48Hours($this->localAvailabilityOnly);
             }
 
             $promoAvailabilityQuery = clone $productsQuery;
@@ -860,11 +896,14 @@ class CatalogController extends Controller
                     'products.id',
                     'products.code',
                     'products.sku',
+                    'products.barcode',
                     'products.base_price',
                     'products.stock_qty',
+                    'products.supplier_stock_qty',
                     'products.tax_rate_id',
                     'products.manufacturer_id',
                     'products.is_active',
+                    'products.payload',
                 ])
                 ->withApprovedCommentSummary([$locale, $fallbackLocale])
                 ->with([
@@ -900,17 +939,22 @@ class CatalogController extends Controller
                         ]),
                 ]);
 
-            match ($sort) {
-                'newest' => $productsQuery->orderByDesc('products.id'),
-                'price_low' => $this->applyPriceSort($productsQuery, 'asc'),
-                'price_high' => $this->applyPriceSort($productsQuery, 'desc'),
-                'stock_high' => $productsQuery->orderByDesc('products.stock_qty')->orderByDesc('products.id'),
-                'oldest' => $productsQuery->orderBy('products.id'),
-                default => $this->applyCategoryDefaultProductSort($productsQuery, $categoryScopeIds, $locale, $fallbackLocale),
-            };
+            if ($search !== '' && $sort === 'relevance') {
+                app(StorefrontProductSearch::class)->orderByRelevance($productsQuery, $search);
+                $productsQuery->orderByDesc('products.id');
+            } else {
+                match ($sort) {
+                    'newest' => $productsQuery->orderByDesc('products.id'),
+                    'price_low' => $this->applyPriceSort($productsQuery, 'asc'),
+                    'price_high' => $this->applyPriceSort($productsQuery, 'desc'),
+                    'stock_high' => $productsQuery->orderByRaw($this->availableStockSql().' DESC')->orderByDesc('products.id'),
+                    'oldest' => $productsQuery->orderBy('products.id'),
+                    default => $this->applyCategoryDefaultProductSort($productsQuery, $categoryScopeIds, $locale, $fallbackLocale),
+                };
+            }
 
             $products = $productsQuery
-                ->paginate($this->shopPerPage($request))
+                ->paginate($this->shopPerPage($request), total: $this->searchPaginationTotal($request, $productsQuery, $search))
                 ->withQueryString();
         } else {
             $priceBounds = $this->resolvePriceBounds(null, $priceMin, $priceMax);
@@ -928,7 +972,16 @@ class CatalogController extends Controller
         }
 
         $categories = $showCategoryFilters
-            ? $this->cachedCatalogCategories($locale, $fallbackLocale, $availableOnly)
+            ? ($promoOnly
+                ? $this->promotionCatalogCategories(
+                    Category::query(),
+                    $locale,
+                    $fallbackLocale,
+                    $request->user(),
+                    $availableOnly,
+                    $manufacturerId
+                )
+                : $this->cachedCatalogCategories($locale, $fallbackLocale, $availableOnly))
             : collect();
         $manufacturers = $showCategoryFilters
             ? $this->cachedCatalogManufacturers(
@@ -939,61 +992,67 @@ class CatalogController extends Controller
             )
             : collect();
 
-        $subcategories = $showCategoryFilters
-            ? $category->children()
-                ->where('scope', Category::SCOPE_CATALOG)
-                ->currentlyVisible()
-                ->with(['translations' => fn ($q) => $q
+        if ($showCategoryFilters && $promoOnly) {
+            $subcategories = $categories
+                ->where('parent_id', $category->id)
+                ->values();
+        } else {
+            $subcategories = $showCategoryFilters
+                ? $category->children()
                     ->where('scope', Category::SCOPE_CATALOG)
-                    ->whereIn('locale', [$locale, $fallbackLocale])])
-                ->withCount(['products' => function ($q) use ($availableOnly, $manufacturerId): void {
-                    $q->visibleOnStorefront($this->hideOutOfStockProducts() || $availableOnly);
-                    if ($manufacturerId && $manufacturerId > 0) {
-                        $q->where('products.manufacturer_id', $manufacturerId);
-                    } elseif ($manufacturerId !== null) {
-                        $q->whereRaw('1 = 0');
-                    }
-                }])
-                ->orderBy('sort_order')
-                ->orderBy('id')
-                ->get()
-            : collect();
-        $subcategories->transform(function (Category $subCategory) use ($availableOnly, $manufacturerId): Category {
-            $subTreeIds = Category::query()
-                ->descendantsAndSelf($subCategory->id)
-                ->where('scope', Category::SCOPE_CATALOG)
-                ->filter(fn (Category $category): bool => $category->isCurrentlyVisible())
-                ->pluck('id');
+                    ->currentlyVisible()
+                    ->with(['translations' => fn ($q) => $q
+                        ->where('scope', Category::SCOPE_CATALOG)
+                        ->whereIn('locale', [$locale, $fallbackLocale])])
+                    ->withCount(['products' => function ($q) use ($availableOnly, $manufacturerId): void {
+                        $q->visibleOnStorefront($this->hideOutOfStockProducts() || $availableOnly)->availableWithin48Hours($this->localAvailabilityOnly);
+                        if ($manufacturerId && $manufacturerId > 0) {
+                            $q->where('products.manufacturer_id', $manufacturerId);
+                        } elseif ($manufacturerId !== null) {
+                            $q->whereRaw('1 = 0');
+                        }
+                    }])
+                    ->orderBy('sort_order')
+                    ->orderBy('id')
+                    ->get()
+                : collect();
+            $subcategories->transform(function (Category $subCategory) use ($availableOnly, $manufacturerId): Category {
+                $subTreeIds = Category::query()
+                    ->descendantsAndSelf($subCategory->id)
+                    ->where('scope', Category::SCOPE_CATALOG)
+                    ->filter(fn (Category $category): bool => $category->isCurrentlyVisible())
+                    ->pluck('id');
 
-            if ($subTreeIds->isEmpty()) {
-                $subCategory->setAttribute('products_count', 0);
+                if ($subTreeIds->isEmpty()) {
+                    $subCategory->setAttribute('products_count', 0);
+
+                    return $subCategory;
+                }
+
+                $recursiveCount = Product::query()
+                    ->visibleOnStorefront($this->hideOutOfStockProducts() || $availableOnly)->availableWithin48Hours($this->localAvailabilityOnly)
+                    ->when(
+                        $manufacturerId && $manufacturerId > 0,
+                        fn (Builder $query) => $query->where('products.manufacturer_id', $manufacturerId)
+                    )
+                    ->when(
+                        $manufacturerId !== null && $manufacturerId <= 0,
+                        fn (Builder $query) => $query->whereRaw('1 = 0')
+                    )
+                    ->whereHas('categories', function ($categoryQuery) use ($subTreeIds): void {
+                        $categoryQuery
+                            ->where('scope', Category::SCOPE_CATALOG)
+                            ->currentlyVisible()
+                            ->whereIn('categories.id', $subTreeIds);
+                    })
+                    ->distinct('products.id')
+                    ->count('products.id');
+
+                $subCategory->setAttribute('products_count', $recursiveCount);
 
                 return $subCategory;
-            }
-
-            $recursiveCount = Product::query()
-                ->visibleOnStorefront($this->hideOutOfStockProducts() || $availableOnly)
-                ->when(
-                    $manufacturerId && $manufacturerId > 0,
-                    fn (Builder $query) => $query->where('products.manufacturer_id', $manufacturerId)
-                )
-                ->when(
-                    $manufacturerId !== null && $manufacturerId <= 0,
-                    fn (Builder $query) => $query->whereRaw('1 = 0')
-                )
-                ->whereHas('categories', function ($categoryQuery) use ($subTreeIds): void {
-                    $categoryQuery
-                        ->where('scope', Category::SCOPE_CATALOG)
-                        ->currentlyVisible()
-                        ->whereIn('categories.id', $subTreeIds);
-                })
-                ->distinct('products.id')
-                ->count('products.id');
-
-            $subCategory->setAttribute('products_count', $recursiveCount);
-
-            return $subCategory;
-        })->filter(fn (Category $subCategory): bool => (int) $subCategory->products_count > 0)->values();
+            })->filter(fn (Category $subCategory): bool => (int) $subCategory->products_count > 0)->values();
+        }
 
         $breadcrumbCategories = $category->ancestors()
             ->where('scope', Category::SCOPE_CATALOG)
@@ -1130,15 +1189,73 @@ class CatalogController extends Controller
         });
     }
 
+    private function promotionCatalogCategories(
+        Builder $categoryQuery,
+        string $locale,
+        string $fallbackLocale,
+        ?User $user,
+        bool $availableOnly,
+        ?int $manufacturerId = null
+    ): Collection {
+        $categories = $categoryQuery
+            ->select(['id', 'code', 'parent_id', 'sort_order'])
+            ->where('scope', Category::SCOPE_CATALOG)
+            ->currentlyVisible()
+            ->with(['translations' => fn ($query) => $query
+                ->select(['id', 'category_id', 'scope', 'locale', 'name', 'slug'])
+                ->where('scope', Category::SCOPE_CATALOG)
+                ->whereIn('locale', [$locale, $fallbackLocale])])
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        if ($categories->isEmpty()) {
+            return $categories;
+        }
+
+        // Count each product once per category tree, using the same promotion
+        // eligibility as the product list. These counts depend on the viewer
+        // and current promotion dates, so they must not use the general cache.
+        $productsQuery = Product::query()
+            ->visibleOnStorefront($this->hideOutOfStockProducts() || $availableOnly)
+            ->availableWithin48Hours($this->localAvailabilityOnly)
+            ->join('category_product as promotion_category_product', 'promotion_category_product.product_id', '=', 'products.id')
+            ->join('categories as promotion_product_categories', 'promotion_product_categories.id', '=', 'promotion_category_product.category_id')
+            ->join('categories as promotion_filter_categories', function ($join): void {
+                $join
+                    ->on('promotion_product_categories._lft', '>=', 'promotion_filter_categories._lft')
+                    ->on('promotion_product_categories._rgt', '<=', 'promotion_filter_categories._rgt');
+            })
+            ->where('promotion_product_categories.scope', Category::SCOPE_CATALOG)
+            ->where('promotion_product_categories.is_active', true)
+            ->whereIn('promotion_filter_categories.id', $categories->modelKeys());
+        $this->applyCategoryScheduleToBaseQuery($productsQuery->getQuery(), 'promotion_product_categories');
+        if ($manufacturerId !== null) {
+            $productsQuery->where('products.manufacturer_id', $manufacturerId);
+        }
+        $this->applyPromotionFilter($productsQuery, $user);
+
+        $counts = $productsQuery
+            ->selectRaw('promotion_filter_categories.id as category_id, COUNT(DISTINCT products.id) as products_count')
+            ->groupBy('promotion_filter_categories.id')
+            ->toBase()
+            ->pluck('products_count', 'category_id');
+
+        return $categories
+            ->each(fn (Category $category) => $category->setAttribute('products_count', (int) ($counts[$category->id] ?? 0)))
+            ->filter(fn (Category $category): bool => (int) $category->products_count > 0)
+            ->values();
+    }
+
     private function cachedCatalogCategories(
         string $locale,
         string $fallbackLocale,
         bool $availableOnly = false
     ) {
         $hideOutOfStock = $this->hideOutOfStockProducts() || $availableOnly;
-        $cacheKey = sprintf('front:catalog:categories:v2:%s:%s:%s', $locale, $fallbackLocale, $hideOutOfStock ? 'hide-oos' : 'all-stock');
+        $cacheKey = sprintf('front:catalog:categories:v2:%s:%s:%s', $locale, $fallbackLocale, $this->localAvailabilityOnly ? 'local-48h' : ($hideOutOfStock ? 'hide-oos' : 'all-stock'));
 
-        return Cache::remember($cacheKey, now()->addMinutes(10), static function () use ($locale, $fallbackLocale, $hideOutOfStock) {
+        return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($locale, $fallbackLocale, $hideOutOfStock) {
             return Category::query()
                 ->select(['id', 'code', 'sort_order'])
                 ->where('scope', Category::SCOPE_CATALOG)
@@ -1147,7 +1264,7 @@ class CatalogController extends Controller
                     ->select(['id', 'category_id', 'scope', 'locale', 'name', 'slug'])
                     ->where('scope', Category::SCOPE_CATALOG)
                     ->whereIn('locale', [$locale, $fallbackLocale])])
-                ->withCount(['products' => fn ($q) => $q->visibleOnStorefront($hideOutOfStock)])
+                ->withCount(['products' => fn ($q) => $q->visibleOnStorefront($hideOutOfStock)->availableWithin48Hours($this->localAvailabilityOnly)])
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get()
@@ -1162,9 +1279,9 @@ class CatalogController extends Controller
         bool $availableOnly = false
     ) {
         $hideOutOfStock = $this->hideOutOfStockProducts() || $availableOnly;
-        $cacheKey = sprintf('front:catalog:shop-root-categories:v2:%s:%s:%s', $locale, $fallbackLocale, $hideOutOfStock ? 'hide-oos' : 'all-stock');
+        $cacheKey = sprintf('front:catalog:shop-root-categories:v2:%s:%s:%s', $locale, $fallbackLocale, $this->localAvailabilityOnly ? 'local-48h' : ($hideOutOfStock ? 'hide-oos' : 'all-stock'));
 
-        return Cache::remember($cacheKey, now()->addMinutes(10), static function () use ($locale, $fallbackLocale, $hideOutOfStock) {
+        return Cache::remember($cacheKey, now()->addMinutes(10), function () use ($locale, $fallbackLocale, $hideOutOfStock) {
             $categories = Category::query()
                 ->select(['id', 'code', 'parent_id', 'sort_order'])
                 ->where('scope', Category::SCOPE_CATALOG)
@@ -1188,7 +1305,7 @@ class CatalogController extends Controller
                 $productCount = $treeIds->isEmpty()
                     ? 0
                     : Product::query()
-                        ->visibleOnStorefront($hideOutOfStock)
+                        ->visibleOnStorefront($hideOutOfStock)->availableWithin48Hours($this->localAvailabilityOnly)
                         ->whereHas('categories', function ($categoryQuery) use ($treeIds): void {
                             $categoryQuery
                                 ->where('scope', Category::SCOPE_CATALOG)
@@ -1228,10 +1345,10 @@ class CatalogController extends Controller
             $locale,
             $fallbackLocale,
             $categoryKey,
-            $hideOutOfStock ? 'hide-oos' : 'all-stock'
+            $this->localAvailabilityOnly ? 'local-48h' : ($hideOutOfStock ? 'hide-oos' : 'all-stock')
         );
 
-        return Cache::remember($cacheKey, now()->addMinutes(10), static function () use (
+        return Cache::remember($cacheKey, now()->addMinutes(10), function () use (
             $locale,
             $fallbackLocale,
             $hideOutOfStock,
@@ -1244,7 +1361,7 @@ class CatalogController extends Controller
                     ->select(['id', 'manufacturer_id', 'locale', 'name', 'slug'])
                     ->whereIn('locale', [$locale, $fallbackLocale])])
                 ->withCount(['products' => function ($query) use ($hideOutOfStock, $scopeIds): void {
-                    $query->visibleOnStorefront($hideOutOfStock);
+                    $query->visibleOnStorefront($hideOutOfStock)->availableWithin48Hours($this->localAvailabilityOnly);
                     if ($scopeIds !== []) {
                         $query->whereHas('categories', function ($categoryQuery) use ($scopeIds): void {
                             $categoryQuery
@@ -1274,7 +1391,7 @@ class CatalogController extends Controller
             $manufacturerId,
             $locale,
             $fallbackLocale,
-            $hideOutOfStock ? 'hide-oos' : 'all-stock'
+            $this->localAvailabilityOnly ? 'local-48h' : ($hideOutOfStock ? 'hide-oos' : 'all-stock')
         );
 
         return Cache::remember($cacheKey, now()->addMinutes(10), function () use (
@@ -1296,7 +1413,7 @@ class CatalogController extends Controller
                     $productCount = $treeIds->isEmpty()
                         ? 0
                         : Product::query()
-                            ->visibleOnStorefront($hideOutOfStock)
+                            ->visibleOnStorefront($hideOutOfStock)->availableWithin48Hours($this->localAvailabilityOnly)
                             ->where('manufacturer_id', $manufacturerId)
                             ->whereHas('categories', function ($categoryQuery) use ($treeIds): void {
                                 $categoryQuery
@@ -1352,6 +1469,7 @@ class CatalogController extends Controller
         $query->where(function (QueryBuilder $stockQuery) use ($productTable): void {
             $stockQuery
                 ->where($productTable.'.stock_qty', '>', 0)
+                ->when(! $this->localAvailabilityOnly, fn (QueryBuilder $supplierQuery) => $supplierQuery->orWhere($productTable.'.supplier_stock_qty', '>', 0))
                 ->orWhereExists(function (QueryBuilder $existsQuery) use ($productTable): void {
                     $existsQuery
                         ->selectRaw('1')
@@ -1361,6 +1479,12 @@ class CatalogController extends Controller
                         ->where('storefront_stock_options.stock_qty', '>', 0);
                 });
         });
+    }
+
+    private function availableStockSql(): string
+    {
+        return '(CASE WHEN products.stock_qty > 0 THEN products.stock_qty ELSE 0 END'
+            .' + CASE WHEN products.supplier_stock_qty > 0 THEN products.supplier_stock_qty ELSE 0 END)';
     }
 
     private function applyCategoryScheduleToBaseQuery(QueryBuilder $query, string $categoryTable = 'categories'): void
@@ -1439,7 +1563,7 @@ class CatalogController extends Controller
             sha1(implode(',', $optionIds)),
             $categoryKey,
             $manufacturerKey,
-            $hideOutOfStock ? 'hide-oos' : 'all-stock'
+            $this->localAvailabilityOnly ? 'local-48h' : ($hideOutOfStock ? 'hide-oos' : 'all-stock')
         );
 
         $rows = Cache::remember($cacheKey, now()->addMinutes(10), function () use (
@@ -1570,7 +1694,7 @@ class CatalogController extends Controller
             sha1(implode(',', $groupCodes)),
             $categoryKey,
             $manufacturerKey,
-            $hideOutOfStock ? 'hide-oos' : 'all-stock'
+            $this->localAvailabilityOnly ? 'local-48h' : ($hideOutOfStock ? 'hide-oos' : 'all-stock')
         );
 
         $rows = Cache::remember($cacheKey, now()->addMinutes(10), function () use (
@@ -1585,7 +1709,7 @@ class CatalogController extends Controller
                 ->whereIn('group_code', $groupCodes)
                 ->where('is_active', true)
                 ->whereHas('products', function ($productQuery) use ($scopeIds, $manufacturerId, $hideOutOfStock): void {
-                    $productQuery->visibleOnStorefront($hideOutOfStock);
+                    $productQuery->visibleOnStorefront($hideOutOfStock)->availableWithin48Hours($this->localAvailabilityOnly);
                     if ($manufacturerId !== null) {
                         $productQuery->where('products.manufacturer_id', $manufacturerId);
                     }
@@ -1823,6 +1947,7 @@ class CatalogController extends Controller
             'scope' => $categoryScopeIds === null ? null : $scopeIds,
             'manufacturer' => $manufacturerId,
             'hide_out_of_stock' => $hideOutOfStock,
+            'local_stock_only' => $this->localAvailabilityOnly,
             'candidate_options' => $candidateOptionIds,
             'candidate_attributes' => $candidateAttributeIds,
             'selected_options' => $selectedOptions,
@@ -2099,10 +2224,10 @@ class CatalogController extends Controller
             $fallbackLocale,
             $categoryKey,
             $manufacturerKey,
-            $hideOutOfStock ? 'hide-oos' : 'all-stock'
+            $this->localAvailabilityOnly ? 'local-48h' : ($hideOutOfStock ? 'hide-oos' : 'all-stock')
         );
 
-        return Cache::remember($cacheKey, now()->addMinutes(10), static function () use (
+        return Cache::remember($cacheKey, now()->addMinutes(10), function () use (
             $locale,
             $fallbackLocale,
             $scopeIds,
@@ -2115,7 +2240,7 @@ class CatalogController extends Controller
                 ->whereHas('productOptionValues', function ($q) use ($scopeIds, $manufacturerId, $hideOutOfStock): void {
                     $q->where('is_active', true)
                         ->whereHas('product', function ($productQuery) use ($scopeIds, $manufacturerId, $hideOutOfStock): void {
-                            $productQuery->visibleOnStorefront($hideOutOfStock);
+                            $productQuery->visibleOnStorefront($hideOutOfStock)->availableWithin48Hours($this->localAvailabilityOnly);
                             if ($manufacturerId !== null) {
                                 $productQuery->where('products.manufacturer_id', $manufacturerId);
                             }
@@ -2191,37 +2316,28 @@ class CatalogController extends Controller
         return redirect()->to($target);
     }
 
-    private function applyProductSearch(Builder $query, string $locale, string $fallbackLocale, string $search): void
+    private function searchPaginationTotal(Request $request, Builder $query, string $search): ?int
     {
-        if ($search === '') {
-            return;
+        if ($this->priceBoundsPaginationTotal !== null) {
+            return $this->priceBoundsPaginationTotal;
         }
 
-        $query->where(function (Builder $searchQuery) use ($locale, $fallbackLocale, $search): void {
-            $searchQuery
-                ->where('sku', 'like', '%'.$search.'%')
-                ->orWhereHas('optionValues', function (Builder $optionValueQuery) use ($search): void {
-                    $optionValueQuery
-                        ->where('is_active', true)
-                        ->where('sku', 'like', '%'.$search.'%');
-                })
-                ->orWhereHas('translations', function ($translationQuery) use ($locale, $fallbackLocale, $search): void {
-                    $translationQuery
-                        ->whereIn('locale', [$locale, $fallbackLocale])
-                        ->where(function ($textQuery) use ($search): void {
-                            $textQuery->where('name', 'like', '%'.$search.'%')
-                                ->orWhere('excerpt', 'like', '%'.$search.'%')
-                                ->orWhere('description', 'like', '%'.$search.'%');
-                        });
-                });
-        });
+        return mb_strlen($search) >= 2
+            ? app(StorefrontSearchCountCache::class)->total($query, $request->user()?->id)
+            : null;
     }
 
-    /**
-     * @return array{0:?float,1:?float}
-     */
+    private function applyProductSearch(Builder $query, string $locale, string $fallbackLocale, string $search): void
+    {
+        app(StorefrontProductSearch::class)->apply($query, $locale, $fallbackLocale, $search);
+    }
+
     private function normalizedPriceRange(mixed $priceMinInput, mixed $priceMaxInput): array
     {
+        if (! app(B2BAccessService::class)->canViewPrices(auth()->user())) {
+            return [null, null];
+        }
+
         $priceMin = $this->normalizePriceFilterValue($priceMinInput);
         $priceMax = $this->normalizePriceFilterValue($priceMaxInput);
 
@@ -2268,6 +2384,18 @@ class CatalogController extends Controller
             return;
         }
 
+        $audiencePrice = app(PriceCatalogQuery::class)->displayedPrice($query, auth()->user());
+        if ($audiencePrice) {
+            if ($priceMin !== null) {
+                $query->whereRaw($audiencePrice['sql'].' >= CAST(? AS DECIMAL(20, 4))', [...$audiencePrice['bindings'], $priceMin]);
+            }
+            if ($priceMax !== null) {
+                $query->whereRaw($audiencePrice['sql'].' <= CAST(? AS DECIMAL(20, 4))', [...$audiencePrice['bindings'], $priceMax]);
+            }
+
+            return;
+        }
+
         $defaultRate = $this->defaultCatalogTaxRate();
         if ($this->usesStoredPriceColumn($defaultRate)) {
             if ($priceMin !== null) {
@@ -2294,6 +2422,12 @@ class CatalogController extends Controller
 
     private function applyPriceSort(Builder $query, string $direction = 'asc'): void
     {
+        $audiencePrice = app(PriceCatalogQuery::class)->displayedPrice($query, auth()->user());
+        if ($audiencePrice) {
+            $query->orderByRaw($audiencePrice['sql'].' '.($direction === 'desc' ? 'DESC' : 'ASC'), $audiencePrice['bindings'])->orderBy('products.id');
+
+            return;
+        }
         $defaultRate = $this->defaultCatalogTaxRate();
         if ($this->usesStoredPriceColumn($defaultRate)) {
             $query->orderBy('products.base_price', $direction === 'desc' ? 'desc' : 'asc');
@@ -2438,6 +2572,9 @@ class CatalogController extends Controller
 
     private function applyPromotionFilter(Builder $query, ?User $user): void
     {
+        if (app(PriceCatalogQuery::class)->applyPromotionFilter($query, $user)) {
+            return;
+        }
         $promotionQuery = CatalogAction::query()
             ->selectRaw('1')
             ->active()
@@ -2500,10 +2637,32 @@ class CatalogController extends Controller
      */
     private function resolvePriceBounds(?Builder $query, ?float $fallbackMin = null, ?float $fallbackMax = null): array
     {
+        $this->priceBoundsPaginationTotal = null;
+        if (! app(B2BAccessService::class)->canViewPrices(auth()->user())) {
+            return ['min' => null, 'max' => null];
+        }
+
         $min = null;
         $max = null;
 
         if ($query !== null) {
+            $audienceQuery = clone $query->getQuery();
+            $audiencePrice = app(PriceCatalogQuery::class)->displayedPrice($audienceQuery, auth()->user());
+            if ($audiencePrice) {
+                $bounds = $audienceQuery->reorder()->select([])
+                    ->selectRaw('COUNT(*) as audience_total, MIN('.$audiencePrice['sql'].') as audience_min, MAX('.$audiencePrice['sql'].') as audience_max', [...$audiencePrice['bindings'], ...$audiencePrice['bindings']])
+                    ->first();
+                // Without a price range, these are the same rows pagination
+                // would count. Reuse the aggregate from this request only.
+                if ($fallbackMin === null && $fallbackMax === null) {
+                    $this->priceBoundsPaginationTotal = (int) ($bounds?->audience_total ?? 0);
+                }
+
+                return [
+                    'min' => is_numeric($bounds?->audience_min) ? round((float) $bounds->audience_min, 2) : $fallbackMin,
+                    'max' => is_numeric($bounds?->audience_max) ? round((float) $bounds->audience_max, 2) : $fallbackMax,
+                ];
+            }
             $defaultRate = $this->defaultCatalogTaxRate();
             $baseQuery = clone $query->getQuery();
 

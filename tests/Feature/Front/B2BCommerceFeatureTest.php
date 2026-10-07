@@ -5,6 +5,7 @@ namespace Tests\Feature\Front;
 use App\Livewire\Admin\User\B2BAccountManager;
 use App\Models\Catalog\Pricing\B2BPriceRule;
 use App\Models\Catalog\Product\Product;
+use App\Models\Content\Page\InfoPage;
 use App\Models\Sales\Order\Order;
 use App\Models\User;
 use App\Models\User\B2BAccount;
@@ -147,6 +148,14 @@ class B2BCommerceFeatureTest extends TestCase
 
     public function test_business_registration_uses_the_checkout_postal_code_autofill_contract(): void
     {
+        $terms = InfoPage::query()->create(['code' => 'herrera-oc-page-5', 'is_active' => true]);
+        $terms->translations()->create([
+            'locale' => 'hr',
+            'title' => 'Opći uvjeti korištenja',
+            'slug' => 'opci-uvjeti-koristenja',
+            'body_html' => '<p>Uvjeti korištenja.</p>',
+        ]);
+
         $this->get(route('front.auth.b2b-register'))
             ->assertOk()
             ->assertSee('data-address-autofill', false)
@@ -161,7 +170,7 @@ class B2BCommerceFeatureTest extends TestCase
             ->assertSee('front-theme/scripts/address-autofill.js', false)
             ->assertSee('PDV ID (OIB)')
             ->assertSee('name="terms_accepted"', false)
-            ->assertSee('/page/uvjeti-koristenja', false)
+            ->assertSee('/page/opci-uvjeti-koristenja', false)
             ->assertDontSee('name="vat_id"', false)
             ->assertDontSee('name="address_line_2"', false);
     }
@@ -324,7 +333,7 @@ class B2BCommerceFeatureTest extends TestCase
             ->assertJsonPath('items.0.product_id', $product->id);
     }
 
-    public function test_frequent_and_favorite_products_are_separate_b2b_navigation_pages(): void
+    public function test_frequent_and_favorite_products_have_navigation_pages_and_quick_order_suggestions(): void
     {
         $customer = User::factory()->create();
         $group = $this->makeGroup('b2b-product-lists');
@@ -355,8 +364,11 @@ class B2BCommerceFeatureTest extends TestCase
             ->assertOk()
             ->assertDontSee('Unos artikala')
             ->assertDontSee('Odaberite proizvod ili konkretnu varijantu iz rezultata pretrage.')
-            ->assertDontSee('Artikl FREQUENT-100')
-            ->assertDontSee('Artikl FAVORITE-100')
+            ->assertSee('Artikl FREQUENT-100')
+            ->assertSee('Artikl FAVORITE-100')
+            ->assertSee('data-quick-order-suggestions-panel', false)
+            ->assertViewHas('quickOrderSuggestions', fn ($suggestions) => $suggestions['frequent']->pluck('product_id')->all() === [$frequentProduct->id]
+                && $suggestions['favorites']->pluck('product_id')->all() === [$favoriteProduct->id])
             ->assertSee(route('account.b2b.frequent-products'), false)
             ->assertSee(route('account.b2b.favorite-products'), false);
 

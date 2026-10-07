@@ -31,12 +31,8 @@
                         ?? $manufacturer->translations->first();
                     $manufacturerName = trim((string) ($manufacturerTranslation?->name ?? $manufacturer->code));
                     $manufacturerSlug = $manufacturerTranslation?->slug ?? $manufacturer->id;
-                    $logo = $manufacturer->getFirstMedia('manufacturer_logo');
-                    $uploadedLogoUrl = \App\Support\Media\MediaUrl::hasUsableOriginal($logo)
-                        ? (string) $logo->getUrl()
-                        : '';
-                    $knownLogoUrl = trim((string) config('manufacturer_logos.'.$manufacturer->code, ''));
-                    $logoUrl = $uploadedLogoUrl !== '' ? $uploadedLogoUrl : $knownLogoUrl;
+                    $logo = \App\Support\Media\ManufacturerLogo::resolve($manufacturer);
+                    $logoUrl = $logo['url'];
                     $nameParts = preg_split('/\s+/u', $manufacturerName, -1, PREG_SPLIT_NO_EMPTY) ?: [];
                     $initials = collect($nameParts)
                         ->take(2)
@@ -56,8 +52,8 @@
                     aria-label="{{ __('ui.popular_brands.browse', ['name' => $manufacturerName]) }}"
                     data-popular-brand="{{ $manufacturer->id }}"
                 >
-                    <span class="popular-brand-logo">
-                        @if ($logoUrl !== '')
+                    <span class="popular-brand-logo {{ $logo['variant'] !== '' ? 'manufacturer-logo--'.$logo['variant'] : '' }}">
+                        @if ($logoUrl)
                             <img
                                 src="{{ $logoUrl }}"
                                 alt="{{ __('ui.popular_brands.image_alt', ['name' => $manufacturerName]) }}"

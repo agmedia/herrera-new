@@ -19,6 +19,7 @@ use Tests\TestCase;
 class MsanClientTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\EnablesLegacyMsanModule;
 
     public function test_dataset_and_image_downloads_use_fixed_endpoints_mtls_and_atomic_destinations(): void
     {

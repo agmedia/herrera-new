@@ -73,9 +73,15 @@
                                     <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $statusClasses }}">{{ __($statusOptions[$row->status] ?? $row->status) }}</span>
                                 </td>
                                 <td class="px-4 py-3 text-right">
+                                    <div class="flex flex-wrap items-center justify-end gap-2">
+                                    @if ($row->user)
+                                        @include('admin.users.partials.impersonate-button', ['customer' => $row->user])
+                                        <a href="{{ route('admin.users.show', ['user' => $row->user->id]) }}" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">{{ __('Račun kupca') }}</a>
+                                    @endif
                                     <button type="button" wire:click="selectAccount({{ $row->id }})" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">
                                         {{ __('Otvori') }}
                                     </button>
+                                    </div>
                                 </td>
                             </tr>
                         @empty

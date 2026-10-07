@@ -91,7 +91,9 @@
             <div class="flex flex-wrap items-center gap-2">
                 <span class="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{{ __('Moduli') }}</span>
                 <span class="admin-chip">{{ __('Atributi') }}: {{ $features['catalog_use_attributes'] ? __('ON') : __('OFF') }}</span>
-                <span class="admin-chip">{{ __('Opcije') }}: {{ $features['catalog_use_options'] ? __('ON') : __('OFF') }}</span>
+                @if ($features['catalog_use_options'])
+                    <span class="admin-chip">{{ __('Opcije') }}: {{ __('ON') }}</span>
+                @endif
                 <span class="admin-chip">{{ __('Brendovi') }}: {{ $features['catalog_use_manufacturers'] ? __('ON') : __('OFF') }}</span>
                 <span class="admin-chip">{{ __('Akcije') }}: {{ ($features['catalog_use_actions'] ?? false) ? __('ON') : __('OFF') }}</span>
             </div>

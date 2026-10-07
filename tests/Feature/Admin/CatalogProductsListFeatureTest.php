@@ -159,11 +159,11 @@ class CatalogProductsListFeatureTest extends TestCase
             ->assertSeeHtml('target="_blank"')
             ->assertSeeHtml('rel="noopener noreferrer"')
             ->assertSeeHtml('aria-label="'.__('Preview').': Category Name Product"')
-            ->assertSeeHtml(asset('front-theme/fonts/sprites/solid.svg').'#eye')
+            ->assertSeeHtml(\App\Support\FontAwesomeIcon::url('eye'))
             ->assertSeeHtml('aria-label="'.__('admin.common.edit').': Category Name Product"')
-            ->assertSeeHtml(asset('front-theme/fonts/sprites/solid.svg').'#pen-to-square')
+            ->assertSeeHtml(\App\Support\FontAwesomeIcon::url('pen-to-square'))
             ->assertSeeHtml('aria-label="'.__('admin.common.delete').': Category Name Product"')
-            ->assertSeeHtml(asset('front-theme/fonts/sprites/solid.svg').'#trash')
+            ->assertSeeHtml(\App\Support\FontAwesomeIcon::url('trash'))
             ->assertDontSee('skriveni-slug-kategorije');
     }
 

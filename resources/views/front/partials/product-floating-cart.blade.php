@@ -4,7 +4,7 @@
     $floatingCartImage = trim((string) (($gallery->first()['full'] ?? '') ?: ''));
 @endphp
 
-@if ($isPurchasable)
+@if (($canViewPrices ?? app(\App\Services\Pricing\B2BAccessService::class)->canViewPrices(auth()->user())) && $isPurchasable)
     <aside
         class="product-floating-cart"
         data-product-floating-cart
@@ -32,6 +32,7 @@
 
             <p class="product-floating-cart-price" data-product-price-current>
                 {{ $productPriceData['current'] }}
+                @include('front.partials.b2b-tax-note', ['includesTax' => $displayIncludesTax ?? true])
             </p>
 
             <div class="product-detail-quantity-control product-floating-cart-quantity">

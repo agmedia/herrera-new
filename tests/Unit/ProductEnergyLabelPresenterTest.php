@@ -9,7 +9,7 @@ use Tests\TestCase;
 
 class ProductEnergyLabelPresenterTest extends TestCase
 {
-    public function test_it_builds_official_eprel_assets_from_strict_persisted_identifiers(): void
+    public function test_registration_and_thumbnail_alone_do_not_invent_downloads_for_an_unconfirmed_record(): void
     {
         $product = new Product;
         $product->setRelation('energyDeclarations', collect([
@@ -28,22 +28,18 @@ class ProductEnergyLabelPresenterTest extends TestCase
         ]));
         $product->setRelation('energyMedia', collect());
 
-        $declaration = app(ProductEnergyLabelPresenter::class)->primary($product);
+        $declaration = app(ProductEnergyLabelPresenter::class)->primaryDeclaration($product);
 
         $this->assertNotNull($declaration);
-        $this->assertTrue($declaration['is_complete']);
+        $this->assertTrue($declaration['has_arrow']);
+        $this->assertFalse($declaration['is_complete']);
         $this->assertSame(
             'https://ec.europa.eu/assets/move-ener/eprel/EPREL%20Public/Nested-labels%20thumbnails/D%20A-G.svg',
             $declaration['energy_class_image_url'],
         );
-        $this->assertSame(
-            'https://eprel.ec.europa.eu/api/products/electronicdisplays/1713217/labels?format=PDF',
-            $declaration['energy_label_url'],
-        );
-        $this->assertSame(
-            'https://eprel.ec.europa.eu/fiches/electronicdisplays/Fiche_1713217_HR.pdf',
-            $declaration['product_information_sheet_url'],
-        );
+        $this->assertNull($declaration['energy_label_url']);
+        $this->assertNull($declaration['product_information_sheet_url']);
+        $this->assertNull(app(ProductEnergyLabelPresenter::class)->primary($product));
     }
 
     public function test_it_rejects_unsafe_eprel_thumbnail_names_but_uses_css_fallback_with_a_valid_label(): void
@@ -58,8 +54,9 @@ class ProductEnergyLabelPresenterTest extends TestCase
                 'eprel_registration_number' => '123456',
                 'eprel_product_group' => 'lightsources',
                 'energy_label_image' => '../A.svg?token=secret',
+                'energy_label_url' => 'https://cdn.example.test/labels/explicit-manual.pdf',
                 'is_primary' => true,
-                'source' => ProductEnergyDeclaration::SOURCE_EPREL,
+                'source' => ProductEnergyDeclaration::SOURCE_MANUAL,
             ]),
         ]));
         $product->setRelation('energyMedia', collect());

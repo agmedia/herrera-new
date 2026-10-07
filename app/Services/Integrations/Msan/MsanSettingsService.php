@@ -2,6 +2,7 @@
 
 namespace App\Services\Integrations\Msan;
 
+use App\Services\Integrations\Eprel\EprelSettingsService;
 use App\Services\Settings\SystemSettingsService;
 use Cron\CronExpression;
 use Cron\FieldFactory;
@@ -86,16 +87,17 @@ class MsanSettingsService
 
     public const KEY_FTP_TIMEOUT = 'msan_ftp_timeout';
 
-    public const KEY_EPREL_ENABLED = 'msan_eprel_enabled';
+    public const KEY_EPREL_ENABLED = EprelSettingsService::KEY_ENABLED;
 
-    public const KEY_EPREL_API_KEY_ENCRYPTED = 'msan_eprel_api_key_encrypted';
+    public const KEY_EPREL_API_KEY_ENCRYPTED = EprelSettingsService::KEY_API_KEY_ENCRYPTED;
 
-    public const KEY_EPREL_CONNECT_TIMEOUT = 'msan_eprel_connect_timeout';
+    public const KEY_EPREL_CONNECT_TIMEOUT = EprelSettingsService::KEY_CONNECT_TIMEOUT;
 
-    public const KEY_EPREL_TIMEOUT = 'msan_eprel_timeout';
+    public const KEY_EPREL_TIMEOUT = EprelSettingsService::KEY_TIMEOUT;
 
     public function __construct(
         private readonly SystemSettingsService $settings,
+        private readonly EprelSettingsService $eprel,
     ) {}
 
     /**
@@ -130,11 +132,11 @@ class MsanSettingsService
             'msan_ftp_password_configured' => $this->hasFtpPassword(),
             self::KEY_FTP_CONNECT_TIMEOUT => $this->ftpConnectTimeout(),
             self::KEY_FTP_TIMEOUT => $this->ftpTimeout(),
-            self::KEY_EPREL_ENABLED => $this->eprelEnabled(),
+            'msan_eprel_enabled' => $this->eprelEnabled(),
             'msan_eprel_api_key' => '',
             'msan_eprel_api_key_configured' => $this->hasEprelApiKey(),
-            self::KEY_EPREL_CONNECT_TIMEOUT => $this->eprelConnectTimeout(),
-            self::KEY_EPREL_TIMEOUT => $this->eprelTimeout(),
+            'msan_eprel_connect_timeout' => $this->eprelConnectTimeout(),
+            'msan_eprel_timeout' => $this->eprelTimeout(),
         ];
     }
 
@@ -236,26 +238,6 @@ class MsanSettingsService
                 max: 120,
             );
         }
-        if (array_key_exists(self::KEY_EPREL_ENABLED, $values)) {
-            $entries[self::KEY_EPREL_ENABLED] = $this->toBool($values[self::KEY_EPREL_ENABLED]);
-        }
-        if (array_key_exists(self::KEY_EPREL_CONNECT_TIMEOUT, $values)) {
-            $entries[self::KEY_EPREL_CONNECT_TIMEOUT] = $this->boundedInt(
-                $values[self::KEY_EPREL_CONNECT_TIMEOUT],
-                default: 10,
-                min: 2,
-                max: 30,
-            );
-        }
-        if (array_key_exists(self::KEY_EPREL_TIMEOUT, $values)) {
-            $entries[self::KEY_EPREL_TIMEOUT] = $this->boundedInt(
-                $values[self::KEY_EPREL_TIMEOUT],
-                default: 30,
-                min: 5,
-                max: 120,
-            );
-        }
-
         $p12Pin = (string) ($values['msan_p12_pin'] ?? '');
         if (trim($p12Pin) !== '') {
             $entries[self::KEY_P12_PIN_ENCRYPTED] = Crypt::encryptString($p12Pin);
@@ -266,10 +248,21 @@ class MsanSettingsService
             $entries[self::KEY_FTP_PASSWORD_ENCRYPTED] = Crypt::encryptString($ftpPassword);
         }
 
-        $eprelApiKey = (string) ($values['msan_eprel_api_key'] ?? '');
-        if (trim($eprelApiKey) !== '') {
-            $entries[self::KEY_EPREL_API_KEY_ENCRYPTED] = Crypt::encryptString(trim($eprelApiKey));
+        $eprelValues = [];
+        // Stari pozivatelji ostaju kompatibilni, ali EPREL piše samo samostalne postavke.
+        foreach ([
+            'msan_eprel_enabled' => EprelSettingsService::KEY_ENABLED,
+            'msan_eprel_api_key' => EprelSettingsService::KEY_API_KEY,
+            'msan_eprel_connect_timeout' => EprelSettingsService::KEY_CONNECT_TIMEOUT,
+            'msan_eprel_timeout' => EprelSettingsService::KEY_TIMEOUT,
+        ] as $legacyKey => $key) {
+            if (array_key_exists($key, $values)) {
+                $eprelValues[$key] = $values[$key];
+            } elseif (array_key_exists($legacyKey, $values)) {
+                $eprelValues[$key] = $values[$legacyKey];
+            }
         }
+        $this->eprel->saveAdminValues($eprelValues);
 
         if ($entries !== []) {
             $this->settings->putMany($entries);
@@ -292,7 +285,8 @@ class MsanSettingsService
 
     public function enabled(): bool
     {
-        return $this->toBool($this->settings->get(self::KEY_ENABLED, false));
+        return \App\Support\Integrations\MsanModule::available()
+            && $this->toBool($this->settings->get(self::KEY_ENABLED, false));
     }
 
     public function assertEnabled(): void
@@ -330,7 +324,8 @@ class MsanSettingsService
     {
         // Availability was historically refreshed every 15 minutes without a
         // toggle, so enabled-by-default preserves the existing deployment.
-        return $this->toBool($this->settings->get(self::KEY_PRICE_STOCK_SYNC_ENABLED, true));
+        return \App\Support\Integrations\MsanModule::available()
+            && $this->toBool($this->settings->get(self::KEY_PRICE_STOCK_SYNC_ENABLED, true));
     }
 
     public function priceStockSyncCron(): string
@@ -585,22 +580,22 @@ class MsanSettingsService
 
     public function eprelEnabled(): bool
     {
-        return $this->toBool($this->settings->get(self::KEY_EPREL_ENABLED, false));
+        return $this->eprel->enabled();
     }
 
     public function eprelConnectTimeout(): int
     {
-        return $this->boundedInt($this->settings->get(self::KEY_EPREL_CONNECT_TIMEOUT, 10), 10, 2, 30);
+        return $this->eprel->connectTimeout();
     }
 
     public function eprelTimeout(): int
     {
-        return $this->boundedInt($this->settings->get(self::KEY_EPREL_TIMEOUT, 30), 30, 5, 120);
+        return $this->eprel->timeout();
     }
 
     public function eprelApiKey(): string
     {
-        return $this->decryptSetting(self::KEY_EPREL_API_KEY_ENCRYPTED, 'EPREL API ključ');
+        return $this->eprel->apiKey();
     }
 
     public function p12Pin(): string
@@ -635,7 +630,7 @@ class MsanSettingsService
 
     public function hasEprelApiKey(): bool
     {
-        return trim((string) $this->settings->get(self::KEY_EPREL_API_KEY_ENCRYPTED, '')) !== '';
+        return $this->eprel->hasApiKey();
     }
 
     private function decryptSetting(string $key, string $label): string

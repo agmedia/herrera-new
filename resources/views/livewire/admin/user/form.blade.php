@@ -13,6 +13,8 @@
         </div>
     </div>
 
+    <livewire:admin.user.b2b-user-profile-editor :user-id="$userId" :key="'b2b-profile-'.$userId" />
+
     <form wire:submit="save" class="space-y-6">
         <div class="admin-panel admin-form-panel p-6">
             <p class="admin-section-title">{{ __('Core Data') }}</p>

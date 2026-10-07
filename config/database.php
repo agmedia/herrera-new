@@ -31,6 +31,20 @@ return [
 
     'connections' => [
 
+        // This isolated snapshot connection is used exclusively for SELECTs.
+        'herrera_source' => [
+            'driver' => 'mysql',
+            'host' => env('HERRERA_SOURCE_DB_HOST', env('DB_HOST', '127.0.0.1')),
+            'port' => env('HERRERA_SOURCE_DB_PORT', env('DB_PORT', '3306')),
+            'database' => env('HERRERA_SOURCE_DB_DATABASE', 'herrera_live_snapshot_20261006'),
+            'username' => env('HERRERA_SOURCE_DB_USERNAME', env('DB_USERNAME', 'root')),
+            'password' => env('HERRERA_SOURCE_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+        ],
+
         'sqlite' => [
             'driver' => 'sqlite',
             'url' => env('DB_URL'),

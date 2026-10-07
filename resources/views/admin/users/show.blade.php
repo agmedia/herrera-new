@@ -15,7 +15,8 @@
                     <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{{ __('User Overview') }}</h1>
                     <p class="mt-2 text-sm text-slate-600">{{ __('Read-only account view with profile, addresses and recent activity.') }}</p>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
+                    @include('admin.users.partials.impersonate-button', ['customer' => $user])
                     @if ($loyaltyEnabled)
                         <a href="{{ route('admin.users.loyalty', ['user_id' => $user->id]) }}" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">{{ __('Loyalty Ledger') }}</a>
                     @endif
@@ -24,6 +25,8 @@
                 </div>
             </div>
         </div>
+
+        @include('admin.users.partials.purchase-statistics')
 
         @if ($user->b2bAccount)
             @php
@@ -191,6 +194,7 @@
                 </div>
             @endif
 
+            @if ($canViewCustomerOrders)
             <div class="admin-panel admin-panel-soft p-5">
                 <h2 class="admin-section-title">{{ __('Recent Orders') }}</h2>
                 <div class="mt-3 overflow-x-auto">
@@ -220,6 +224,7 @@
                     </table>
                 </div>
             </div>
+            @endif
         </div>
 
         <div class="grid gap-6" style="grid-template-columns: repeat(2, minmax(0, 1fr));">

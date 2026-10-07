@@ -8,12 +8,15 @@ use App\Models\User\UserAddress;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Silber\Bouncer\BouncerFacade as Bouncer;
 use Silber\Bouncer\Database\Role;
 
 class Form extends Component
 {
+    #[Locked]
     public int $userId;
 
     /**
@@ -149,6 +152,38 @@ class Form extends Component
     public function backToList()
     {
         return redirect()->route('admin.users');
+    }
+
+    #[On('b2b-user-profile-saved')]
+    public function syncSavedB2BProfile(int $userId): void
+    {
+        $this->authorizeAccess();
+        if ($userId !== $this->userId) {
+            return;
+        }
+        $user = User::query()->with(['profile', 'addresses', 'b2bAccount.customerGroup'])->findOrFail($this->userId);
+        $this->ensureCanManageTargetUser($user);
+        if (! $user->b2bAccount) {
+            return;
+        }
+
+        foreach (['company', 'oib', 'phone'] as $field) {
+            $this->form['profile'][$field] = (string) ($user->profile?->{$field} ?? '');
+        }
+        $billing = $user->addresses->where('type', UserAddress::TYPE_BILLING)->sortByDesc('is_default')->first();
+        if ($billing) {
+            foreach (['company', 'oib', 'vat_id', 'phone', 'address_line_1', 'address_line_2', 'postal_code', 'city', 'country_code'] as $field) {
+                $this->form['billing_address'][$field] = (string) ($billing->{$field} ?? '');
+            }
+        }
+
+        $account = $user->b2bAccount;
+        if ($account->isApproved() && $account->customerGroup?->is_active) {
+            $this->form['customer_groups'] = collect((array) ($this->form['customer_groups'] ?? []))
+                ->push($account->customer_group_id)
+                ->map(static fn ($id): string => (string) $id)
+                ->unique()->values()->all();
+        }
     }
 
     public function render()

@@ -33,6 +33,8 @@ class ImportMsanProductImageJob implements ShouldQueue
         MsanFtpClient $ftp,
         MsanSettingsService $settings,
     ): void {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         /** @var MsanProduct|null $source */
         $source = MsanProduct::query()->with('localProduct.media')->find($this->msanProductId);
         $product = $source?->localProduct;
@@ -90,6 +92,10 @@ class ImportMsanProductImageJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        if (! \App\Support\Integrations\MsanModule::available()) {
+            return;
+        }
+
         $message = preg_replace(
             '/(password|passphrase|pin)\s*[=:]\s*\S+/iu',
             '$1=[skriveno]',

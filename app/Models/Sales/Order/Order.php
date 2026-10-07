@@ -2,15 +2,22 @@
 
 namespace App\Models\Sales\Order;
 
+use App\Models\Concerns\HasB2BMonetaryPrecision;
 use App\Models\Settings\Local\OrderStatus;
 use App\Models\User;
 use App\Models\User\LoyaltyTransaction;
+use App\Support\OrderStatusClassification;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Order extends Model
 {
+    use HasB2BMonetaryPrecision;
+
+    protected array $b2bMonetaryAttributes = ['subtotal', 'shipping_total', 'payment_fee_total', 'discount_total', 'tax_total', 'grand_total'];
+
     protected $fillable = [
         'order_number',
         'erp_order_id',
@@ -80,6 +87,11 @@ class Order extends Model
         'placed_at' => 'datetime',
         'paid_at' => 'datetime',
     ];
+
+    public function scopeWithoutCancelled(Builder $query): Builder
+    {
+        return $query->whereDoesntHave('status', fn (Builder $status) => OrderStatusClassification::applyCancelledQuery($status));
+    }
 
     public function status(): BelongsTo
     {

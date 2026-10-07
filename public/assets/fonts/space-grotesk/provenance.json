@@ -1,0 +1,36 @@
+{
+  "fetched": "2026-10-07",
+  "family": "Space Grotesk",
+  "repository": "https://github.com/floriankarsten/space-grotesk",
+  "commit": "03507d024a01282884232081fc6011c09ff4e849",
+  "license": "SIL Open Font License 1.1",
+  "modified": false,
+  "conversion": null,
+  "source_format": "official complete variable WOFF2",
+  "weight_axes": {
+    "wght": {
+      "minimum": 300.0,
+      "default": 300.0,
+      "maximum": 700.0
+    }
+  },
+  "glyph_count": 1001,
+  "validated_characters": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ČĆĐŠŽčćđšž€",
+  "public_url_path": "/assets/fonts/space-grotesk/SpaceGrotesk-Variable.woff2",
+  "assets": [
+    {
+      "file": "SpaceGrotesk-Variable.woff2",
+      "original_source_path": "fonts/woff2/SpaceGrotesk[wght].woff2",
+      "source_url": "https://raw.githubusercontent.com/floriankarsten/space-grotesk/03507d024a01282884232081fc6011c09ff4e849/fonts/woff2/SpaceGrotesk%5Bwght%5D.woff2",
+      "bytes": 49256,
+      "sha256": "8e085aa438094f11487a836652edd5c054fa6a96f63fc7c282105ee3a4b08c07"
+    },
+    {
+      "file": "OFL.txt",
+      "original_source_path": "OFL.txt",
+      "source_url": "https://raw.githubusercontent.com/floriankarsten/space-grotesk/03507d024a01282884232081fc6011c09ff4e849/OFL.txt",
+      "bytes": 4495,
+      "sha256": "564ce565c371c5e5bbf286006565a7c9aa55a9f56e7ca58d56e05d649dd61a72"
+    }
+  ]
+}

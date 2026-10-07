@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Product\ProductEnergyDeclaration;
+use App\Services\Integrations\Msan\EprelDocumentService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -78,9 +79,21 @@ class ProductEnergyLabelPresenter
                 'energy_label_url' => $product->energy_label_url,
                 'product_information_sheet_url' => $product->product_information_sheet_url,
                 'is_primary' => true,
-                'source' => trim((string) $product->eprel_registration_number) !== ''
+                'source' => trim((string) $product->eprel_registration_number) !== '' && ! $this->hasManualLegacyDocument($product)
                     ? ProductEnergyDeclaration::SOURCE_EPREL
                     : ProductEnergyDeclaration::SOURCE_MANUAL,
+            ])]);
+        }
+
+        if ($declarations->isEmpty() && ($importedClass = $this->importedEnergyClass($product))) {
+            $declarations = collect([new ProductEnergyDeclaration([
+                'context_code' => 'herrera-imported-attribute',
+                'label' => __('ui.product.energy_label'),
+                'energy_class' => $importedClass,
+                'scale_min' => 'A',
+                'scale_max' => 'G',
+                'is_primary' => true,
+                'source' => 'herrera-opencart',
             ])]);
         }
 
@@ -91,7 +104,7 @@ class ProductEnergyLabelPresenter
         );
 
         return $declarations
-            ->map(function (ProductEnergyDeclaration $declaration, int $index) use ($hasExplicitPrimary, $labelMedia, $sheetMedia): array {
+            ->map(function (ProductEnergyDeclaration $declaration, int $index) use ($product, $hasExplicitPrimary, $labelMedia, $sheetMedia): array {
                 $energyClass = $this->energyClass($declaration->energy_class);
                 $scaleMin = $this->energyClass($declaration->scale_min);
                 $scaleMax = $this->energyClass($declaration->scale_max);
@@ -102,11 +115,14 @@ class ProductEnergyLabelPresenter
                 $eprelGroup = $this->eprelGroup($declaration->eprel_product_group);
                 $eprelRegistration = $this->eprelRegistration($declaration->eprel_registration_number);
                 $energyClassImageUrl = $this->eprelNestedLabelUrl($declaration->energy_label_image);
-                $energyLabelUrl = $this->safeAssetUrl($declaration->energy_label_url)
-                    ?? $this->eprelLabelUrl($eprelGroup, $eprelRegistration)
+                $officialDeclaration = $source === ProductEnergyDeclaration::SOURCE_EPREL;
+                $energyLabelUrl = ($officialDeclaration
+                    ? app(EprelDocumentService::class)->url($product, $declaration, 'label')
+                    : $this->safeAssetUrl($declaration->energy_label_url))
                     ?? ($isPrimary ? $this->mediaUrl($labelMedia) : null);
-                $sheetUrl = $this->safeAssetUrl($declaration->product_information_sheet_url)
-                    ?? $this->eprelProductInformationSheetUrl($eprelGroup, $eprelRegistration)
+                $sheetUrl = ($officialDeclaration
+                    ? app(EprelDocumentService::class)->url($product, $declaration, 'sheet')
+                    : $this->safeAssetUrl($declaration->product_information_sheet_url))
                     ?? ($isPrimary ? $this->mediaUrl($sheetMedia) : null);
                 $hasArrow = $energyClass !== null
                     && $scaleMin !== null
@@ -145,6 +161,54 @@ class ProductEnergyLabelPresenter
         return trim((string) $product->energy_efficiency_class) !== ''
             || trim((string) $product->energy_label_url) !== ''
             || trim((string) $product->product_information_sheet_url) !== '';
+    }
+
+    private function hasManualLegacyDocument(Product $product): bool
+    {
+        foreach ([$product->energy_label_url, $product->product_information_sheet_url] as $value) {
+            $url = $this->safeAssetUrl($value);
+            if ($url !== null && strtolower((string) parse_url($url, PHP_URL_HOST)) !== 'eprel.ec.europa.eu') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function importedEnergyClass(Product $product): ?string
+    {
+        $labels = ['razina energetske učinkovitosti', 'klasa energetske učinkovitosti eei'];
+        $classes = [];
+        $collectClass = function (mixed $label, mixed $value) use ($labels, &$classes): void {
+            $label = mb_strtolower(trim(preg_replace('/\s+/u', ' ', (string) $label) ?? ''));
+            $class = is_scalar($value) ? $this->energyClass($value) : null;
+            if (in_array($label, $labels, true) && $class !== null && preg_match('/^[A-G]$/', $class)) {
+                $classes[$class] = true;
+            }
+        };
+
+        if ($product->relationLoaded('technicalSpecificationRows')) {
+            foreach ($product->technicalSpecificationRows as $row) {
+                if ($row->source !== 'herrera-opencart') {
+                    continue;
+                }
+                foreach ((array) $row->values as $value) {
+                    $collectClass($row->item_name, $value);
+                }
+            }
+        }
+        if ($product->relationLoaded('attributes')) {
+            foreach ($product->attributes as $attribute) {
+                if (data_get($attribute->payload, 'source') !== 'herrera-opencart' || ! $attribute->relationLoaded('translations')) {
+                    continue;
+                }
+                foreach ($attribute->translations as $translation) {
+                    $collectClass($translation->group_name, $translation->name);
+                }
+            }
+        }
+
+        return count($classes) === 1 ? array_key_first($classes) : null;
     }
 
     private function energyClass(mixed $value): ?string
@@ -235,20 +299,6 @@ class ProductEnergyLabelPresenter
         $value = trim((string) $value);
 
         return preg_match('/^\d{3,20}$/', $value) === 1 ? $value : null;
-    }
-
-    private function eprelLabelUrl(?string $group, ?string $registration): ?string
-    {
-        return $group && $registration
-            ? 'https://eprel.ec.europa.eu/api/products/'.rawurlencode($group).'/'.$registration.'/labels?format=PDF'
-            : null;
-    }
-
-    private function eprelProductInformationSheetUrl(?string $group, ?string $registration): ?string
-    {
-        return $group && $registration
-            ? 'https://eprel.ec.europa.eu/fiches/'.rawurlencode($group).'/Fiche_'.$registration.'_HR.pdf'
-            : null;
     }
 
     private function loadedMedia(Product $product, string $collection): ?Media

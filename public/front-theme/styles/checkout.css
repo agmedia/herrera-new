@@ -220,10 +220,88 @@
 }
 
 .checkout-summary {
-    position: sticky;
-    top: 7rem;
+    --checkout-summary-offset: 7rem;
+    position: static;
     padding: clamp(1.25rem, 2vw, 1.75rem);
     border-top: 4px solid var(--checkout-accent);
+}
+
+.herrera-storefront .checkout-summary {
+    --checkout-summary-offset: 146px;
+}
+
+.checkout-summary-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+}
+
+.checkout-summary-line-count {
+    color: var(--checkout-muted);
+    font-size: .75rem;
+    white-space: nowrap;
+}
+
+.checkout-summary-items {
+    max-height: 320px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-right: .5rem;
+    scrollbar-gutter: stable;
+    scrollbar-width: auto;
+    scrollbar-color: #8294aa var(--checkout-surface);
+}
+
+.checkout-summary-items:focus-visible {
+    outline: 2px solid var(--checkout-focus-ring);
+    outline-offset: 3px;
+}
+
+.checkout-summary-items::-webkit-scrollbar {
+    width: 10px;
+}
+
+.checkout-summary-items::-webkit-scrollbar-track {
+    background: var(--checkout-surface);
+}
+
+.checkout-summary-items::-webkit-scrollbar-thumb {
+    border: 2px solid var(--checkout-surface);
+    border-radius: 6px;
+    background: #8294aa;
+}
+
+.checkout-summary-scroll-hint {
+    margin-top: .5rem;
+    color: var(--checkout-muted);
+    font-size: .75rem;
+    line-height: 1.5;
+}
+
+.checkout-summary-image {
+    aspect-ratio: 1;
+}
+
+.checkout-summary-image img {
+    height: 100%;
+    object-fit: contain;
+}
+
+.checkout-summary-item-details {
+    overflow-wrap: anywhere;
+}
+
+.checkout-summary-line-total {
+    white-space: nowrap;
+}
+
+@media (min-width: 1024px) and (min-height: 1050px) {
+    .checkout-summary {
+        position: sticky;
+        top: var(--checkout-summary-offset);
+    }
 }
 
 .checkout-summary-line {

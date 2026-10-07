@@ -65,8 +65,8 @@
         : $desktopDefaultCols;
 @endphp
 
-<section class="relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2 overflow-x-hidden bg-white max-[540px]:py-5 py-8">
-    <div class="w-full px-3 sm:px-4 lg:px-6">
+<section class="relative left-1/2 w-screen max-w-[100vw] -translate-x-1/2 overflow-x-hidden bg-white max-[540px]:py-5 py-8" data-herrera-aligned-section>
+    <div class="w-full px-3 sm:px-4 lg:px-6" data-herrera-aligned-inner>
         <div class="max-[540px]:mb-5 mb-8 text-center">
             <div class="mx-auto flex max-w-3xl items-center gap-4 md:gap-6">
                 @include('front.partials.section-heading-line', ['side' => 'left'])
@@ -133,7 +133,7 @@
             @include('front.partials.splide-assets')
 
             <div class="mt-4">
-                <div id="products-carousel-{{ $block->id }}" class="splide" data-products-carousel-splide>
+                <div id="products-carousel-{{ $block->id }}" class="splide" data-products-carousel-splide data-continuous-card-carousel>
                     <div class="splide__track">
                         <ul class="splide__list">
                             @foreach ($products as $product)
@@ -170,12 +170,13 @@
                                     const count = el.querySelectorAll('.splide__slide').length;
                                     const mobilePerPage = {{ $mobileDefaultCols }};
                                     const preferredDesktopPerPage = {{ $preferredGridCols }};
+                                    const continuousCards = document.body.classList.contains('herrera-storefront');
                                     const desktopGap = preferredDesktopPerPage >= 5 ? '1rem' : '1.25rem';
                                     new window.Splide(el, {
                                         type: count > 1 ? 'loop' : 'slide',
                                         perPage: Math.min(Math.max(1, preferredDesktopPerPage), Math.max(1, count)),
                                         perMove: 1,
-                                        gap: desktopGap,
+                                        gap: continuousCards ? '0rem' : desktopGap,
                                         drag: count > 1,
                                         snap: true,
                                         pagination: false,
@@ -186,8 +187,8 @@
                                             1536: { perPage: Math.min(Math.min(Math.max(1, preferredDesktopPerPage), 5), Math.max(1, count)) },
                                             1280: { perPage: Math.min(Math.min(Math.max(1, preferredDesktopPerPage), 4), Math.max(1, count)) },
                                             1024: { perPage: Math.min(Math.min(Math.max(1, preferredDesktopPerPage), 3), Math.max(1, count)) },
-                                            860: { perPage: Math.min(mobilePerPage, Math.max(1, count)), gap: '1rem' },
-                                            640: { perPage: Math.min(mobilePerPage, Math.max(1, count)), gap: '0.8rem' },
+                                            860: { perPage: Math.min(mobilePerPage, Math.max(1, count)), gap: continuousCards ? '0rem' : '1rem' },
+                                            640: { perPage: Math.min(mobilePerPage, Math.max(1, count)), gap: continuousCards ? '0rem' : '0.8rem' },
                                         },
                                     }).mount();
                                 });

@@ -45,7 +45,9 @@ class AdminDocumentationFeatureTest extends TestCase
             ->assertSeeText('Upute za administraciju')
             ->assertSeeText('Centralno uređivanje proizvoda, cijene, zalihe')
             ->assertSeeText('Obrada narudžbi koje ostaju u CMS-u')
-            ->assertSeeText('Konfiguriranje B2B veze, certifikata')
+            ->assertSeeText('Samostalan pristup službenom EPREL API-ju')
+            ->assertSeeText('Kontrolirani dohvat energetskih podataka')
+            ->assertDontSeeText('M SAN —')
             ->assertSee('data-manual-section="nadzorna-ploca"', false)
             ->assertSee('data-manual-section="katalog"', false)
             ->assertSee('data-manual-section="prodaja"', false)
@@ -55,8 +57,9 @@ class AdminDocumentationFeatureTest extends TestCase
             ->assertSee('data-manual-section="korisnici"', false)
             ->assertSee('data-manual-entry="kategorije"', false)
             ->assertSee('data-manual-entry="artikli"', false)
-            ->assertSee('data-manual-entry="msan-postavke"', false)
-            ->assertSee('data-manual-entry="msan-artikli"', false)
+            ->assertSee('data-manual-entry="eprel-postavke"', false)
+            ->assertSee('data-manual-entry="eprel-katalog"', false)
+            ->assertDontSee('data-manual-entry="msan-', false)
             ->assertSee('data-manual-entry="nacini-dostave"', false)
             ->assertSee('data-manual-entry="uloge-ovlasti"', false)
             ->assertSee('data-manual-toc-topic="artikli"', false)
@@ -90,12 +93,8 @@ class AdminDocumentationFeatureTest extends TestCase
             'artikli',
             'narudzbe',
             'blokovi',
-            'msan-pregled',
-            'msan-postavke',
-            'msan-kategorije',
-            'msan-specifikacije',
-            'msan-artikli',
-            'msan-izvrsavanja',
+            'eprel-katalog',
+            'eprel-postavke',
             'nacini-placanja',
             'nacini-dostave',
             'postavke-trgovine',
@@ -106,6 +105,8 @@ class AdminDocumentationFeatureTest extends TestCase
                 "Missing documentation topic [{$expectedTopicId}].",
             );
         }
+        $this->assertFalse($topicIds->contains(fn (string $topicId): bool => str_starts_with($topicId, 'msan-')));
+        $this->assertFalse(Route::has('admin.integrations.msan.overview'));
     }
 
     public function test_header_documentation_link_points_to_the_current_admin_topic(): void

@@ -12,7 +12,7 @@
         : collect();
     $preferWebp = (bool) ($storeSettings['images']['use_webp'] ?? false);
     $coverImage = $mediaItems->firstWhere('collection_name', 'blog_cover') ?? $post->getFirstMedia('blog_cover');
-    $coverImageUrl = $coverImage?->getUrl();
+    $coverImageUrl = $coverImage?->getUrl() ?: \App\Support\Media\LegacyCatalogImage::first($post);
     $galleryItems = $mediaItems->where('collection_name', 'blog_gallery')->values();
     if ($galleryItems->isEmpty()) {
         $galleryItems = $post->getMedia('blog_gallery')
@@ -253,7 +253,7 @@
                                     @endif
                                     <div class="min-w-0">
                                         <p class="line-clamp-2 text-[14px] leading-tight text-slate-800">{{ $hotspotProduct['name'] ?? '' }}</p>
-                                        <p class="mt-1.5 text-[14px] font-medium leading-none text-slate-800">{{ $hotspotProduct['price'] ?? '' }}</p>
+                                        <p class="mt-1.5 text-[14px] font-medium leading-none text-slate-800">{{ $canViewPrices ? ($hotspotProduct['price'] ?? '') : __('ui.b2b.pricing.access_required') }}</p>
                                     </div>
                                 </a>
                             </div>
@@ -328,7 +328,7 @@
                 </style>
 
                 <div class="mt-4">
-                    <div id="blog-related-products-carousel-{{ $post->id }}" class="splide" data-blog-related-products-splide>
+                    <div id="blog-related-products-carousel-{{ $post->id }}" class="splide" data-blog-related-products-splide data-continuous-card-carousel>
                         <div class="splide__track">
                             <ul class="splide__list">
                                 @foreach ($relatedProducts as $relatedProduct)

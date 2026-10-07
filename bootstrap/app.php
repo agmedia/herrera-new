@@ -13,6 +13,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->prependToGroup('web', \App\Http\Middleware\ResolveHerreraLegacyUrl::class);
+
+        $middleware->prependToPriorityList(
+            \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            \App\Http\Middleware\EnsureApiUserEnabled::class,
+        );
+
         $middleware->redirectUsersTo(function (Request $request): string {
             $user = $request->user();
 
@@ -30,6 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin/*',
             'admin/login',
             'admin/logout',
+            'account/impersonation/stop',
             'login',
             'logout',
             'register',
@@ -61,6 +69,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.maintenance-bypass' => \App\Http\Middleware\IssueMaintenanceBypassForPrivilegedAdmin::class,
             'front.locale' => \App\Http\Middleware\SetFrontendLocale::class,
             'front.device' => \App\Http\Middleware\DetectFrontendVariant::class,
+            'front.b2b' => \App\Http\Middleware\ProtectB2BStorefront::class,
+            'front.search' => \App\Http\Middleware\GuardStorefrontSearch::class,
             'catalog.feature' => \App\Http\Middleware\EnsureCatalogFeatureEnabled::class,
             'user.feature' => \App\Http\Middleware\EnsureUserFeatureEnabled::class,
             'api.user.enabled' => \App\Http\Middleware\EnsureApiUserEnabled::class,

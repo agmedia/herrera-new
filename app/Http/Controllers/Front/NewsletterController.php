@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Services\Front\NewsletterSignupService;
 use App\Services\Front\StoreNotificationService;
 use App\Services\Front\StoreSettingsService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -22,8 +22,7 @@ class NewsletterController extends Controller
         private readonly NewsletterSignupService $newsletterSignups,
         private readonly StoreNotificationService $notifications,
         private readonly StoreSettingsService $storeSettings,
-    ) {
-    }
+    ) {}
 
     public function store(Request $request): RedirectResponse|JsonResponse
     {
@@ -119,7 +118,7 @@ class NewsletterController extends Controller
             ? __('ui.front.desktop.newsletter.status.subscribed')
             : __('ui.front.desktop.newsletter.status.saved_with_sync_issue');
 
-        if ($result['synced']) {
+        if ($result['synced'] && ! config('commerce.b2b_only', false) && ($this->storeSettings->newsletter()['coupon_enabled'] ?? true)) {
             $this->notifications->sendNewsletterCoupon(
                 (string) $validator->validated()['newsletter_email'],
                 (string) app()->getLocale(),

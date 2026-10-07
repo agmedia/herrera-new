@@ -20,6 +20,8 @@ class TestMsanFtpConnectionJob implements ShouldQueue
 
     public function handle(MsanFtpClient $client): void
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $run = MsanSyncRun::query()->find($this->runId);
         if (! $run) {
             return;
@@ -50,6 +52,10 @@ class TestMsanFtpConnectionJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        if (! \App\Support\Integrations\MsanModule::available()) {
+            return;
+        }
+
         $this->markFailed($exception?->getMessage() ?: 'Provjera M SAN FTPS veze nije dovršena.');
     }
 

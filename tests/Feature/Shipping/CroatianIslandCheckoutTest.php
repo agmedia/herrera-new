@@ -213,6 +213,9 @@ class CroatianIslandCheckoutTest extends TestCase
         ]]);
 
         $cart = Mockery::mock(CartService::class);
+        $cart->shouldReceive('raw')->zeroOrMoreTimes()->andReturn([
+            ['product_id' => $product->id, 'product_option_value_id' => null, 'quantity' => 1],
+        ]);
         $cart->shouldReceive('lines')->zeroOrMoreTimes()->andReturn($lines);
         $cart->shouldReceive('summary')->zeroOrMoreTimes()->andReturn([
             'subtotal' => 50,

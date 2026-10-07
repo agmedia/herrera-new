@@ -20,6 +20,8 @@ class MsanImportCoordinator
 
     public function queueSelected(?int $userId = null): MsanSyncRun
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         // Staging can touch a large selected catalog before its run becomes
         // visible to other database connections. Keep the cross-process lease
         // comfortably above that bounded preparation window.

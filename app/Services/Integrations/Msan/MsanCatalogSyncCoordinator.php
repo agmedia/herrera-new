@@ -22,6 +22,8 @@ class MsanCatalogSyncCoordinator
 
     public function queueFullSync(?int $userId = null): MsanSyncRun
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $lock = Cache::lock('integrations:msan:queue-run', 30);
         if (! $lock->get()) {
             throw new DomainException('Druga M SAN obrada upravo se pokreće.');
@@ -56,6 +58,8 @@ class MsanCatalogSyncCoordinator
 
     public function queueConnectionTest(?int $userId = null): MsanSyncRun
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $run = MsanSyncRun::query()->create([
             'kind' => 'connection_test',
             'status' => MsanSyncRun::STATUS_PENDING,
@@ -75,6 +79,11 @@ class MsanCatalogSyncCoordinator
 
     public function queuePricesAndStock(?int $userId = null, bool $scheduled = false): ?MsanSyncRun
     {
+        if ($scheduled && ! \App\Support\Integrations\MsanModule::available()) {
+            return null;
+        }
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $lock = Cache::lock('integrations:msan:queue-run', 30);
         if (! $lock->get()) {
             if ($scheduled) {
@@ -147,6 +156,8 @@ class MsanCatalogSyncCoordinator
 
     public function queueEprelEnergy(?int $userId = null): MsanSyncRun
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $lock = Cache::lock('integrations:msan:queue-run', 30);
         if (! $lock->get()) {
             throw new DomainException('Druga M SAN obrada upravo se pokreće.');
@@ -201,6 +212,8 @@ class MsanCatalogSyncCoordinator
 
     public function queueSpecifications(?int $userId = null): MsanSyncRun
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $lock = Cache::lock('integrations:msan:queue-run', 30);
         if (! $lock->get()) {
             throw new DomainException('Druga M SAN obrada upravo se pokreće.');
@@ -246,6 +259,8 @@ class MsanCatalogSyncCoordinator
 
     public function queueFtpConnectionTest(?int $userId = null): MsanSyncRun
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $run = MsanSyncRun::query()->create([
             'kind' => 'ftp_connection_test',
             'status' => MsanSyncRun::STATUS_PENDING,

@@ -17,20 +17,12 @@
                 <dl class="mt-2 divide-y divide-slate-200 border-y border-slate-200">
                     @foreach ($groupRows as $specification)
                         @php
-                            $valueText = collect((array) $specification->values)
-                                ->flatten()
-                                ->filter(fn ($value): bool => is_scalar($value) && trim((string) $value) !== '')
-                                ->map(fn ($value): string => trim((string) $value))
-                                ->unique()
-                                ->implode(', ');
-                            $measure = trim((string) ($specification->measure ?? ''));
-                            $showMeasure = $measure !== ''
-                                && ! \Illuminate\Support\Str::endsWith(\Illuminate\Support\Str::lower($valueText), \Illuminate\Support\Str::lower($measure));
+                            $valueText = app(\App\Support\ProductSpecificationPresenter::class)->valueText($specification);
                         @endphp
                         <div class="grid gap-1 py-2.5 text-sm sm:grid-cols-[minmax(12rem,40%)_1fr] sm:gap-4">
                             <dt class="font-medium text-slate-600">{{ $specification->item_name }}</dt>
                             <dd class="text-slate-900">
-                                {{ $valueText }}@if ($showMeasure) {{ $measure }}@endif
+                                {{ $valueText }}
                             </dd>
                         </div>
                     @endforeach

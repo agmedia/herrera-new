@@ -28,6 +28,7 @@ use Tests\TestCase;
 class MsanSpecificationSyncTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\EnablesLegacyMsanModule;
 
     public function test_selected_product_specifications_are_streamed_published_and_replayable(): void
     {

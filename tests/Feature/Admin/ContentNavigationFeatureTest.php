@@ -31,6 +31,24 @@ class ContentNavigationFeatureTest extends TestCase
             ->assertSee(__('admin.content.navigation.title'));
     }
 
+    public function test_admin_can_save_linkedin_and_x_social_links_without_facebook_fallback(): void
+    {
+        $user = $this->makeAdminUser();
+        $socials = [
+            ['network' => 'linkedin', 'url' => 'https://www.linkedin.com/company/braytron-hrvatska', 'is_active' => true, 'sort_order' => 1],
+            ['network' => 'twitter', 'url' => 'https://twitter.com/BraytronHr?t=L6x9MrI3_apFe5ezB73StA&s=08', 'is_active' => true, 'sort_order' => 2],
+        ];
+
+        Livewire::actingAs($user)->test(NavigationManager::class)
+            ->set('form.top_bar.socials', $socials)
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertSame($socials, app(NavigationMenuService::class)->topBar()['socials']);
+        $this->actingAs($user)->get('/admin/content/navigation')->assertOk()
+            ->assertSee('value="linkedin"', false)->assertSee('value="twitter"', false);
+    }
+
     public function test_admin_can_save_navigation_config(): void
     {
         $user = $this->makeAdminUser();

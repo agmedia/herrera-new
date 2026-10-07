@@ -33,6 +33,7 @@ use Tests\TestCase;
 class MsanLivewireFeatureTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\EnablesLegacyMsanModule;
 
     public function test_admin_can_map_multiple_msan_categories_to_one_local_category_and_ignore_another(): void
     {

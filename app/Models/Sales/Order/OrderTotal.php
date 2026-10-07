@@ -2,11 +2,16 @@
 
 namespace App\Models\Sales\Order;
 
+use App\Models\Concerns\HasB2BMonetaryPrecision;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class OrderTotal extends Model
 {
+    use HasB2BMonetaryPrecision;
+
+    protected array $b2bMonetaryAttributes = ['value'];
+
     protected $fillable = [
         'order_id',
         'code',

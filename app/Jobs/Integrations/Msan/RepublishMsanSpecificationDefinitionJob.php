@@ -45,6 +45,8 @@ class RepublishMsanSpecificationDefinitionJob implements ShouldBeUniqueUntilProc
 
     public function handle(MsanSpecificationPublisher $publisher): void
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $lock = Cache::lock(
             MsanSpecificationPublisher::PUBLISH_LOCK_KEY,
             MsanSpecificationPublisher::PUBLISH_LOCK_SECONDS,

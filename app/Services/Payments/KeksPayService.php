@@ -2,20 +2,21 @@
 
 namespace App\Services\Payments;
 
-use App\Models\Catalog\Product\Product;
-use App\Models\Catalog\Product\ProductOptionValue;
 use App\Models\Sales\Order\Order;
 use App\Models\Sales\Order\OrderHistory;
 use App\Models\Sales\Order\OrderTransaction;
 use App\Models\Settings\Local\OrderStatus;
 use App\Models\Settings\Local\PaymentMethod;
+use App\Services\Front\OrderStockAllocationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class KeksPayService
 {
     public const PAYLOAD_KEY = 'kekspay';
+
     private const SELL_URL_TEST = 'https://kekspayuat.erstebank.hr/galebpay';
+
     private const SELL_URL_LIVE = 'https://kekspay.hr/galebpay';
 
     public function isKeksCode(string $code): bool
@@ -140,6 +141,7 @@ class KeksPayService
 
         if ($status === 0) {
             $this->applyApprovedAdvice($order, $input);
+
             return ['status' => 0, 'message' => 'Accepted', 'order' => $order];
         }
 
@@ -169,29 +171,7 @@ class KeksPayService
             }
 
             foreach ($locked->items as $item) {
-                $qty = max(0, (int) $item->quantity);
-                if ($qty <= 0) {
-                    continue;
-                }
-
-                $optionValueId = (int) ($item->product_option_value_id ?? 0);
-                if ($optionValueId > 0) {
-                    $optionRow = ProductOptionValue::query()->lockForUpdate()->find($optionValueId);
-                    if ($optionRow) {
-                        $optionRow->stock_qty = max(0, (int) $optionRow->stock_qty) + $qty;
-                        $optionRow->save();
-                    }
-                    continue;
-                }
-
-                $productId = (int) ($item->product_id ?? 0);
-                if ($productId > 0) {
-                    $product = Product::query()->lockForUpdate()->find($productId);
-                    if ($product) {
-                        $product->stock_qty = max(0, (int) $product->stock_qty) + $qty;
-                        $product->save();
-                    }
-                }
+                app(OrderStockAllocationService::class)->restore($item);
             }
 
             $beforeStatusId = (int) $locked->status_id;
@@ -306,6 +286,7 @@ class KeksPayService
         $header = trim((string) $request->header('Authorization', ''));
         if ($mode === 'token') {
             $token = trim((string) ($settings['keks_advice_token'] ?? ''));
+
             return $token !== '' && hash_equals('Token '.$token, $header);
         }
 
@@ -316,12 +297,14 @@ class KeksPayService
                 return false;
             }
             $expected = 'Basic '.base64_encode($username.':'.$password);
+
             return hash_equals($expected, $header);
         }
 
         if ($mode === 'url_token') {
             $token = trim((string) ($settings['keks_advice_token'] ?? ''));
             $incoming = trim((string) $request->query('token', ''));
+
             return $token !== '' && hash_equals($token, $incoming);
         }
 

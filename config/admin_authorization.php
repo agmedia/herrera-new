@@ -138,6 +138,12 @@ return [
             'view' => ['catalog.b2b_prices.create'],
             'mutate' => ['catalog.b2b_prices.create'],
         ],
+        'admin.b2b-prices.catalogs' => [
+            'view' => ['catalog.b2b_prices.view'],
+            // Navigation/simulation are read-only; each mutator authorizes its scoped operation in PriceCatalogService.
+            'mutate' => ['catalog.b2b_prices.view'],
+            'delete' => ['catalog.b2b_prices.delete'],
+        ],
         'admin.b2b-prices.edit' => [
             'view' => ['catalog.b2b_prices.update'],
             'mutate' => ['catalog.b2b_prices.update'],
@@ -178,36 +184,29 @@ return [
             'delete' => ['settings.local.manage'],
         ],
 
-        'admin.integrations.msan.settings' => [
-            'view' => ['integrations.msan.settings.manage'],
-            'mutate' => ['integrations.msan.settings.manage'],
+        'admin.integrations.eprel.settings' => [
+            'view' => ['integrations.eprel.settings.manage'],
+            'mutate' => ['integrations.eprel.settings.manage'],
         ],
-        'admin.integrations.msan.categories' => [
-            'view' => ['integrations.msan.view'],
-            'mutate' => ['integrations.msan.mapping.manage'],
+        'admin.integrations.eprel.catalog' => [
+            'view' => ['integrations.eprel.settings.manage'],
+            'mutate' => ['integrations.eprel.settings.manage'],
         ],
-        'admin.integrations.msan.specifications.edit' => [
-            'view' => ['integrations.msan.mapping.manage'],
-            'mutate' => ['integrations.msan.mapping.manage'],
+        'admin.integrations.stock.index' => [
+            'view' => ['integrations.stock.manage'],
+            'mutate' => ['integrations.stock.manage'],
         ],
-        'admin.integrations.msan.specifications' => [
-            'view' => ['integrations.msan.view'],
-            'mutate' => ['integrations.msan.mapping.manage'],
+        'admin.integrations.eracuni.index' => [
+            'view' => ['integrations.eracuni.manage'],
+            'mutate' => ['integrations.eracuni.manage'],
         ],
-        'admin.integrations.msan.products.image' => [
-            'view' => ['integrations.msan.view'],
+        'admin.integrations.spreadsheet.index' => [
+            'view' => ['integrations.spreadsheet.manage'],
+            'mutate' => ['integrations.spreadsheet.manage'],
         ],
-        'admin.integrations.msan.products' => [
-            'view' => ['integrations.msan.view'],
-            'mutate' => ['integrations.msan.import.manage'],
-        ],
-        'admin.integrations.msan.runs' => [
-            'view' => ['integrations.msan.view'],
-            'mutate' => ['integrations.msan.sync.run'],
-        ],
-        'admin.integrations.msan.overview' => [
-            'view' => ['integrations.msan.view'],
-            'mutate' => ['integrations.msan.sync.run'],
+        'admin.integrations.media.index' => [
+            'view' => ['integrations.media.manage'],
+            'mutate' => ['integrations.media.manage'],
         ],
 
         'admin.content.blog.create' => [
@@ -326,6 +325,12 @@ return [
             'mutate' => ['settings.user.manage'],
         ],
 
+        'admin.users.impersonate' => [
+            'mutate' => ['users.profile.update'],
+        ],
+        'admin.users.statistics' => [
+            'view' => ['users.list.view'],
+        ],
         'admin.users.edit' => [
             'view' => ['users.profile.update'],
             'mutate' => ['users.profile.update'],

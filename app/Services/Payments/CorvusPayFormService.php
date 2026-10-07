@@ -2,13 +2,12 @@
 
 namespace App\Services\Payments;
 
-use App\Models\Catalog\Product\Product;
-use App\Models\Catalog\Product\ProductOptionValue;
 use App\Models\Sales\Order\Order;
 use App\Models\Sales\Order\OrderHistory;
 use App\Models\Sales\Order\OrderTransaction;
 use App\Models\Settings\Local\OrderStatus;
 use App\Models\Settings\Local\PaymentMethod;
+use App\Services\Front\OrderStockAllocationService;
 use Illuminate\Support\Facades\DB;
 
 class CorvusPayFormService
@@ -334,30 +333,7 @@ class CorvusPayFormService
         }
 
         foreach ($locked->items as $item) {
-            $qty = max(0, (int) $item->quantity);
-            if ($qty <= 0) {
-                continue;
-            }
-
-            $optionValueId = (int) ($item->product_option_value_id ?? 0);
-            if ($optionValueId > 0) {
-                $optionRow = ProductOptionValue::query()->lockForUpdate()->find($optionValueId);
-                if ($optionRow) {
-                    $optionRow->stock_qty = max(0, (int) $optionRow->stock_qty) + $qty;
-                    $optionRow->save();
-                }
-
-                continue;
-            }
-
-            $productId = (int) ($item->product_id ?? 0);
-            if ($productId > 0) {
-                $product = Product::query()->lockForUpdate()->find($productId);
-                if ($product) {
-                    $product->stock_qty = max(0, (int) $product->stock_qty) + $qty;
-                    $product->save();
-                }
-            }
+            app(OrderStockAllocationService::class)->restore($item);
         }
 
         $beforeStatusId = (int) $locked->status_id;

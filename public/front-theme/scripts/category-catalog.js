@@ -217,6 +217,36 @@
         syncRangeState();
     };
 
+    const initStickyDesktopSidebar = () => {
+        const layout = document.querySelector('.catalog-products-layout');
+        const header = document.querySelector('.site-main-header');
+        if (!(layout instanceof HTMLElement) || !(header instanceof HTMLElement)
+            || layout.dataset.sidebarStickyInit === '1') {
+            return;
+        }
+        layout.dataset.sidebarStickyInit = '1';
+        let frame = 0;
+        const measure = () => {
+            frame = 0;
+            // The Herrera header keeps its search row on wide screens. Read its
+            // actual visible bottom rather than assuming the Termol 96px height.
+            const headerBottom = Math.max(0, Math.ceil(header.getBoundingClientRect().bottom));
+            layout.style.setProperty('--catalog-sidebar-sticky-top', `${headerBottom + 12}px`);
+        };
+        const requestMeasure = () => {
+            if (!frame) {
+                frame = window.requestAnimationFrame(measure);
+            }
+        };
+        measure();
+        window.addEventListener('scroll', requestMeasure, { passive: true });
+        window.addEventListener('resize', requestMeasure, { passive: true });
+        if ('ResizeObserver' in window) {
+            new ResizeObserver(requestMeasure).observe(header);
+        }
+        new MutationObserver(requestMeasure).observe(header, { attributes: true, attributeFilter: ['class'] });
+    };
+
     const initStickyFilterBar = () => {
         const shell = document.querySelector('[data-sticky-filter-shell]');
         const bar = shell?.querySelector('[data-sticky-filter-bar]');
@@ -509,6 +539,7 @@
             });
         });
 
+        initStickyDesktopSidebar();
         initStickyFilterBar();
         initResponsiveGridToggles();
     };

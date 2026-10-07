@@ -3,8 +3,9 @@
 namespace App\Models\Catalog\Action;
 
 use App\Models\Catalog\Product\Product;
-use App\Models\User\CustomerGroup;
 use App\Models\User;
+use App\Models\User\CustomerGroup;
+use App\Services\Pricing\B2BAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,21 +16,31 @@ use Illuminate\Support\Carbon;
 class CatalogAction extends Model
 {
     public const SCOPE_PRODUCT = 'product';
+
     public const SCOPE_CART = 'cart';
 
     public const TYPE_PERCENTAGE = 'percentage';
+
     public const TYPE_FIXED = 'fixed_amount';
+
     public const TYPE_BUY_X_GET_Y = 'buy_x_get_y';
+
     public const TYPE_GIFT_ON_AMOUNT = 'gift_on_amount';
 
     public const TARGET_ALL = 'all';
+
     public const TARGET_PRODUCT = 'product';
+
     public const TARGET_CATEGORY = 'category';
+
     public const TARGET_MANUFACTURER = 'manufacturer';
 
     public const AUDIENCE_ALL = 'all';
+
     public const AUDIENCE_USER_GROUP = 'user_group';
+
     public const AUDIENCE_ROLE = 'role';
+
     public const AUDIENCE_USER = 'user';
 
     protected $fillable = [
@@ -197,7 +208,11 @@ class CatalogAction extends Model
                         ->where('user_id', $user->id);
                 });
 
-                $groupIds = $user->customerGroups()->pluck('customer_groups.id')->map(fn ($id) => (int) $id)->all();
+                $access = app(B2BAccessService::class);
+                $account = $access->requiresApprovedAccount() ? $access->approvedAccount($user) : null;
+                $groupIds = $access->requiresApprovedAccount()
+                    ? ($account ? [(int) $account->customer_group_id] : [])
+                    : $user->customerGroups()->pluck('customer_groups.id')->map(fn ($id) => (int) $id)->all();
                 if ($groupIds !== []) {
                     $audienceQuery->orWhere(function (Builder $q) use ($groupIds): void {
                         $q->where('audience_type', self::AUDIENCE_USER_GROUP)
@@ -207,7 +222,7 @@ class CatalogAction extends Model
 
                 // Legacy fallback for actions created before user-group audience migration.
                 $roleIds = $user->roles()->pluck('roles.id')->map(fn ($id) => (int) $id)->all();
-                if ($roleIds !== []) {
+                if (! $access->requiresApprovedAccount() && $roleIds !== []) {
                     $audienceQuery->orWhere(function (Builder $q) use ($roleIds): void {
                         $q->where('audience_type', self::AUDIENCE_ROLE)
                             ->whereIn('role_id', $roleIds);

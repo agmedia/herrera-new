@@ -103,6 +103,8 @@ class MsanClient
      */
     public function downloadDataset(string $dataset, string $destinationPath): void
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $dataset = strtolower(trim($dataset));
         $definition = self::DATASETS[$dataset] ?? null;
         if (! is_array($definition)) {

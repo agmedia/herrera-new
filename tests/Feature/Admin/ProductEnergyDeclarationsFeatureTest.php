@@ -283,7 +283,7 @@ class ProductEnergyDeclarationsFeatureTest extends TestCase
             ->assertSee('Službena EPREL energetska oznaka')
             ->assertSee('EPREL broj');
 
-        $labelUrl = EprelClient::BASE_URL.'/api/products/'.self::EPREL_GROUP.'/646868/labels?format=PDF';
+        $labelUrl = EprelClient::BASE_URL.'/labels/'.self::EPREL_GROUP.'/Label_646868_big_color.pdf';
         $sheetUrl = EprelClient::BASE_URL.'/fiches/'.self::EPREL_GROUP.'/Fiche_646868_HR.pdf';
         $this->assertDatabaseHas('product_energy_declarations', [
             'product_id' => $product->id,

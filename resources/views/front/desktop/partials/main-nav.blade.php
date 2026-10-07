@@ -33,6 +33,9 @@
                     @if ($isCatalogItem) data-catalog-mega-trigger @endif
                     @if($target) target="{{ $target }}" rel="{{ $rel }}" @endif
                 >
+                    @if (!empty($herreraCatalogHeader))
+                        <x-fa-icon name="bars" class="h-4 w-4" />
+                    @endif
                     <span>{{ $item['label'] }}</span>
                     @if ($isCatalogItem)
                         <x-fa-icon name="chevron-down" class="h-4 w-4 transition-transform group-hover/nav:rotate-180 group-focus-within/nav:rotate-180" />

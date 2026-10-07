@@ -1,27 +1,36 @@
 @extends('front.desktop.layouts.store')
 
 @php
+    $isHerreraProductDetail = str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera');
+    $canViewPrices = $canViewPrices ?? app(\App\Services\Pricing\B2BAccessService::class)->canViewPrices(auth()->user());
     $translation = $product->translations->firstWhere('locale', $locale)
         ?? $product->translations->firstWhere('locale', $fallbackLocale);
     $manufacturerTranslation = $product->manufacturer?->translations?->firstWhere('locale', $locale)
         ?? $product->manufacturer?->translations?->firstWhere('locale', $fallbackLocale);
     $manufacturerEnabled = app(\App\Services\Catalog\CatalogFeatureService::class)->useManufacturers();
-    $formatGrossPrice = static fn ($value): string => number_format((float) $value, 2).' €';
-    $formatGrossDecimal = static fn ($value): string => number_format((float) $value, 2, '.', '');
-    $formatPriceData = static function (array $priceData) use ($formatGrossPrice, $formatGrossDecimal): array {
-        $oldGross = $priceData['old_gross'] ?? null;
-        $lowestGross = $priceData['lowest_30_days_gross'] ?? null;
+    $productDisplayCode = trim((string) data_get($product->payload, 'opencart.model')) ?: (string) ($product->sku ?: $product->code);
+    $productEanCode = trim((string) $product->barcode) ?: trim((string) data_get($product->payload, 'opencart.ean'));
+    $localStockQuantity = max(0, (int) $product->stock_qty);
+    $supplierStockQuantity = max(0, (int) ($product->supplier_stock_qty ?? 0));
+    $formatDisplayPrice = static fn ($value): string => number_format((float) $value, 2).' €';
+    $formatDisplayDecimal = static fn ($value): string => number_format((float) $value, 2, '.', '');
+    $formatPriceData = static function (array $priceData) use ($formatDisplayPrice, $formatDisplayDecimal, $canViewPrices): array {
+        if (! $canViewPrices) {
+            return ['current' => '', 'current_value' => '', 'current_net' => '', 'old' => '', 'discount_percent' => '', 'is_b2b' => false, 'lowest_30_days' => ''];
+        }
+        $displayOld = $priceData['display_old'] ?? $priceData['old_gross'] ?? null;
+        $displayLowest = $priceData['display_lowest_30_days'] ?? $priceData['lowest_30_days_gross'] ?? null;
         $discountPercent = (int) ($priceData['discount_percent'] ?? 0);
 
         return [
-            'current' => $formatGrossPrice((float) ($priceData['current_gross'] ?? 0)),
-            'current_value' => $formatGrossDecimal((float) ($priceData['current_gross'] ?? 0)),
-            'current_net' => $formatGrossPrice((float) ($priceData['current_net'] ?? $priceData['current_gross'] ?? 0)),
-            'old' => $oldGross !== null ? $formatGrossPrice((float) $oldGross) : '',
+            'current' => $formatDisplayPrice((float) ($priceData['display_current'] ?? $priceData['current_gross'] ?? 0)),
+            'current_value' => $formatDisplayDecimal((float) ($priceData['display_current'] ?? $priceData['current_gross'] ?? 0)),
+            'current_net' => $formatDisplayPrice((float) ($priceData['current_net'] ?? $priceData['current_gross'] ?? 0)),
+            'old' => $displayOld !== null ? $formatDisplayPrice((float) $displayOld) : '',
             'discount_percent' => $discountPercent > 0 ? (string) $discountPercent : '',
             'is_b2b' => (bool) ($priceData['is_b2b_price'] ?? false),
-            'lowest_30_days' => $lowestGross !== null
-                ? __('ui.product.lowest_price_30_days', ['price' => $formatGrossPrice((float) $lowestGross)])
+            'lowest_30_days' => $displayLowest !== null
+                ? __('ui.product.lowest_price_30_days', ['price' => $formatDisplayPrice((float) $displayLowest)])
                 : '',
         ];
     };
@@ -36,13 +45,13 @@
         return $formatPriceData($pricePresenter->forStoredBase($product, $storedBase, $authUser));
     };
     $currentPrice = $productPriceData['current'];
-    $oldPrice = isset($pricePresentation['old_gross']) && $pricePresentation['old_gross'] !== null
-        ? $formatGrossPrice((float) $pricePresentation['old_gross'])
-        : null;
+    $oldPrice = $productPriceData['old'] !== '' ? $productPriceData['old'] : null;
+    $displayIncludesTax = (bool) ($pricePresentation['display_includes_tax'] ?? true);
     $discountPercent = (int) ($pricePresentation['discount_percent'] ?? 0);
     $isB2BPrice = (bool) ($pricePresentation['is_b2b_price'] ?? false);
-    $lowest30DaysPrice = isset($pricePresentation['lowest_30_days_gross']) && $pricePresentation['lowest_30_days_gross'] !== null
-        ? $formatGrossPrice((float) $pricePresentation['lowest_30_days_gross'])
+    $lowestDisplayValue = $pricePresentation['display_lowest_30_days'] ?? $pricePresentation['lowest_30_days_gross'] ?? null;
+    $lowest30DaysPrice = $lowestDisplayValue !== null
+        ? $formatDisplayPrice((float) $lowestDisplayValue)
         : null;
     $energyLabelPresenter = app(\App\Support\ProductEnergyLabelPresenter::class);
     $energyDeclarations = $energyLabelPresenter->declarations($product);
@@ -104,10 +113,22 @@
         })
         ->values();
 
+    if ($gallery->isEmpty()) {
+        $gallery = \App\Support\Media\LegacyCatalogImage::gallery($product)
+            ->map(static fn (string $url, int $index): array => [
+                'id' => 'legacy-'.$index,
+                'full' => $url,
+                'display' => $url,
+                'display_srcset' => '',
+                'thumb' => $url,
+                'alt' => (string) ($translation?->name ?? $product->code),
+            ]);
+    }
+
     $allOptionRows = $product->visibleOptionRows();
-    $availableOptionRows = $product->availableOptionRows();
+    $availableOptionRows = $canViewPrices ? $product->availableOptionRows() : $allOptionRows;
     $optionRows = $availableOptionRows->isNotEmpty() ? $availableOptionRows : $allOptionRows;
-    $isPurchasable = $product->storefrontIsPurchasable();
+    $isPurchasable = $canViewPrices && $product->storefrontIsPurchasable();
     $hasLinkedOptions = $optionRows->contains(fn ($row) => (int) ($row->parent_option_value_id ?? 0) > 0);
     $primaryOptionLabel = __('ui.cart.modal.option');
     $secondaryOptionLabel = __('ui.cart.modal.option');
@@ -165,9 +186,12 @@
 @section('main_class', 'w-full px-0 py-8')
 
 @section('content')
-    @push('styles')
-        <link rel="stylesheet" href="{{ asset('front-theme/styles/product-detail.css') }}?v={{ filemtime(public_path('front-theme/styles/product-detail.css')) }}">
-    @endpush
+@push('styles')
+    <link rel="stylesheet" href="{{ asset('front-theme/styles/product-detail.css') }}?v={{ filemtime(public_path('front-theme/styles/product-detail.css')) }}">
+    @if ($isHerreraProductDetail)
+        <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-product-detail.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-product-detail.css')) }}">
+    @endif
+@endpush
 
     <div class="product-detail-shell">
         @if ($topBlocks->isNotEmpty())
@@ -293,15 +317,22 @@
                             ])
                         </div>
                     @endif
-                    <h1 class="text-2xl font-extrabold leading-tight text-slate-900">{{ $translation?->name ?? $product->code }}</h1>
-                    <p class="mt-1 text-xs text-slate-500">{{ __('ui.product.sku') }}: <span data-product-sku-value>{{ $product->sku ?: $product->code ?: 'n/a' }}</span></p>
+                    <h1 class="product-detail-title text-2xl font-extrabold leading-tight text-slate-900">{{ $translation?->name ?? $product->code }}</h1>
+                    <p class="product-detail-identifier mt-1 text-xs text-slate-500">{{ __('Šifra') }}: <span data-product-sku-value>{{ $productDisplayCode }}</span></p>
+                    @if ($productEanCode !== '')
+                        <p class="product-detail-identifier mt-1 text-xs text-slate-500">EAN: <span data-product-ean>{{ $productEanCode }}</span></p>
+                    @endif
                     @if ($manufacturerTranslation && $manufacturerEnabled)
-                        <p class="mt-1 text-xs text-slate-600">
+                        <p class="product-detail-brand mt-1 text-xs text-slate-600">
                             <a href="{{ route('manufacturers.show', ['slug' => $manufacturerTranslation->slug]) }}" class="font-semibold text-slate-700 hover:text-slate-900">{{ $manufacturerTranslation->name }}</a>
                         </p>
                     @endif
                 </div>
-                <div class="mt-3">
+                <div class="product-detail-pricing mt-3">
+                    @if (! $canViewPrices)
+                        @include('front.partials.b2b-price-access')
+                        <x-front.energy-label-arrow :declaration="$primaryEnergyDocuments" :compact="false" />
+                    @else
                     <p class="{{ $isB2BPrice ? '' : 'hidden' }} mb-1 text-xs font-semibold text-cyan-800" data-product-price-b2b>
                         {{ __('ui.product.b2b_contract_price') }}
                     </p>
@@ -314,16 +345,20 @@
                             @endif
                         </span>
                     </div>
-                    @if ($vatRate !== null)
+                    @include('front.partials.b2b-tax-note', ['includesTax' => $displayIncludesTax])
+                    @if ($displayIncludesTax && $vatRate !== null)
                         <p class="product-detail-tax-note">
                             {{ __('ui.product.vat_included', ['rate' => rtrim(rtrim(number_format($vatRate, 2, $locale === 'hr' ? ',' : '.', ''), '0'), $locale === 'hr' ? ',' : '.')]) }}
                         </p>
                     @endif
+                    @if ($displayIncludesTax)
                     <p class="product-detail-net-price">
                         {{ __('ui.product.price_excluding_vat') }}: <span data-product-price-net>{{ $productPriceData['current_net'] }}</span>
                     </p>
+                    @endif
                     <p class="{{ $oldPrice ? '' : 'hidden' }} mt-1 text-sm text-slate-500 line-through" data-product-price-old>{{ $oldPrice ?: '' }}</p>
                     <p class="{{ $lowest30DaysPrice ? '' : 'hidden' }} mt-1 text-xs text-slate-600" data-product-price-lowest>{{ $lowest30DaysPrice ? __('ui.product.lowest_price_30_days', ['price' => $lowest30DaysPrice]) : '' }}</p>
+                    @endif
                     <x-front.energy-information-sheet-link :declaration="$primaryEnergyDocuments" :compact="false" class="mt-2" />
 
                     @if ($energyDocumentDeclarations->count() > 1 || ($energyDocumentDeclarations->isNotEmpty() && ! $primaryEnergyDeclaration))
@@ -353,6 +388,8 @@
                 </div>
             </div>
 
+            @include('front.partials.product-availability')
+
             @if ($colorVariants->isNotEmpty())
                 <div class="mt-5 border-y border-slate-200 py-4" data-product-color-variants>
                     <p class="text-sm font-extrabold text-slate-900">{{ __('ui.product.color_variants') }}</p>
@@ -380,6 +417,7 @@
                 </div>
             @endif
 
+            @if ($canViewPrices)
             <form
                 id="product-detail-cart-form-{{ $product->id }}"
                 method="POST"
@@ -393,7 +431,7 @@
                 data-ga4-item-brand="{{ (string) ($manufacturerTranslation?->name ?? '') }}"
                 data-ga4-item-category="{{ (string) ($firstCategoryTranslation?->name ?? '') }}"
                 data-ga4-currency="EUR"
-                data-product-base-sku="{{ (string) ($product->sku ?: $product->code ?: '') }}"
+                data-product-base-sku="{{ $productDisplayCode }}"
                 data-product-fallback-id="{{ (int) $product->id }}"
                 data-product-name="{{ $translation?->name ?? $product->code }}"
                 data-product-image="{{ (string) (($gallery->first()['full'] ?? '') ?: '') }}"
@@ -547,12 +585,15 @@
                         aria-label="{{ $isWishlisted ? __('ui.wishlist.remove') : __('ui.wishlist.add') }}"
                         data-wishlist-button
                     >
-                        <svg class="fa6-icon h-5 w-5" fill="currentColor" aria-hidden="true" focusable="false">
-                            <use href="{{ asset('front-theme/fonts/storefront-sprites/'.($isWishlisted ? 'solid' : 'regular').'.svg') }}#heart"></use>
-                        </svg>
+                        <x-fa-icon name="heart" style="{{ $isWishlisted ? 'solid' : 'regular' }}" class="h-5 w-5" />
                     </button>
                 </div>
             </form>
+            @else
+                <button type="submit" form="wishlist-product-{{ $product->id }}" class="product-card-wishlist product-detail-wishlist mt-5 {{ $isWishlisted ? 'is-active' : '' }}" aria-label="{{ $isWishlisted ? __('ui.wishlist.remove') : __('ui.wishlist.add') }}" data-wishlist-button>
+                    <x-fa-icon name="heart" style="{{ $isWishlisted ? 'solid' : 'regular' }}" class="h-5 w-5" />
+                </button>
+            @endif
 
             @if ($fitFinderEnabled && $optionRows->count() > 1)
                 <div
@@ -825,71 +866,91 @@
     @endif
 
     @if ($related->isNotEmpty())
-        <section class="product-products-widget">
-            <x-storefront-section-heading class="mb-7">
-                {{ __('ui.product.related') }}
-            </x-storefront-section-heading>
-            @if ($related->count() > $mobileDefaultCols)
-                @include('front.partials.carousel-swipe-hint')
-            @endif
-            <div
-                id="related-products-carousel-{{ $product->id }}"
-                class="splide"
-                data-related-products-splide
-                data-desktop-cols="5"
-                data-mobile-cols="{{ $mobileDefaultCols }}"
-            >
-                <div class="splide__track">
-                    <ul class="splide__list">
-                        @foreach ($related as $relatedProduct)
-                            <li class="splide__slide">
-                                @include('front.desktop.partials.product-card', [
-                                    'product' => $relatedProduct,
-                                    'locale' => $locale,
-                                    'fallbackLocale' => $fallbackLocale,
-                                    'flat' => true,
-                                    'lined' => true,
-                                ])
-                            </li>
-                        @endforeach
-                    </ul>
+        @if ($isHerreraProductDetail)
+            @include('front.partials.herrera-product-carousel', [
+                'products' => $related,
+                'carouselId' => 'related-products-carousel-'.$product->id,
+                'title' => __('ui.product.related'),
+                'kind' => 'related',
+            ])
+        @else
+            <section class="product-products-widget">
+                <x-storefront-section-heading class="mb-7">
+                    {{ __('ui.product.related') }}
+                </x-storefront-section-heading>
+                @if ($related->count() > $mobileDefaultCols)
+                    @include('front.partials.carousel-swipe-hint')
+                @endif
+                <div
+                    id="related-products-carousel-{{ $product->id }}"
+                    class="splide"
+                    data-related-products-splide
+                    data-continuous-card-carousel
+                    data-desktop-cols="5"
+                    data-mobile-cols="{{ $mobileDefaultCols }}"
+                >
+                    <div class="splide__track">
+                        <ul class="splide__list">
+                            @foreach ($related as $relatedProduct)
+                                <li class="splide__slide">
+                                    @include('front.desktop.partials.product-card', [
+                                        'product' => $relatedProduct,
+                                        'locale' => $locale,
+                                        'fallbackLocale' => $fallbackLocale,
+                                        'flat' => true,
+                                        'lined' => true,
+                                    ])
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
                 </div>
-            </div>
-        </section>
+            </section>
+        @endif
     @endif
 
     @if (($recentlyViewed ?? collect())->isNotEmpty())
-        <section class="product-products-widget">
-            <x-storefront-section-heading class="mb-7">
-                {{ __('ui.product.recently_viewed') }}
-            </x-storefront-section-heading>
-            @if ($recentlyViewed->count() > $mobileDefaultCols)
-                @include('front.partials.carousel-swipe-hint')
-            @endif
-            <div
-                id="recently-viewed-products-carousel-{{ $product->id }}"
-                class="splide"
-                data-related-products-splide
-                data-desktop-cols="5"
-                data-mobile-cols="{{ $mobileDefaultCols }}"
-            >
-                <div class="splide__track">
-                    <ul class="splide__list">
-                        @foreach ($recentlyViewed as $recentlyViewedProduct)
-                            <li class="splide__slide">
-                                @include('front.desktop.partials.product-card', [
-                                    'product' => $recentlyViewedProduct,
-                                    'locale' => $locale,
-                                    'fallbackLocale' => $fallbackLocale,
-                                    'flat' => true,
-                                    'lined' => true,
-                                ])
-                            </li>
-                        @endforeach
-                    </ul>
+        @if ($isHerreraProductDetail)
+            @include('front.partials.herrera-product-carousel', [
+                'products' => $recentlyViewed,
+                'carouselId' => 'recently-viewed-products-carousel-'.$product->id,
+                'title' => __('ui.product.recently_viewed'),
+                'kind' => 'recently-viewed',
+            ])
+        @else
+            <section class="product-products-widget">
+                <x-storefront-section-heading class="mb-7">
+                    {{ __('ui.product.recently_viewed') }}
+                </x-storefront-section-heading>
+                @if ($recentlyViewed->count() > $mobileDefaultCols)
+                    @include('front.partials.carousel-swipe-hint')
+                @endif
+                <div
+                    id="recently-viewed-products-carousel-{{ $product->id }}"
+                    class="splide"
+                    data-related-products-splide
+                    data-continuous-card-carousel
+                    data-desktop-cols="5"
+                    data-mobile-cols="{{ $mobileDefaultCols }}"
+                >
+                    <div class="splide__track">
+                        <ul class="splide__list">
+                            @foreach ($recentlyViewed as $recentlyViewedProduct)
+                                <li class="splide__slide">
+                                    @include('front.desktop.partials.product-card', [
+                                        'product' => $recentlyViewedProduct,
+                                        'locale' => $locale,
+                                        'fallbackLocale' => $fallbackLocale,
+                                        'flat' => true,
+                                        'lined' => true,
+                                    ])
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
                 </div>
-            </div>
-        </section>
+            </section>
+        @endif
     @endif
 
     @if ($bottomBlocks->isNotEmpty())

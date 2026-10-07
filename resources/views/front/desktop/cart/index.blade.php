@@ -12,9 +12,14 @@
     <section class="commerce-hero">
         <h1 class="text-3xl font-extrabold tracking-tight text-slate-900">{{ __('ui.cart.title') }}</h1>
         <p class="mt-2 text-slate-600">{{ __('ui.cart.subtitle') }}</p>
+        @include('front.partials.b2b-tax-note', ['taxNoteLabel' => __('ui.b2b.pricing.items_excludes_tax')])
     </section>
 
-    @if ($lines->isEmpty())
+    @if (! $canViewPrices)
+        <div class="border border-slate-200 bg-white p-6">
+            @include('front.partials.b2b-price-access')
+        </div>
+    @elseif ($lines->isEmpty())
         <div class="border border-dashed border-slate-300 bg-white p-10 text-center">
             <p class="text-slate-600">{{ __('ui.cart.empty') }}</p>
             <a href="{{ route('shop.index') }}" class="commerce-primary-action mt-4 px-5 py-2.5">{{ __('ui.cart.actions.continue') }}</a>
@@ -37,9 +42,7 @@
                                 : null;
                             $productImage = $product->getFirstMedia('product_main')
                                 ?? $product->getFirstMedia('product_gallery');
-                            $productImageUrl = $productImage
-                                ? ($productImage->hasGeneratedConversion('thumb_100x100') ? $productImage->getUrl('thumb_100x100') : $productImage->getUrl())
-                                : null;
+                            $productImageUrl = \App\Support\Media\LegacyCatalogImage::first($product, ['thumb_100x100']);
                             $displayCurrent = (float) ($line['display_unit_price'] ?? $line['unit_price'] ?? 0);
                             $displayBase = (float) ($line['display_base_unit_price'] ?? $line['base_unit_price'] ?? $displayCurrent);
                         @endphp
@@ -169,9 +172,7 @@
                                 : null;
                             $productImage = $product->getFirstMedia('product_main')
                                 ?? $product->getFirstMedia('product_gallery');
-                            $productImageUrl = $productImage
-                                ? ($productImage->hasGeneratedConversion('thumb_100x100') ? $productImage->getUrl('thumb_100x100') : $productImage->getUrl())
-                                : null;
+                            $productImageUrl = \App\Support\Media\LegacyCatalogImage::first($product, ['thumb_100x100']);
                             $displayCurrent = (float) ($line['display_unit_price'] ?? $line['unit_price'] ?? 0);
                         @endphp
                         <tr class="border-t border-slate-200">
@@ -279,7 +280,7 @@
                         <dd class="font-semibold text-slate-900">{{ $summary['item_qty'] }}</dd>
                     </div>
                     <div class="flex items-center justify-between">
-                        <dt class="text-slate-600">{{ __('ui.cart.summary.subtotal') }}</dt>
+                        <dt class="text-slate-600">{{ ((bool) config('commerce.b2b_only') && (bool) config('commerce.b2b_display_net', true)) ? __('ui.b2b.pricing.net_subtotal') : __('ui.cart.summary.subtotal') }}</dt>
                         <dd class="font-semibold text-slate-900">{{ number_format((float) $summary['subtotal'], 2) }} €</dd>
                     </div>
                     @if ((float) ($summary['discount_total'] ?? 0) > 0)

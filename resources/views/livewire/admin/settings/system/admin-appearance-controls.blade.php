@@ -65,6 +65,10 @@
                 <div class="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
                     {{ __('Recommendation: keep desktop 20-30 items and mobile 8-16 items for better UX + cache hit consistency.') }}
                 </div>
+
+                <div class="admin-form-actions flex items-center gap-2">
+                    <button type="submit" class="rounded-xl bg-cyan-700 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-800">{{ __('admin.common.save') }}</button>
+                </div>
             </form>
         </div>
     </div>

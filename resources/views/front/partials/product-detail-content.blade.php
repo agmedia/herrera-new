@@ -8,15 +8,26 @@
         && $product->attributes->contains(
             fn ($attribute): bool => ! $attribute->isMsanManaged(),
         );
-    $hasImportedSpecifications = $product->relationLoaded('technicalSpecificationRows')
-        && $product->technicalSpecificationRows->isNotEmpty();
+    $technicalSpecificationRows = app(\App\Support\ProductSpecificationPresenter::class)
+        ->remainingRows($product, $locale, $fallbackLocale);
+    $hasImportedSpecifications = $technicalSpecificationRows->isNotEmpty();
     $hasSpecificationAttributes = $hasAttributeSpecifications || $hasImportedSpecifications;
     $firstDetailSectionId = $hasProductStory
         ? 'product-description'
         : ($hasSpecificationAttributes ? 'product-specifications' : 'product-comments');
+    $isHerreraProductContent = str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera');
 @endphp
 
+@if ($isHerreraProductContent)
+    @once
+        @push('styles')
+            <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-product-tabs.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-product-tabs.css')) }}">
+        @endpush
+    @endonce
+@endif
+
 <section class="product-detail-lower" data-product-detail-lower>
+    @unless ($isHerreraProductContent)
     <nav class="product-detail-tabs" aria-label="{{ __('ui.product.detail_navigation') }}" data-product-detail-tabs>
         @if ($hasProductStory)
             <a
@@ -48,6 +59,7 @@
             {{ __('ui.product.comments_title') }}
         </a>
     </nav>
+    @endunless
 
     @if ($hasProductStory)
         <section id="product-description" class="product-detail-content-section" data-product-detail-section>
@@ -82,7 +94,7 @@
                 @endif
                 @if ($hasImportedSpecifications)
                     @include('front.partials.product-technical-specifications', [
-                        'rows' => $product->technicalSpecificationRows,
+                        'rows' => $technicalSpecificationRows,
                     ])
                 @endif
             </div>

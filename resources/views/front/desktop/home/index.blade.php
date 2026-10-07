@@ -1,7 +1,7 @@
 @extends('front.desktop.layouts.store')
 
-@section('title', config('app.name', 'AG Shop').' Store')
-@section('main_class', 'mx-auto w-full max-w-7xl px-6 pt-0 pb-0')
+@section('title', str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera') ? __('herrera.page_title') : config('app.name', 'AG Shop').' Store')
+@section('main_class', 'mx-auto w-full max-w-7xl px-6 pt-0 pb-0'.(str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera') ? ' herrera-home-main' : ''))
 
 @section('content')
     @php
@@ -16,6 +16,14 @@
         $homeBottomBlocks = $resolver->forPlacement('home.bottom', $locale, null, null, 'desktop');
         $homeBottomIsInstagramOnly = $homeBottomBlocks->isNotEmpty()
             && $homeBottomBlocks->every(fn ($item) => (string) data_get($item, 'block.type') === 'instagram_curated_grid');
+        $isHerreraHome = str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera');
+        $hasManagedHerreraHomeCategories = $isHerreraHome
+            && \Illuminate\Support\Facades\Schema::hasTable('content_block_slots')
+            && \Illuminate\Support\Facades\Schema::hasTable('content_blocks')
+            && \App\Models\Content\ContentBlockSlot::query()
+                ->where('placement', 'home.categories')
+                ->whereHas('block', fn ($query) => $query->where('type', 'featured_categories'))
+                ->exists();
 
         $viewer = auth()->user();
         $canPreviewBlock = $viewer && ($viewer->isA('superadmin') || $viewer->can('content.blocks'));
@@ -63,12 +71,19 @@
                 }
             }
         }
+
+        $useHerreraHomeFallback = $isHerreraHome && $homeHeroBlocks->isEmpty();
+        $hasHomeBrandsBlock = collect([$homeHeroBlocks, $homeHeroBenefitsBlocks, $homeCategoriesBlocks, $homeBeforeProductsBlocks, $homeAfterProductsBlocks, $homeBottomBlocks])
+            ->flatten(1)
+            ->contains(fn ($item) => (string) data_get($item, 'block.type') === 'popular_brands');
     @endphp
 
     @if ($homeHeroBlocks->isNotEmpty())
-        <section class="-mt-px">
+        <section class="-mt-px" data-herrera-home-hero-placement>
             @include('components.content-placement', ['items' => $homeHeroBlocks])
         </section>
+    @elseif ($useHerreraHomeFallback)
+        @include('front.partials.herrera-home', ['herreraHomeSection' => 'hero'])
     @endif
 
     @if ($homeHeroBenefitsBlocks->isNotEmpty())
@@ -77,10 +92,14 @@
         </section>
     @endif
 
-    @if ($homeCategoriesBlocks->isNotEmpty())
+    @if ($isHerreraHome && $homeCategoriesBlocks->isNotEmpty() && $homeCategoriesBlocks->every(fn ($item) => (string) data_get($item, 'block.type') === 'featured_categories'))
+        @include('components.content-placement', ['items' => $homeCategoriesBlocks])
+    @elseif ($homeCategoriesBlocks->isNotEmpty())
         <section class="mt-8">
             @include('components.content-placement', ['items' => $homeCategoriesBlocks])
         </section>
+    @elseif ($useHerreraHomeFallback && ! $hasManagedHerreraHomeCategories)
+        @include('front.partials.herrera-home', ['herreraHomeSection' => 'categories'])
     @endif
 
     @if ($homeBeforeProductsBlocks->isNotEmpty())
@@ -89,10 +108,18 @@
         </section>
     @endif
 
+    @if ($useHerreraHomeFallback)
+        @include('front.partials.herrera-home', ['herreraHomeSection' => 'products'])
+    @endif
+
     @if ($homeAfterProductsBlocks->isNotEmpty())
         <section class="mt-8">
             @include('components.content-placement', ['items' => $homeAfterProductsBlocks])
         </section>
+    @endif
+
+    @if ($useHerreraHomeFallback && ! $hasHomeBrandsBlock)
+        @include('front.partials.herrera-home', ['herreraHomeSection' => 'brands'])
     @endif
 
     @if ($homeBottomBlocks->isNotEmpty())
@@ -108,6 +135,7 @@
         && $homeCategoriesBlocks->isEmpty()
         && $homeAfterProductsBlocks->isEmpty()
         && $homeBottomBlocks->isEmpty()
+        && ! str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera')
     )
         <section class="border border-slate-200 bg-white p-10">
             <h1 class="text-3xl font-extrabold tracking-tight text-slate-900">Home</h1>

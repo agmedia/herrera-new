@@ -23,6 +23,53 @@
 }
 
 @layer components {
+    .b2b-price-manager .admin-btn-primary,
+    .b2b-price-manager .admin-btn-secondary {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        gap: .5rem;
+        border: 1px solid transparent;
+        border-radius: .5rem;
+        padding: .5rem 1rem;
+        font-size: .875rem;
+        font-weight: 600;
+        line-height: 1.4;
+        transition: background-color .15s, border-color .15s;
+    }
+
+    .b2b-price-manager .admin-btn-primary {
+        background: #0e7490;
+        color: #fff;
+    }
+
+    .b2b-price-manager .admin-btn-primary:hover {
+        background: #155e75;
+    }
+
+    .b2b-price-manager .admin-btn-secondary {
+        border-color: #d7e0eb;
+        background: #fff;
+        color: #334155;
+    }
+
+    .b2b-price-manager .admin-btn-secondary:hover {
+        border-color: #94a3b8;
+        background: #f8fafc;
+    }
+
+    .b2b-price-manager .admin-btn-primary:focus-visible,
+    .b2b-price-manager .admin-btn-secondary:focus-visible {
+        outline: 2px solid #0e7490;
+        outline-offset: 3px;
+    }
+
+    .b2b-price-manager button:disabled {
+        cursor: wait;
+        opacity: .6;
+    }
+
     .content-richtext {
         color: var(--reading-slate-700);
         line-height: 1.7;

@@ -1,0 +1,65 @@
+.legal-warranty-notice {
+    margin: 20px 0;
+    padding: 14px 18px;
+    border: 1px solid #00b5cc;
+    background: #f0fbfc;
+    color: #32373b;
+}
+.legal-warranty-notice > a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: inherit;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.legal-warranty-icon { width: 16px; height: 16px; }
+.legal-warranty-notice--footer {
+    width: 100vw;
+    margin: 24px 0 32px calc(50% - 50vw);
+    border: 0;
+    background: #00b5cc;
+    color: #fff;
+    text-align: center;
+}
+.legal-warranty-notice > a:focus-visible,
+.legal-warranty-modal a:focus-visible,
+.legal-warranty-modal button:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 4px;
+}
+.legal-warranty-modal {
+    width: min(980px, calc(100vw - 32px));
+    max-width: none;
+    max-height: calc(100dvh - 32px);
+    padding: 0;
+    margin: auto;
+    border: 1px solid #dce6eb;
+    background: #fff;
+    color: #32373b;
+}
+.legal-warranty-modal::backdrop { background: rgb(20 30 35 / 65%); }
+.legal-warranty-modal-header,
+.legal-warranty-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 20px;
+}
+.legal-warranty-modal-header h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.legal-warranty-modal-header button { padding: 8px; }
+.legal-warranty-modal-header button svg { width: 18px; height: 18px; }
+.legal-warranty-modal-body { max-height: 70dvh; overflow: auto; padding: 16px; background: #f7f7f7; }
+.legal-warranty-modal-body img { display: block; width: 100%; height: auto; background: #fff; }
+.legal-warranty-modal-footer a { color: #00869b; text-decoration: underline; }
+.legal-warranty-modal-footer button { padding: 8px 16px; border: 1px solid #32373b; }
+.site-footer-contact-address { white-space: pre-line; }
+@media (max-width: 600px) {
+    .legal-warranty-modal-header,
+    .legal-warranty-modal-footer { padding: 12px; }
+    .legal-warranty-modal-footer { flex-wrap: wrap; }
+    .legal-warranty-modal-body { padding: 6px; }
+}

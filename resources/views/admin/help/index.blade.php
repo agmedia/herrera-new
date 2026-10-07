@@ -251,7 +251,7 @@
         <section id="uvod" class="admin-manual-hero relative scroll-mt-24 overflow-hidden rounded-3xl px-5 py-7 sm:px-8 sm:py-9">
             <div class="admin-manual-hero-grid relative">
                 <div class="max-w-3xl">
-                    <p class="text-xs font-bold uppercase tracking-[0.2em] text-cyan-700">Termol administracija</p>
+                    <p class="text-xs font-bold uppercase tracking-[0.2em] text-cyan-700">Herrera administracija</p>
                     <h1 class="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">{{ $manual['title'] ?? 'Upute za administraciju' }}</h1>
                     <p class="mt-4 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">{{ $manual['intro'] ?? '' }}</p>
 
@@ -264,7 +264,7 @@
 
                 <div class="admin-manual-search-panel rounded-2xl p-4 sm:p-5">
                     <label for="admin-manual-search" class="text-sm font-bold text-slate-900">Što želite napraviti?</label>
-                    <p class="mt-1 text-xs leading-5 text-slate-500">Pretražite naziv, polje ili postupak, primjerice „zaliha”, „M SAN” ili „dostava”.</p>
+                    <p class="mt-1 text-xs leading-5 text-slate-500">Pretražite naziv, polje ili postupak, primjerice „zaliha”, „EPREL” ili „dostava”.</p>
                     <div class="relative mt-3">
                         <svg class="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 20 20" fill="none" aria-hidden="true">
                             <circle cx="8.75" cy="8.75" r="5.25" stroke="currentColor" stroke-width="1.6" />

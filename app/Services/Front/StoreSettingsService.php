@@ -24,9 +24,11 @@ class StoreSettingsService
             'images' => $this->images(),
             'product' => $this->product(),
             'cookies' => $this->cookies(),
+            'legal' => $this->legalPages(),
             'branding' => $this->branding(),
             'footer' => $this->footer(),
             'newsletter' => $this->newsletter(),
+            'legal_warranty' => $this->legalWarranty(),
             'captcha' => $this->captcha(),
             'analytics' => $this->analytics(),
             'email' => $this->email(),
@@ -135,13 +137,24 @@ class StoreSettingsService
      */
     public function cookies(): array
     {
+        $policyUrl = trim((string) $this->localizedSetting('store_cookie_consent_policy_url', ''));
+        if (in_array($policyUrl, ['/page/pravila-zastite-podataka-i-privatnosti', '/page/privatnost-podataka', '/page/pravila-privatnosti'], true)) {
+            $configuredSlug = basename($policyUrl);
+            $configuredPageExists = InfoPage::query()->where('is_active', true)
+                ->where(fn ($query) => $query->whereNull('published_at')->orWhere('published_at', '<=', now()))
+                ->whereHas('translations', fn ($query) => $query->where('slug', $configuredSlug))->exists();
+            if (! $configuredPageExists) {
+                $policyUrl = $this->legalPages()['privacy']['url'] ?? '';
+            }
+        }
+
         return [
             'enabled' => (bool) $this->settings->get('store_cookie_consent_enabled', true),
             'title' => trim((string) $this->localizedSetting('store_cookie_consent_title', 'Koristimo kolačiće')),
             'message' => trim((string) $this->localizedSetting('store_cookie_consent_message', 'Koristimo kolačiće za ispravan rad sajta i bolje korisničko iskustvo.')),
             'accept_label' => trim((string) $this->localizedSetting('store_cookie_consent_accept_label', 'U redu')),
             'policy_label' => trim((string) $this->localizedSetting('store_cookie_consent_policy_label', 'Politika kolačića')),
-            'policy_url' => trim((string) $this->localizedSetting('store_cookie_consent_policy_url', '')),
+            'policy_url' => $policyUrl,
             'preferences_title' => trim((string) $this->localizedSetting('store_cookie_preferences_title', 'Postavke kolačića')),
             'preferences_accept_all_label' => trim((string) $this->localizedSetting('store_cookie_preferences_accept_all_label', 'Prihvati sve')),
             'preferences_accept_necessary_label' => trim((string) $this->localizedSetting('store_cookie_preferences_accept_necessary_label', 'Samo nužni')),
@@ -153,6 +166,42 @@ class StoreSettingsService
             'marketing_title' => trim((string) $this->localizedSetting('store_cookie_marketing_title', 'Marketinški kolačići')),
             'marketing_description' => trim((string) $this->localizedSetting('store_cookie_marketing_description', 'Marketinški kolačići služe za praćenje posjetitelja u korištenju internet stranice u svrhu omogućavanja prikazivanja relevantnih oglasa oglašivača trećih strana.')),
         ];
+    }
+
+    /** @return array<string, array{title:string,url:string}|null> */
+    public function legalPages(): array
+    {
+        $definitions = [
+            'terms' => ['codes' => ['herrera-oc-page-5', 'terms-of-use'], 'slugs' => ['opci-uvjeti-koristenja', 'uvjeti-koristenja', 'terms-of-use']],
+            'privacy' => ['codes' => ['herrera-oc-page-3', 'privacy-policy'], 'slugs' => ['pravila-privatnosti', 'pravila-zastite-podataka-i-privatnosti', 'privatnost-podataka', 'privacy-policy']],
+            'shipping_payment' => ['codes' => ['herrera-oc-page-7'], 'slugs' => ['nacin-placanja-i-dostava', 'nacini-placanja-i-dostave']],
+        ];
+        $codes = array_merge(...array_column($definitions, 'codes'));
+        $slugs = array_merge(...array_column($definitions, 'slugs'));
+        $locale = (string) app()->getLocale();
+        $fallbackLocale = (string) config('app.locale');
+        $pages = InfoPage::query()->where('is_active', true)
+            ->where(fn ($query) => $query->whereNull('published_at')->orWhere('published_at', '<=', now()))
+            ->where(fn ($query) => $query->whereIn('code', $codes)
+                ->orWhereHas('translations', fn ($translation) => $translation->whereIn('slug', $slugs)))
+            ->with('translations')->get();
+
+        $links = [];
+        foreach ($definitions as $type => $definition) {
+            $page = $pages->filter(fn (InfoPage $page) => in_array($page->code, $definition['codes'], true)
+                || $page->translations->contains(fn ($translation) => in_array($translation->slug, $definition['slugs'], true)))
+                ->sortBy(fn (InfoPage $page) => array_search($page->code, $definition['codes'], true) === false
+                    ? count($definition['codes']) : array_search($page->code, $definition['codes'], true))->first();
+            $translation = $page?->translations->firstWhere('locale', $locale)
+                ?? $page?->translations->firstWhere('locale', $fallbackLocale)
+                ?? $page?->translations->first();
+            $links[$type] = $translation && trim((string) $translation->slug) !== ''
+                ? ['title' => (string) $translation->title, 'url' => route('pages.show', ['slug' => $translation->slug])]
+                : null;
+        }
+        $links['withdrawal'] = ['title' => __('return_request.page_title'), 'url' => route('returns.create', ['returnRequestSlug' => __('return_request.slug')])];
+
+        return $links;
     }
 
     /**
@@ -229,7 +278,7 @@ class StoreSettingsService
                 $locale,
                 $fallbackLocale
             )),
-            'address' => implode(', ', array_filter([
+            'address' => trim((string) $this->settings->get('store_footer_address', '')) ?: implode(', ', array_filter([
                 trim((string) $this->settings->get('store_schema_address_street', '')),
                 trim(implode(' ', array_filter([
                     trim((string) $this->settings->get('store_schema_address_postal_code', '')),
@@ -248,6 +297,7 @@ class StoreSettingsService
     public function newsletter(): array
     {
         return [
+            'enabled' => (bool) $this->settings->get('store_newsletter_enabled', true),
             'provider' => (string) $this->settings->get('store_newsletter_provider', 'none'),
             'mailchimp_api_key' => (string) $this->settings->get('store_newsletter_mailchimp_api_key', ''),
             'mailchimp_list_id' => (string) $this->settings->get('store_newsletter_mailchimp_list_id', ''),
@@ -258,6 +308,26 @@ class StoreSettingsService
             'subtitle' => trim((string) $this->settings->get('store_newsletter_subtitle', '')),
             'button_label' => trim((string) $this->settings->get('store_newsletter_button_label', '')),
             'consent_label' => trim((string) $this->settings->get('store_newsletter_consent_label', '')),
+            'coupon_enabled' => (bool) $this->settings->get('store_newsletter_coupon_enabled', true),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function legalWarranty(): array
+    {
+        $euUrl = trim((string) $this->settings->get('store_legal_warranty_eu_url', ''));
+        if (! filter_var($euUrl, FILTER_VALIDATE_URL) || parse_url($euUrl, PHP_URL_SCHEME) !== 'https') {
+            $euUrl = 'https://europa.eu/youreurope/citizens/consumers/shopping/guarantees/index_hr.htm';
+        }
+
+        return [
+            'enabled' => (bool) $this->settings->get('store_legal_warranty_enabled', false),
+            'footer_enabled' => (bool) $this->settings->get('store_legal_warranty_footer_enabled', true),
+            'product_enabled' => (bool) $this->settings->get('store_legal_warranty_product_enabled', true),
+            'checkout_enabled' => (bool) $this->settings->get('store_legal_warranty_checkout_enabled', true),
+            'email_enabled' => (bool) $this->settings->get('store_legal_warranty_email_enabled', true),
+            'asset_url' => asset('assets/legal/legal-guarantee-notice-hr-color.svg'),
+            'eu_url' => $euUrl,
         ];
     }
 
@@ -408,6 +478,10 @@ class StoreSettingsService
         $path = trim($path);
         if ($path === '') {
             return null;
+        }
+
+        if (str_starts_with($path, 'assets/brand/') && ! str_contains($path, '..') && is_file(public_path($path))) {
+            return asset($path);
         }
 
         return Storage::disk('public')->url($path);

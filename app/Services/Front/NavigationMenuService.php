@@ -5,6 +5,7 @@ namespace App\Services\Front;
 use App\Models\Catalog\Category\Category;
 use App\Models\Content\Page\InfoPage;
 use App\Services\Settings\SystemSettingsService;
+use App\Support\Media\HerreraCategoryImage;
 use App\Support\Media\MediaUrl;
 use Illuminate\Support\Facades\Storage;
 
@@ -70,7 +71,7 @@ class NavigationMenuService
                 'translations' => fn ($q) => $q
                     ->where('scope', Category::SCOPE_CATALOG)
                     ->whereIn('locale', [$locale, $fallbackLocale]),
-                'media' => fn ($q) => $q->where('collection_name', 'category_icon'),
+                'media' => fn ($q) => $q->whereIn('collection_name', ['category_icon', 'category_banner']),
             ])
             ->orderBy('_lft')
             ->get();
@@ -338,7 +339,7 @@ class NavigationMenuService
             ->values()
             ->all();
 
-        $allowedSocialNetworks = ['facebook', 'youtube', 'instagram'];
+        $allowedSocialNetworks = ['facebook', 'youtube', 'instagram', 'linkedin', 'twitter'];
         $socials = collect(is_array($raw['socials'] ?? null) ? $raw['socials'] : [])
             ->filter(fn ($item): bool => is_array($item))
             ->map(function (array $item, int $index) use ($allowedSocialNetworks): array {
@@ -492,16 +493,25 @@ class NavigationMenuService
      */
     private function categoryImageData(Category $category, string $locale, string $fallbackLocale): array
     {
-        $media = $category->getFirstMedia('category_icon');
+        $media = collect([
+            $category->getFirstMedia('category_icon'),
+            $category->getFirstMedia('category_banner'),
+        ])->first(fn ($candidate): bool => MediaUrl::hasUsableSource($candidate,
+            $candidate?->collection_name === 'category_banner' ? ['card_360x240'] : ['icon_96x96']));
         if (! $media) {
             return [
-                'image_url' => '',
-                'image_alt' => '',
+                'image_url' => HerreraCategoryImage::url($category, $locale, $fallbackLocale,
+                    (string) $this->settings->get('store_brand_name', config('app.name', 'AG Shop')))
+                    ?? \App\Support\Media\LegacyCatalogImage::first($category, ['icon_96x96']) ?? '',
+                'image_alt' => (string) ($category->translations->firstWhere('locale', $locale)?->name
+                    ?? $category->translations->firstWhere('locale', $fallbackLocale)?->name
+                    ?? $category->code),
             ];
         }
 
         $preferWebp = (bool) $this->settings->get('store_images_use_webp', true);
-        $imageUrl = MediaUrl::conversion($media, 'icon_96x96', $preferWebp);
+        $imageUrl = MediaUrl::conversion($media,
+            $media->collection_name === 'category_banner' ? 'card_360x240' : 'icon_96x96', $preferWebp);
 
         $imageAlt = trim((string) $media->getCustomProperty('alt.'.$locale));
         if ($imageAlt === '') {

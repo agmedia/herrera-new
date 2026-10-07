@@ -10,9 +10,13 @@ new class extends Component
      */
     public function logout(Logout $logout): void
     {
+        $customerId = (int) session()->get(\App\Services\User\CustomerImpersonationService::SESSION_KEY.'.customer_id', 0);
         $logout();
 
-        $this->redirect('/', navigate: true);
+        $destination = $customerId > 0 && auth()->check()
+            ? route('admin.users.show', ['user' => $customerId])
+            : '/';
+        $this->redirect($destination, navigate: true);
     }
 }; ?>
 

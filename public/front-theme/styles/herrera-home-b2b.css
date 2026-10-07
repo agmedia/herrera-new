@@ -1,0 +1,374 @@
+/* Keep catalog discovery and repeat B2B ordering close together. */
+.herrera-storefront .herrera-home-main {
+    padding-top: 28px;
+    padding-bottom: 56px;
+}
+
+.herrera-storefront .herrera-b2b-hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(300px, .75fr);
+    align-items: center;
+    gap: clamp(28px, 5vw, 92px);
+    margin: 0;
+    padding: clamp(28px, 3.7vw, 60px);
+    border: 1px solid #e1ecee;
+    border-radius: 16px;
+    background: #edf7f9;
+    box-shadow: none;
+}
+
+.herrera-storefront .herrera-b2b-hero .herrera-hero-copy {
+    max-width: 800px;
+}
+
+.herrera-storefront .herrera-b2b-hero::before {
+    display: block;
+}
+
+.herrera-storefront .herrera-b2b-hero .herrera-eyebrow::before {
+    display: none;
+}
+
+.herrera-storefront .herrera-b2b-hero .herrera-eyebrow,
+.herrera-storefront .herrera-home-section-eyebrow {
+    margin: 0 0 13px;
+    color: #007c8d;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.5;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+}
+
+.herrera-storefront .herrera-b2b-hero h1 {
+    max-width: 680px;
+    margin: 0;
+    color: #2e3539;
+    font-size: clamp(32px, 3.5vw, 56px);
+    font-weight: 750;
+    line-height: 1.08;
+    letter-spacing: -.045em;
+}
+
+@media (min-width: 1024px) {
+    .herrera-storefront .herrera-hero-headline-line {
+        display: block;
+    }
+}
+
+.herrera-storefront .herrera-b2b-hero .herrera-hero-description {
+    max-width: 570px;
+    margin: 20px 0 0;
+    color: #637179;
+    font-size: clamp(14px, 1.1vw, 16px);
+    line-height: 1.75;
+}
+
+.herrera-storefront .herrera-b2b-hero .herrera-hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px 24px;
+    margin-top: 26px;
+}
+
+.herrera-storefront .herrera-b2b-hero .herrera-hero-actions a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    min-height: 46px;
+    padding: 12px 20px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.4;
+    text-decoration: none;
+}
+
+.herrera-storefront .herrera-b2b-hero .herrera-hero-primary-action {
+    background: #007f91;
+    color: #fff;
+}
+
+.herrera-storefront .herrera-b2b-hero .herrera-hero-primary-action:hover {
+    background: #006879;
+}
+
+.herrera-storefront .herrera-b2b-hero .herrera-hero-secondary-action {
+    padding-right: 0;
+    padding-left: 0;
+    background: transparent;
+    color: #3f4c53;
+}
+
+.herrera-storefront .herrera-b2b-hero .herrera-hero-secondary-action:hover {
+    color: #007c8d;
+    text-decoration: underline;
+    text-underline-offset: 4px;
+}
+
+.herrera-storefront .herrera-b2b-hero .herrera-hero-panel {
+    min-width: 0;
+    margin: 0;
+    padding: 26px;
+    border: 1px solid #e0e9ec;
+    border-radius: 10px;
+    background: #fff;
+    color: #32373b;
+    box-shadow: none;
+}
+
+.herrera-storefront .herrera-b2b-hero .herrera-hero-panel h2 {
+    max-width: 310px;
+    margin: 0 0 19px;
+    color: #32373b;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.4;
+    letter-spacing: -.025em;
+}
+
+.herrera-storefront .herrera-b2b-tools a {
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr) 12px;
+    align-items: center;
+    gap: 14px;
+    min-height: 50px;
+    padding: 11px 0;
+    border-top: 1px solid #edf1f2;
+    color: #45525a;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.herrera-storefront .herrera-b2b-tools a > svg:first-child {
+    width: 18px;
+    height: 18px;
+    color: #007c8d;
+}
+
+.herrera-storefront .herrera-b2b-tools a > svg:last-child {
+    width: 12px;
+    height: 12px;
+    color: #7f9098;
+}
+
+.herrera-storefront .herrera-b2b-tools a:hover {
+    color: #007c8d;
+}
+
+.herrera-storefront .herrera-b2b-hero .herrera-b2b-tools-note {
+    margin: 15px 0 0;
+    color: #73828a;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.herrera-storefront .herrera-b2b-products {
+    margin: 44px 0 0;
+}
+
+.herrera-storefront .herrera-b2b-products .herrera-home-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.herrera-storefront .herrera-b2b-products .herrera-home-section-eyebrow {
+    margin-bottom: 6px;
+}
+
+.herrera-storefront .herrera-b2b-products .herrera-home-heading h2 {
+    margin: 0;
+    font-size: clamp(23px, 2vw, 30px);
+    font-weight: 700;
+    letter-spacing: -.035em;
+    line-height: 1.25;
+}
+
+.herrera-storefront .herrera-b2b-products .herrera-home-products-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    color: #007c8d;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.5;
+}
+
+.herrera-storefront .herrera-b2b-products .herrera-home-products-link svg {
+    width: 12px;
+    height: 12px;
+}
+
+.herrera-storefront .herrera-home-product-actions,
+.herrera-storefront .herrera-home-product-carousel .splide__arrows {
+    display: flex;
+    align-items: center;
+}
+
+.herrera-storefront .herrera-home-product-actions {
+    flex-shrink: 0;
+    gap: 24px;
+}
+
+.herrera-storefront .herrera-home-product-carousel {
+    position: relative;
+    visibility: visible;
+}
+
+.herrera-storefront .herrera-home-product-carousel .splide__arrows {
+    gap: 8px;
+}
+
+.herrera-storefront .herrera-home-product-carousel .splide__arrow {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid #dce6e9;
+    border-radius: 6px;
+    background: #fff;
+    color: #34474f;
+    opacity: 1;
+    transform: none;
+    cursor: pointer;
+}
+
+.herrera-storefront .herrera-home-product-carousel .splide__arrow:hover:not(:disabled) {
+    border-color: #007c8d;
+    color: #007c8d;
+}
+
+.herrera-storefront .herrera-home-product-carousel .splide__arrow:disabled {
+    opacity: .35;
+    cursor: default;
+}
+
+.herrera-storefront .herrera-home-product-carousel .splide__arrow svg {
+    width: 12px;
+    height: 12px;
+    fill: currentColor;
+}
+
+.herrera-storefront .herrera-home-product-carousel .splide__arrow--prev svg {
+    transform: rotate(180deg);
+}
+
+.herrera-storefront .herrera-home-product-carousel .splide__track {
+    overflow: hidden;
+}
+
+.herrera-storefront .herrera-home-product-carousel:not(.is-initialized) .splide__track {
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+}
+
+.herrera-storefront .herrera-home-product-carousel .splide__list {
+    display: flex;
+    margin: 0 !important;
+    padding: 0 !important;
+    list-style: none;
+}
+
+.herrera-storefront .herrera-home-product-carousel .splide__slide {
+    flex: 0 0 auto;
+    width: calc(100% / var(--herrera-product-columns, 6));
+    min-width: 0;
+    height: auto;
+    scroll-snap-align: start;
+}
+
+.herrera-storefront .herrera-b2b-hero a:focus-visible,
+.herrera-storefront .herrera-b2b-products .herrera-home-products-link:focus-visible,
+.herrera-storefront .herrera-home-product-carousel .splide__arrow:focus-visible {
+    outline: 2px solid #007c8d;
+    outline-offset: 4px;
+}
+
+@media (max-width: 1279px) {
+    .herrera-storefront .herrera-home-product-carousel .splide__slide {
+        width: calc(100% / var(--herrera-product-tablet-columns, 4));
+    }
+}
+
+@media (max-width: 1023px) {
+    .herrera-storefront .herrera-b2b-hero {
+        grid-template-columns: minmax(0, 1fr) minmax(270px, .8fr);
+        gap: 24px;
+        padding: 30px;
+    }
+
+    .herrera-storefront .herrera-b2b-hero .herrera-hero-panel {
+        padding: 22px;
+    }
+}
+
+@media (max-width: 767px) {
+    .herrera-storefront .herrera-home-main {
+        padding-top: 16px;
+        padding-bottom: 36px;
+    }
+
+    .herrera-storefront .herrera-b2b-hero {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 26px;
+        padding: 26px 22px;
+        border-radius: 10px;
+    }
+
+    .herrera-storefront .herrera-b2b-hero h1 {
+        max-width: 420px;
+        font-size: clamp(32px, 8vw, 44px);
+    }
+
+    .herrera-storefront .herrera-b2b-hero .herrera-hero-description {
+        margin-top: 16px;
+    }
+
+    .herrera-storefront .herrera-b2b-hero .herrera-hero-actions {
+        gap: 8px 20px;
+        margin-top: 20px;
+    }
+
+    .herrera-storefront .herrera-b2b-hero .herrera-hero-panel h2 {
+        max-width: none;
+        margin-bottom: 14px;
+        font-size: 18px;
+    }
+
+    .herrera-storefront .herrera-b2b-products {
+        margin-top: 34px;
+    }
+
+    .herrera-storefront .herrera-b2b-products .herrera-home-heading {
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 14px;
+    }
+
+    .herrera-storefront .herrera-home-product-actions {
+        width: 100%;
+        justify-content: space-between;
+        gap: 16px;
+    }
+
+    .herrera-storefront .herrera-b2b-products .herrera-home-products-link {
+        font-size: 11px;
+    }
+
+    .herrera-storefront .herrera-home-product-carousel .splide__slide {
+        width: calc(100% / var(--herrera-product-mobile-columns, 2));
+    }
+}
+
+.herrera-storefront .herrera-b2b-products,
+.herrera-storefront .herrera-brand-strip { background: #fff; color: #283236; }

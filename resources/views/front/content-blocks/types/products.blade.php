@@ -21,7 +21,7 @@
     $gridClass = (string) ($payload['grid_class'] ?? $defaultGridClass);
     $cardClass = (string) ($payload['card_class'] ?? 'rounded-2xl border border-slate-200 bg-slate-50 p-4');
     $titleClass = (string) ($payload['title_class'] ?? 'text-[1.35rem] leading-[1.95rem] sm:text-[1.7rem] sm:leading-[2.5rem] uppercase font-semibold text-slate-900');
-    $taxPricing = app(\App\Services\Pricing\TaxPricingService::class);
+    $blockPricing = app(\App\Services\Pricing\ProductPricePresentationService::class);
 @endphp
 
 <section class="{{ $sectionClass }}">
@@ -34,17 +34,23 @@
         </div>
     </div>
 
-    <div class="{{ $gridClass }}">
+    <div class="{{ $gridClass }}" data-continuous-card-grid>
         @forelse ($products as $product)
             @php
                 $pt = $product->translations->firstWhere('locale', app()->getLocale())
                     ?? $product->translations->firstWhere('locale', config('app.locale'));
-                $displayPrice = $taxPricing->grossFromStored((float) $product->base_price, $product);
+                $displayPriceData = $canViewPrices ? $blockPricing->forProduct($product, auth()->user()) : null;
+                $displayPrice = $displayPriceData['display_current'] ?? $displayPriceData['current_gross'] ?? null;
             @endphp
             <article class="{{ $cardClass }}">
                 <div class="h-36 rounded-xl bg-gradient-to-br from-slate-200 to-slate-100"></div>
                 <h3 class="mt-3 text-sm font-semibold text-slate-900">{{ $pt?->name ?? $product->code }}</h3>
-                <p class="mt-2 text-sm font-semibold text-slate-800">{{ number_format($displayPrice, 2) }} €</p>
+                @if ($canViewPrices)
+                    <p class="mt-2 text-sm font-semibold text-slate-800">{{ number_format($displayPrice, 2) }} €</p>
+                    @include('front.partials.b2b-tax-note', ['includesTax' => $displayPriceData['display_includes_tax'] ?? true])
+                @else
+                    @include('front.partials.b2b-price-access', ['compact' => true])
+                @endif
             </article>
         @empty
             <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 sm:col-span-2 xl:col-span-4">

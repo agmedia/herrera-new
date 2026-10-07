@@ -34,7 +34,21 @@ class ProductGroupPriceResolver
             return null;
         }
 
-        $groupIds = $user->relationLoaded('customerGroups')
+        $access = app(B2BAccessService::class);
+        if ($access->requiresApprovedAccount() && ! $access->canViewPrices($user)) {
+            return null;
+        }
+
+        if ($access->requiresApprovedAccount()) {
+            $catalogPrice = app(PriceCatalogResolver::class)->resolve($product, $user, $quantity, $fallback);
+            if ($catalogPrice) {
+                return $catalogPrice;
+            }
+        }
+
+        $groupIds = $access->requiresApprovedAccount()
+            ? [(int) $b2bAccount->customer_group_id]
+            : ($user->relationLoaded('customerGroups')
             ? $user->customerGroups
                 ->where('is_active', true)
                 ->pluck('id')
@@ -44,7 +58,7 @@ class ProductGroupPriceResolver
                 ->where('customer_groups.is_active', true)
                 ->pluck('customer_groups.id')
                 ->map(static fn ($id): int => (int) $id)
-                ->all();
+                ->all());
 
         $categoryIds = $product->relationLoaded('categories')
             ? $product->categories->pluck('id')->map(static fn ($id): int => (int) $id)->all()

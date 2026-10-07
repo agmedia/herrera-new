@@ -1,6 +1,6 @@
 @extends('front.desktop.layouts.store')
 
-@section('title', __('ui.blog.page_title'))
+@section('title', ($blogCategoryTranslation?->meta_title ?? null) ?: ($blogCategoryTranslation?->name ?? null) ?: __('ui.blog.page_title'))
 @section('main_class', 'mx-auto w-full max-w-7xl px-6 pt-0 pb-0')
 
 @section('content')
@@ -13,7 +13,7 @@
                     <li class="text-slate-700">{{ __('ui.blog.title') }}</li>
                 </ol>
             </nav>
-            <h1 class="text-2xl font-extrabold uppercase tracking-tight text-slate-900">{{ __('ui.blog.title') }}</h1>
+            <h1 class="text-2xl font-extrabold uppercase tracking-tight text-slate-900">{{ ($blogCategoryTranslation?->name ?? null) ?: __('ui.blog.title') }}</h1>
             <p class="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">{{ __('ui.blog.subtitle') }}</p>
         </div>
     </section>
@@ -31,7 +31,7 @@
                     $translation = $post->translations->firstWhere('locale', $locale)
                         ?? $post->translations->firstWhere('locale', $fallbackLocale);
                     $postImage = $post->getFirstMedia('blog_cover');
-                    $postImageUrl = $postImage?->getUrl();
+                    $postImageUrl = $postImage?->getUrl() ?: \App\Support\Media\LegacyCatalogImage::first($post);
                 @endphp
 
                 <article>

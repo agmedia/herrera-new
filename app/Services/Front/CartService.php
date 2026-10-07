@@ -5,7 +5,9 @@ namespace App\Services\Front;
 use App\Models\Catalog\Action\CatalogAction;
 use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Product\ProductOptionValue;
+use App\Models\Settings\Local\TaxRate;
 use App\Services\Catalog\ActionResolverService;
+use App\Services\Pricing\B2BAccessService;
 use App\Services\Pricing\ProductGroupPriceResolver;
 use App\Services\Pricing\TaxPricingService;
 use App\Support\ProductEnergyLabelPresenter;
@@ -17,6 +19,8 @@ class CartService
     private const SESSION_KEY = 'front.cart.items';
 
     private const COUPON_SESSION_KEY = 'front.cart.coupon_code';
+
+    private const RESOLVED_LINES_ATTRIBUTE = 'front.cart.resolved_lines';
 
     public function __construct(
         private readonly ActionResolverService $actionResolver,
@@ -70,6 +74,10 @@ class CartService
      */
     public function lines(?string $locale = null, ?string $couponCode = null): Collection
     {
+        if (! app(B2BAccessService::class)->canViewPrices(auth()->user())) {
+            return collect();
+        }
+
         $items = $this->raw();
 
         if ($items === []) {
@@ -80,6 +88,22 @@ class CartService
         $fallbackLocale = (string) config('app.locale');
         $couponCode = $couponCode === null ? $this->couponCode() : strtoupper(trim($couponCode));
         $user = auth()->user();
+
+        $request = app('request');
+        $account = $user?->getRelations()['b2bAccount'] ?? null;
+        $group = $account?->getRelations()['customerGroup'] ?? null;
+        $snapshotKey = hash('sha256', serialize([
+            $items, $locale, $fallbackLocale, $couponCode,
+            $user?->getAttributes(),
+            $account?->getAttributes(), $group?->getAttributes(),
+            $user?->relationLoaded('customerGroups') ? $user->customerGroups->map->getAttributes()->all() : null,
+            config('commerce.b2b_only'), config('commerce.b2b_display_net'),
+            $this->taxPricing->pricesIncludeTax(),
+        ]));
+        $snapshots = $request->attributes->get(self::RESOLVED_LINES_ATTRIBUTE, []);
+        if (isset($snapshots[$snapshotKey])) {
+            return clone $snapshots[$snapshotKey];
+        }
 
         $productIds = array_values(array_unique(array_map(
             static fn (array $row): int => (int) $row['product_id'],
@@ -118,6 +142,24 @@ class CartService
 
         $lines = collect();
 
+        $pricingQuantities = [];
+        if (app(B2BAccessService::class)->requiresApprovedAccount()) {
+            foreach ($items as $item) {
+                $productId = (int) $item['product_id'];
+                $product = $products->get($productId);
+                if (! $product) {
+                    continue;
+                }
+                $option = $optionRows->get((int) ($item['product_option_value_id'] ?? 0));
+                if ($option && (int) $option->product_id !== $productId) {
+                    $option = null;
+                }
+                $stock = $option ? (int) $option->stock_qty : $product->availableStockQuantity();
+                $pricingQuantities[$productId] = ($pricingQuantities[$productId] ?? 0)
+                    + $this->normalizeOrderQuantity($product, (int) $item['quantity'], $stock);
+            }
+        }
+
         foreach ($items as $key => $item) {
             $productId = (int) $item['product_id'];
             $quantity = (int) $item['quantity'];
@@ -133,7 +175,7 @@ class CartService
                 $optionRow = null;
             }
 
-            $maxStock = $optionRow ? (int) $optionRow->stock_qty : (int) $product->stock_qty;
+            $maxStock = $optionRow ? (int) $optionRow->stock_qty : $product->availableStockQuantity();
             if ($maxStock <= 0) {
                 continue;
             }
@@ -149,28 +191,45 @@ class CartService
             $groupPrice = $this->groupPriceResolver->resolve(
                 $product,
                 $user,
-                $qty,
+                $pricingQuantities[$productId] ?? $qty,
                 fallback: $storedBaseUnitPrice,
             );
             $storedAudienceUnitPrice = (float) ($groupPrice?->price ?? $storedBaseUnitPrice);
-            $resolvedAction = $this->actionResolver->resolveProductAction($product, $user, $couponCode);
+            $preciseSnapshot = app(B2BAccessService::class)->requiresApprovedAccount() && (bool) $groupPrice?->is_final;
+            if ($preciseSnapshot && $optionRow && is_numeric(data_get($optionRow->payload, 'opencart.price'))) {
+                $delta = (float) data_get($optionRow->payload, 'opencart.price');
+                $prefix = (string) data_get($optionRow->payload, 'opencart.price_prefix', '+');
+                $storedAudienceUnitPrice = max(0.0, $storedAudienceUnitPrice + ($prefix === '-' ? -$delta : $delta));
+            }
+            $resolvedAction = $groupPrice?->is_final
+                ? null
+                : $this->actionResolver->resolveProductAction($product, $user, $couponCode);
             $storedDiscountedUnitPrice = $resolvedAction
                 ? $this->actionResolver->applyToPrice($storedAudienceUnitPrice, $resolvedAction)
                 : $storedAudienceUnitPrice;
-            $catalogUnitPrice = $this->taxPricing->normalizeNetPrice($storedBaseUnitPrice, $product);
-            $baseUnitPrice = $this->taxPricing->normalizeNetPrice($storedAudienceUnitPrice, $product);
-            $unitPrice = $this->taxPricing->normalizeNetPrice($storedDiscountedUnitPrice, $product);
-            $unitDiscount = round(max(0, $baseUnitPrice - $unitPrice), 2);
-            $lineDiscountTotal = round($unitDiscount * $qty, 2);
-            $lineTotal = round($unitPrice * $qty, 2);
-            $unitTaxAmount = $this->taxPricing->taxFromNet($unitPrice, $product);
-            $baseUnitTaxAmount = $this->taxPricing->taxFromNet($baseUnitPrice, $product);
-            $lineTaxTotal = round($unitTaxAmount * $qty, 2);
+            $resolvedTaxRate = $this->taxPricing->resolveRateForProduct($product, $user);
+            $catalogUnitPrice = $preciseSnapshot ? $this->preciseNetPrice($storedBaseUnitPrice, $resolvedTaxRate) : $this->taxPricing->normalizeNetPrice($storedBaseUnitPrice, $product);
+            $baseUnitPrice = $preciseSnapshot ? $this->preciseNetPrice($storedAudienceUnitPrice, $resolvedTaxRate) : $this->taxPricing->normalizeNetPrice($storedAudienceUnitPrice, $product);
+            $unitPrice = $preciseSnapshot ? $this->preciseNetPrice($storedDiscountedUnitPrice, $resolvedTaxRate) : $this->taxPricing->normalizeNetPrice($storedDiscountedUnitPrice, $product);
+            $precision = $preciseSnapshot ? 4 : 2;
+            $unitDiscount = round(max(0, $baseUnitPrice - $unitPrice), $precision);
+            $lineDiscountTotal = round($unitDiscount * $qty, $precision);
+            $lineTotal = round($unitPrice * $qty, $precision);
+            $unitTaxAmount = $preciseSnapshot ? $this->rawTaxAmount($unitPrice, $resolvedTaxRate) : $this->taxPricing->taxFromNet($unitPrice, $product);
+            $baseUnitTaxAmount = $preciseSnapshot ? $this->rawTaxAmount($baseUnitPrice, $resolvedTaxRate) : $this->taxPricing->taxFromNet($baseUnitPrice, $product);
+            $lineTaxTotal = round($unitTaxAmount * $qty, $precision);
             $displayUnitPrice = round($unitPrice + $unitTaxAmount, 2);
             $displayBaseUnitPrice = round($baseUnitPrice + $baseUnitTaxAmount, 2);
             $displayCatalogUnitPrice = (float) $this->taxPricing->grossFromStored($storedBaseUnitPrice, $product);
             $displayLineTotal = round($lineTotal + $lineTaxTotal, 2);
-            $taxRateValue = (float) ($this->taxPricing->resolveRateForProduct($product)?->rate ?? 0);
+            $taxRateValue = (float) ($resolvedTaxRate?->rate ?? 0);
+            $displayNet = app(B2BAccessService::class)->requiresApprovedAccount() && (bool) config('commerce.b2b_display_net', true);
+            if ($displayNet) {
+                $displayUnitPrice = $unitPrice;
+                $displayBaseUnitPrice = $baseUnitPrice;
+                $displayCatalogUnitPrice = $catalogUnitPrice;
+                $displayLineTotal = $lineTotal;
+            }
             $translation = $product->translations->firstWhere('locale', $locale)
                 ?? $product->translations->firstWhere('locale', $fallbackLocale);
             $optionMeta = $this->optionMeta($optionRow, $locale, $fallbackLocale);
@@ -196,6 +255,9 @@ class CartService
                 'line_total' => $lineTotal,
                 'display_line_total' => $displayLineTotal,
                 'line_tax_total' => $lineTaxTotal,
+                'unit_tax_amount' => round($unitTaxAmount, $precision),
+                'monetary_precision' => $precision,
+                'display_includes_tax' => ! $displayNet,
                 'tax_rate' => $taxRateValue,
                 'action_code' => $resolvedAction?->code,
                 'price_source' => match (true) {
@@ -210,10 +272,25 @@ class CartService
                 'group_price_id' => $groupPrice?->group_price_id,
                 'b2b_rule_id' => $groupPrice?->rule_id,
                 'b2b_source_type' => $groupPrice?->source_type,
+                'price_is_final' => (bool) $groupPrice?->is_final,
+                'price_catalog_id' => $groupPrice?->catalog_id,
+                'price_catalog_entry_id' => $groupPrice?->catalog_entry_id,
             ]);
         }
 
-        return $lines->values();
+        $lines = $lines->values();
+        $snapshots[$snapshotKey] = $lines;
+        $request->attributes->set(self::RESOLVED_LINES_ATTRIBUTE, $snapshots);
+
+        return clone $lines;
+    }
+
+    /** Clear only the current request's product/pricing snapshot after a write. */
+    public static function forgetRequestSnapshot(): void
+    {
+        if (app()->bound('request')) {
+            app('request')->attributes->remove(self::RESOLVED_LINES_ATTRIBUTE);
+        }
     }
 
     /**
@@ -234,6 +311,28 @@ class CartService
     {
         $couponCode = $couponCode === null ? $this->couponCode() : strtoupper(trim($couponCode));
         $lines = $this->lines($locale, $couponCode);
+        $preciseSnapshot = app(B2BAccessService::class)->requiresApprovedAccount()
+            && $lines->contains(fn (array $line): bool => (bool) ($line['price_is_final'] ?? false));
+        if ($preciseSnapshot) {
+            $rawSubtotal = round((float) $lines->sum(static fn (array $line): float => (float) ($line['base_unit_price'] ?? 0) * (int) ($line['quantity'] ?? 0)), 4);
+            $rawDiscount = round((float) $lines->sum('line_discount_total'), 4);
+            $rawAfterDiscount = round(max(0.0, $rawSubtotal - $rawDiscount), 4);
+            $rawTax = round(max(0.0, (float) $lines->sum('line_tax_total')), 4);
+            $taxRates = $lines->pluck('tax_rate')->map(static fn ($rate): float => round((float) $rate, 4))->unique()->values();
+
+            return [
+                'line_count' => $lines->count(), 'item_qty' => (int) $lines->sum('quantity'),
+                'subtotal' => round($rawSubtotal, 2), 'discount_total' => round($rawDiscount, 2),
+                'line_discount_total' => round($rawDiscount, 2), 'cart_discount_total' => 0.0,
+                'cart_discount_action_code' => null, 'subtotal_after_discount' => round($rawAfterDiscount, 2),
+                'tax_rate' => $taxRates->count() === 1 ? (float) $taxRates->first() : null,
+                'tax_rate_type' => 'percent', 'tax_total' => round($rawTax, 2),
+                'grand_total' => round($rawAfterDiscount + $rawTax, 2), 'coupon_code' => $couponCode,
+                'raw_subtotal' => $rawSubtotal, 'raw_discount_total' => $rawDiscount,
+                'raw_subtotal_after_discount' => $rawAfterDiscount, 'raw_tax_total' => $rawTax,
+                'monetary_precision' => 4,
+            ];
+        }
         $subtotal = round((float) $lines->sum(static fn (array $line): float => (float) ($line['base_unit_price'] ?? 0) * (int) ($line['quantity'] ?? 0)), 2);
         $lineDiscountTotal = round((float) $lines->sum('line_discount_total'), 2);
         $subtotalAfterLineDiscount = round(max(0.0, $subtotal - $lineDiscountTotal), 2);
@@ -271,8 +370,32 @@ class CartService
         return $this->summary()['line_count'] > 0;
     }
 
+    private function preciseNetPrice(float $storedAmount, ?TaxRate $rate): float
+    {
+        if (! $this->taxPricing->pricesIncludeTax() || ! $rate) {
+            return round(max(0.0, $storedAmount), 4);
+        }
+        $value = max(0.0, (float) $rate->rate);
+
+        return round(max(0.0, (string) $rate->rate_type === 'fixed'
+            ? $storedAmount - $value
+            : $storedAmount / (1 + $value / 100)), 4);
+    }
+
+    private function rawTaxAmount(float $netAmount, ?TaxRate $rate): float
+    {
+        if (! $rate) {
+            return 0.0;
+        }
+        $value = max(0.0, (float) $rate->rate);
+
+        return (string) $rate->rate_type === 'fixed' ? $value : max(0.0, $netAmount * $value / 100);
+    }
+
     public function add(Product $product, int $quantity = 1, ?int $productOptionValueId = null): bool
     {
+        app(B2BAccessService::class)->ensureCanPurchase(auth()->user());
+
         if (! $product->is_active) {
             return false;
         }
@@ -288,7 +411,7 @@ class CartService
         $requested = max(1, min($quantity, 999));
         $target = $existing + $requested;
 
-        $stock = $optionRow ? (int) $optionRow->stock_qty : (int) $product->stock_qty;
+        $stock = $optionRow ? (int) $optionRow->stock_qty : $product->availableStockQuantity();
         if ($stock <= 0) {
             return false;
         }
@@ -304,18 +427,22 @@ class CartService
             'quantity' => $normalizedQuantity,
         ];
         Session::put(self::SESSION_KEY, $items);
+        self::forgetRequestSnapshot();
 
         return true;
     }
 
     public function set(Product $product, int $quantity, ?int $productOptionValueId = null): bool
     {
+        app(B2BAccessService::class)->ensureCanPurchase(auth()->user());
+
         $items = $this->raw();
         $lineKey = $this->lineKey((int) $product->id, $productOptionValueId);
 
         if ($quantity <= 0) {
             unset($items[$lineKey]);
             Session::put(self::SESSION_KEY, $items);
+            self::forgetRequestSnapshot();
 
             return true;
         }
@@ -325,10 +452,11 @@ class CartService
         }
 
         $optionRow = $this->resolveProductOptionValue($product, $productOptionValueId);
-        $stock = $optionRow ? (int) $optionRow->stock_qty : (int) $product->stock_qty;
+        $stock = $optionRow ? (int) $optionRow->stock_qty : $product->availableStockQuantity();
         if ($stock <= 0) {
             unset($items[$lineKey]);
             Session::put(self::SESSION_KEY, $items);
+            self::forgetRequestSnapshot();
 
             return false;
         }
@@ -337,6 +465,7 @@ class CartService
         if ($normalizedQuantity <= 0) {
             unset($items[$lineKey]);
             Session::put(self::SESSION_KEY, $items);
+            self::forgetRequestSnapshot();
 
             return false;
         }
@@ -347,6 +476,7 @@ class CartService
             'quantity' => $normalizedQuantity,
         ];
         Session::put(self::SESSION_KEY, $items);
+        self::forgetRequestSnapshot();
 
         return $quantity <= $stock;
     }
@@ -366,11 +496,13 @@ class CartService
         }
 
         Session::put(self::SESSION_KEY, $items);
+        self::forgetRequestSnapshot();
     }
 
     public function clear(): void
     {
         Session::forget([self::SESSION_KEY, self::COUPON_SESSION_KEY]);
+        self::forgetRequestSnapshot();
     }
 
     public function couponCode(): string
@@ -380,6 +512,8 @@ class CartService
 
     public function applyCoupon(string $couponCode): bool
     {
+        app(B2BAccessService::class)->ensureCanPurchase(auth()->user());
+
         $couponCode = strtoupper(trim($couponCode));
         if ($couponCode === '') {
             return false;
@@ -393,6 +527,7 @@ class CartService
         }
 
         Session::put(self::COUPON_SESSION_KEY, $couponCode);
+        self::forgetRequestSnapshot();
 
         return true;
     }
@@ -400,6 +535,7 @@ class CartService
     public function clearCoupon(): void
     {
         Session::forget(self::COUPON_SESSION_KEY);
+        self::forgetRequestSnapshot();
     }
 
     /**
@@ -407,6 +543,8 @@ class CartService
      */
     public function replaceRaw(array $lines, ?string $couponCode = null): void
     {
+        app(B2BAccessService::class)->ensureCanPurchase(auth()->user());
+
         $normalized = [];
 
         foreach ($lines as $line) {
@@ -435,6 +573,7 @@ class CartService
         } else {
             Session::forget(self::COUPON_SESSION_KEY);
         }
+        self::forgetRequestSnapshot();
     }
 
     private function lineKey(int $productId, ?int $productOptionValueId): string
@@ -494,7 +633,8 @@ class CartService
      */
     private function resolveCartDiscount(Collection $lines, float $subtotalAfterLineDiscount, string $couponCode): array
     {
-        if ($couponCode === '' || $lines->isEmpty() || $subtotalAfterLineDiscount <= 0.0) {
+        if ($couponCode === '' || $lines->isEmpty() || $subtotalAfterLineDiscount <= 0.0
+            || $lines->contains(fn (array $line): bool => (bool) ($line['price_is_final'] ?? false))) {
             return ['action' => null, 'amount' => 0.0, 'tax_discount' => 0.0];
         }
 

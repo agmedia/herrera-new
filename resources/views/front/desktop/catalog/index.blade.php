@@ -50,14 +50,22 @@
     $catalogCurrentCategoryLabel = ($isShopPage || $isManufacturerPage)
         ? __('ui.shop.filters.all_categories')
         : ($translation?->name ?? $category->code);
-    $defaultSort = ($isShopPage || $isManufacturerPage) ? 'newest' : 'default';
-    $catalogCategoryUrl = static function ($catalogCategory) use ($isManufacturerPage, $translation, $locale, $fallbackLocale): string {
+    $promoOnlyEnabled = (bool) ($filters['promo_only'] ?? false);
+    $catalogNavigationQuery = array_filter([
+        'manufacturer' => trim((string) ($filters['manufacturer'] ?? '')),
+        'promo_only' => $promoOnlyEnabled ? 1 : null,
+    ], static fn ($value): bool => $value !== null && $value !== '');
+    $catalogCurrentCategoryUrl = url()->query($catalogBaseUrl, $catalogNavigationQuery);
+    $hasSearchQuery = trim((string) ($filters['q'] ?? '')) !== '';
+    $defaultSort = $hasSearchQuery ? 'relevance' : (($isShopPage || $isManufacturerPage) ? 'newest' : 'default');
+    $catalogCategoryUrl = static function ($catalogCategory) use ($isManufacturerPage, $translation, $locale, $fallbackLocale, $catalogNavigationQuery): string {
         $catalogCategoryTranslation = $catalogCategory->translations->firstWhere('locale', $locale)
             ?? $catalogCategory->translations->firstWhere('locale', $fallbackLocale);
 
         return route('categories.show', array_filter([
             'slug' => $catalogCategoryTranslation?->slug ?? $catalogCategory->id,
             'manufacturer' => $isManufacturerPage ? ($translation?->slug ?? null) : null,
+            ...$catalogNavigationQuery,
         ], static fn ($value): bool => $value !== null && $value !== ''));
     };
     $mobileDefaultCols = in_array((int) ($storeSettings['product']['mobile_default_cols'] ?? 2), [1, 2], true)
@@ -84,6 +92,7 @@
     $categoryFilterPanel = $resolveFilterPanel('category');
     $manufacturerFilterPanel = $resolveFilterPanel('manufacturer');
     $priceFilterPanel = $resolveFilterPanel('price');
+    $priceFilterPanel['visible'] = $priceFilterPanel['visible'] && $canViewPrices;
     $currentCols = (int) ($filters['cols'] ?? $desktopDefaultCols);
     if (request()->query('cols') === null && in_array($currentCols, [1, 2], true)) {
         $currentCols = $desktopDefaultCols;
@@ -105,7 +114,9 @@
     $priceMinValue = trim((string) ($filters['price_min'] ?? ''));
     $priceMaxValue = trim((string) ($filters['price_max'] ?? ''));
     $availableOnlyEnabled = (bool) ($filters['available_only'] ?? false);
-    $promoOnlyEnabled = (bool) ($filters['promo_only'] ?? false);
+    $availableOnlyLabel = str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera')
+        ? __('ui.shop.filters.available_within_48h')
+        : __('ui.shop.filters.available_only');
     $promoToggleDisabled = ! (bool) ($promoFilterAvailable ?? false) && ! $promoOnlyEnabled;
     $hasPriceFilter = $priceMinValue !== '' || $priceMaxValue !== '';
     $hasPricePanelFilter = $hasPriceFilter || $promoOnlyEnabled;
@@ -187,7 +198,7 @@
 @endphp
 
 @section('title', $isShopPage ? __('ui.shop.page_title') : (($translation?->name ?? __('ui.category.fallback_name')).' '.__('ui.category.products_suffix')))
-@section('main_class', 'w-full px-0 pt-3 pb-4 sm:pt-3 sm:pb-6')
+@section('main_class', 'w-full px-0 pt-3 pb-4 sm:pt-3 sm:pb-6'.(str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera') ? ' herrera-wide-catalog-main' : ''))
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('front-theme/styles/category-catalog.css') }}?v={{ filemtime(public_path('front-theme/styles/category-catalog.css')) }}">
@@ -224,7 +235,7 @@
                             <li class="text-slate-700">{{ $breadcrumbLabel }}</li>
                         @else
                             <li>
-                                <a href="{{ route('categories.show', ['slug' => $breadcrumbTranslation?->slug ?? $breadcrumbCategory->id]) }}" class="hover:text-slate-700">{{ $breadcrumbLabel }}</a>
+                                <a href="{{ $catalogCategoryUrl($breadcrumbCategory) }}" class="hover:text-slate-700">{{ $breadcrumbLabel }}</a>
                             </li>
                         @endif
                     @endforeach
@@ -296,7 +307,7 @@
                                 </summary>
                                 <nav class="catalog-mobile-filter-options catalog-mobile-filter-max-height-{{ $categoryFilterPanel['max_height'] }}" aria-label="{{ __('ui.shop.filters.category') }}">
                                     <a
-                                        href="{{ $catalogBaseUrl }}"
+                                        href="{{ $catalogCurrentCategoryUrl }}"
                                         class="catalog-mobile-filter-option is-selected"
                                         aria-current="page"
                                     >
@@ -388,15 +399,17 @@
                                 </div>
                             </details>
                         @endforeach
+                        @if ($canViewPrices)
                         <div class="catalog-mobile-filter-section catalog-mobile-filter-section--standalone">
                             <label class="catalog-mobile-filter-option catalog-mobile-filter-option--featured">
                                 <input type="checkbox" name="available_only" value="1" @checked($availableOnlyEnabled)>
                                 <span class="catalog-mobile-filter-check" aria-hidden="true">
                                     <x-fa-icon name="check" />
                                 </span>
-                                <span class="catalog-mobile-filter-option-label">{{ __('ui.shop.filters.available_only') }}</span>
+                                <span class="catalog-mobile-filter-option-label">{{ $availableOnlyLabel }}</span>
                             </label>
                         </div>
+                        @endif
                         @if ($priceFilterPanel['visible'])
                             <details class="catalog-mobile-filter-section" @if ($priceFilterPanel['default_open'] || $hasPricePanelFilter) open @endif>
                                 <summary class="catalog-mobile-filter-section-heading">
@@ -456,6 +469,7 @@
                             </summary>
                             <div class="catalog-mobile-filter-options">
                                 @foreach ([
+                                    ...($hasSearchQuery ? ['relevance' => __('ui.shop.filters.relevance')] : []),
                                     'default' => __('ui.shop.filters.default'),
                                     'newest' => __('ui.shop.filters.newest'),
                                     'oldest' => __('ui.shop.filters.oldest'),
@@ -463,6 +477,7 @@
                                     'price_high' => __('ui.shop.filters.price_high'),
                                     'stock_high' => __('ui.shop.filters.stock_high'),
                                 ] as $sortValue => $sortLabel)
+                                    @continue(! $canViewPrices && in_array($sortValue, ['price_low', 'price_high', 'stock_high'], true))
                                     <label class="catalog-mobile-filter-option">
                                         <input
                                             type="checkbox"
@@ -500,8 +515,9 @@
 
         <div class="catalog-desktop-toolbar hidden min-[1025px]:flex">
             <div class="catalog-desktop-toolbar-toggles">
+                @if ($canViewPrices)
                 <label class="catalog-toolbar-toggle">
-                    <span>{{ __('ui.shop.filters.available_only') }}</span>
+                    <span>{{ $availableOnlyLabel }}</span>
                     <span class="catalog-switch">
                         <input
                             type="checkbox"
@@ -510,7 +526,7 @@
                             form="category-desktop-filter-form"
                             @checked($availableOnlyEnabled)
                             data-auto-submit-filter
-                            aria-label="{{ __('ui.shop.filters.available_only') }}"
+                            aria-label="{{ $availableOnlyLabel }}"
                         >
                         <span class="catalog-switch-track" aria-hidden="true"></span>
                     </span>
@@ -531,6 +547,7 @@
                         <span class="catalog-switch-track" aria-hidden="true"></span>
                     </span>
                 </label>
+                @endif
             </div>
             <div class="catalog-desktop-toolbar-actions">
                 <div class="catalog-filter-sort-wrap w-[180px]">
@@ -542,12 +559,17 @@
                         aria-label="{{ __('ui.shop.filters.sort') }}"
                         data-auto-submit-filter
                     >
+                        @if ($hasSearchQuery)
+                            <option value="relevance" @selected(($filters['sort'] ?? '') === 'relevance')>{{ __('ui.shop.filters.relevance') }}</option>
+                        @endif
                         <option value="default" @selected(($filters['sort'] ?? 'default') === 'default')>{{ __('ui.shop.filters.default') }}</option>
                         <option value="newest" @selected(($filters['sort'] ?? '') === 'newest')>{{ __('ui.shop.filters.newest') }}</option>
                         <option value="oldest" @selected(($filters['sort'] ?? '') === 'oldest')>{{ __('ui.shop.filters.oldest') }}</option>
+                        @if ($canViewPrices)
                         <option value="price_low" @selected(($filters['sort'] ?? '') === 'price_low')>{{ __('ui.shop.filters.price_low') }}</option>
                         <option value="price_high" @selected(($filters['sort'] ?? '') === 'price_high')>{{ __('ui.shop.filters.price_high') }}</option>
                         <option value="stock_high" @selected(($filters['sort'] ?? '') === 'stock_high')>{{ __('ui.shop.filters.stock_high') }}</option>
+                        @endif
                     </select>
                 </div>
                 <div class="flex items-center gap-2">
@@ -598,7 +620,7 @@
                                     </summary>
                                     <nav class="catalog-sidebar-options catalog-sidebar-category-options catalog-sidebar-max-height-{{ $categoryFilterPanel['max_height'] }}" aria-label="{{ __('ui.shop.filters.category') }}">
                                         <a
-                                            href="{{ $catalogBaseUrl }}"
+                                            href="{{ $catalogCurrentCategoryUrl }}"
                                             class="catalog-sidebar-category is-current"
                                             aria-current="page"
                                         >
@@ -749,7 +771,7 @@
                     @if ($products->isEmpty())
                         <div class="border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">{{ __('ui.category.empty') }}</div>
                     @else
-                        <div class="catalog-lined-grid {{ $gridClass }}" data-catalog-grid>
+                        <div class="catalog-lined-grid {{ $gridClass }}" data-catalog-grid data-continuous-card-grid>
                             @foreach ($products as $product)
                                 @include('front.desktop.partials.product-card', [
                                     'product' => $product,

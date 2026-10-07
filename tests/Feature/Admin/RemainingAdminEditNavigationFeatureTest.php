@@ -22,6 +22,7 @@ use Tests\TestCase;
 class RemainingAdminEditNavigationFeatureTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\EnablesLegacyMsanModule;
 
     public function test_option_value_list_links_to_a_standalone_editor(): void
     {

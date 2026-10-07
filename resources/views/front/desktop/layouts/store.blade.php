@@ -30,16 +30,30 @@
     @endphp
     @include('front.partials.cookie-consent-head')
     @stack('head')
+    @unless (str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera'))
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"></noscript>
+    @endunless
     @vite(['resources/css/app.css'])
     <link rel="stylesheet" href="{{ asset('front-theme/styles/termol-overrides.css') }}?v={{ filemtime(public_path('front-theme/styles/termol-overrides.css')) }}-{{ $storefrontAssetVersion }}">
     <link rel="stylesheet" href="{{ asset('front-theme/styles/header-cart-popover.css') }}?v={{ filemtime(public_path('front-theme/styles/header-cart-popover.css')) }}-{{ $storefrontAssetVersion }}">
     {{-- Configurable storefront values remain external so product markup contains no inline CSS. --}}
     <link rel="stylesheet" data-storefront-settings href="{{ route('front.storefront.styles', ['v' => $storefrontAssetVersion]) }}">
+    <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera.css')) }}-{{ $storefrontAssetVersion }}">
+    @if (str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera'))
+        <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-b2b.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-b2b.css')) }}-{{ $storefrontAssetVersion }}">
+        <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-product-cards.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-product-cards.css')) }}-{{ $storefrontAssetVersion }}">
+    @endif
+    @if ($storeSettings['legal_warranty']['enabled'] ?? false)
+        <link rel="stylesheet" href="{{ asset('front-theme/styles/legal-warranty.css') }}?v={{ filemtime(public_path('front-theme/styles/legal-warranty.css')) }}">
+    @endif
     @stack('styles')
+    <link rel="stylesheet" href="{{ asset('front-theme/styles/manufacturer-logos.css') }}?v={{ filemtime(public_path('front-theme/styles/manufacturer-logos.css')) }}">
+    @if (str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera'))
+        <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-typography.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-typography.css')) }}-{{ $storefrontAssetVersion }}">
+    @endif
 </head>
 @php
     $cartService = app(\App\Services\Front\CartService::class);
@@ -50,6 +64,7 @@
     $mainNavigation = $navigationService->forLocale((string) app()->getLocale());
     $topBar = $navigationService->topBar();
     $storeBrandName = trim((string) (($storeSettings['branding']['store_name'] ?? null) ?: config('app.name', 'AG Shop')));
+    $herreraStorefront = str_contains(strtolower($storeBrandName), 'herrera');
     $storeBrandLogoUrl = trim((string) ($storeSettings['branding']['logo_url'] ?? ''));
     $storeBrandLogoRawWidth = (int) ($storeSettings['branding']['logo_width'] ?? 0);
     $storeBrandLogoRawHeight = (int) ($storeSettings['branding']['logo_height'] ?? 0);
@@ -68,7 +83,7 @@
     $searchAutocompleteEnabled = (bool) app(\App\Services\Settings\SystemSettingsService::class)
         ->get('store_search_autocomplete_enabled', false);
 @endphp
-<body class="storefront min-h-screen overflow-x-hidden bg-white text-slate-900 antialiased @yield('body_class')">
+<body class="storefront {{ $herreraStorefront ? 'herrera-storefront' : '' }} min-h-screen overflow-x-hidden bg-white text-slate-900 antialiased @yield('body_class')">
 @if ((bool) ($storeSettings['announcement']['enabled'] ?? true))
     @php
         $announcementText = (string) ($storeSettings['announcement']['text'] ?? __('ui.front.desktop.promo_bar'));
@@ -79,10 +94,11 @@
 @endif
 
 <header class="site-main-header sticky top-0 z-40 bg-white">
+    @include('front.partials.customer-impersonation')
     @if ($topBar['is_enabled'])
         <div class="site-top-bar hidden lg:block">
             <div class="site-top-bar-shell storefront-container">
-                <div class="site-top-bar-inner storefront-header-container">
+                <div class="site-top-bar-inner storefront-header-container {{ $herreraStorefront ? 'herrera-layout-container' : '' }}">
                     <nav class="site-top-bar-links" aria-label="{{ __('admin.content.navigation.top_bar_title') }}">
                         @foreach ($topBar['links'] as $link)
                             @if ($link['is_active'])
@@ -91,11 +107,26 @@
                                     class="site-top-bar-link"
                                     @if($link['open_in_new_tab']) target="_blank" rel="noopener noreferrer" @endif
                                 >
+                                    @if ($herreraStorefront && str_starts_with(strtolower($link['url']), 'mailto:'))
+                                        <x-fa-icon name="envelope" style="regular" />
+                                    @elseif ($herreraStorefront && str_starts_with(strtolower($link['url']), 'tel:'))
+                                        <x-fa-icon name="phone" style="regular" />
+                                    @endif
                                     {{ $link['label'] }}
                                 </a>
                             @endif
                         @endforeach
                     </nav>
+
+                    @if ($herreraStorefront && (bool) ($storeSettings['announcement']['enabled'] ?? true))
+                        <div class="site-top-bar-announcement" data-herrera-topbar-announcement>
+                            @if ($announcementUrl !== '')
+                                <a href="{{ $announcementUrl }}" @if($announcementNewTab) target="_blank" rel="noopener noreferrer" @endif>{{ $announcementText }}</a>
+                            @else
+                                <span>{{ $announcementText }}</span>
+                            @endif
+                        </div>
+                    @endif
 
                     <div class="site-top-bar-socials">
                         @foreach ($topBar['socials'] as $social)
@@ -105,7 +136,7 @@
                                 class="site-top-bar-social-link"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                aria-label="{{ ucfirst($social['network']) }}"
+                                aria-label="{{ match ($social['network']) { 'linkedin' => 'LinkedIn', 'twitter' => 'X / Twitter', default => ucfirst($social['network']) } }}"
                             >
                                 @switch($social['network'])
                                     @case('youtube')
@@ -114,9 +145,18 @@
                                     @case('instagram')
                                         <x-fa-icon name="instagram" style="brands" />
                                         @break
+                                    @case('linkedin')
+                                        <x-fa-icon name="linkedin-in" style="brands" />
+                                        @break
+                                    @case('twitter')
+                                        <x-fa-icon name="x-twitter" style="brands" />
+                                        @break
                                     @default
                                         <x-fa-icon name="facebook-f" style="brands" />
                                 @endswitch
+                                @if ($herreraStorefront)
+                                    <span class="site-top-bar-social-label" aria-hidden="true">{{ match ($social['network']) { 'linkedin' => 'LinkedIn', 'twitter' => 'X', default => ucfirst($social['network']) } }}</span>
+                                @endif
                             </a>
                         @endforeach
                     </div>
@@ -126,7 +166,7 @@
     @endif
 
     <div class="site-main-header-shell bg-white">
-        <div class="site-main-header-row storefront-header-container relative mx-auto flex h-[60px] w-full items-stretch justify-between px-2 sm:px-4 lg:px-0">
+        <div class="site-main-header-row {{ $herreraStorefront ? 'herrera-header-layout herrera-layout-container' : '' }} storefront-header-container relative mx-auto flex h-[60px] w-full items-stretch justify-between px-2 sm:px-4 lg:px-0" @if ($herreraStorefront) data-herrera-header @endif>
             <a href="{{ route('home') }}" class="responsive-header-brand inline-flex h-full shrink-0 items-center pr-4 text-2xl font-black tracking-tight text-slate-900 sm:text-4xl lg:w-[230px] lg:px-6">
                 @if ($storeBrandLogoUrl !== '')
                     <img src="{{ $storeBrandLogoUrl }}" alt="{{ $storeBrandName }}" class="site-main-logo h-10 w-auto object-contain" width="{{ $storeBrandLogoWidth }}" height="{{ $storeBrandLogoHeight }}" data-store-brand-logo>
@@ -134,6 +174,32 @@
                     {{ $storeBrandName }}
                 @endif
             </a>
+
+            @if ($herreraStorefront)
+                <nav class="herrera-primary-navigation" aria-label="{{ __('herrera.header.main_navigation') }}" data-herrera-primary-navigation>
+                    @foreach ($mainNavigation as $item)
+                        @continue(($item['type'] ?? '') === 'catalog')
+                        <a
+                            href="{{ $item['url'] ?? '#' }}"
+                            @if (!empty($item['open_in_new_tab'])) target="_blank" rel="noopener noreferrer" @endif
+                            @if (request()->url() === ($item['url'] ?? '')) aria-current="page" @endif
+                            data-herrera-primary-link
+                        >{{ $item['label'] }}</a>
+                    @endforeach
+                </nav>
+                @php
+                    $herreraCatalogNavigation = collect($mainNavigation)->firstWhere('type', 'catalog')
+                        ?? ['type' => 'catalog', 'url' => route('shop.index'), 'children' => []];
+                    $herreraCatalogNavigation['label'] = __('herrera.header.categories');
+                @endphp
+                <nav class="herrera-catalog-navigation" aria-label="{{ __('herrera.header.categories') }}" data-herrera-catalog-navigation>
+                    @include('front.desktop.partials.main-nav', ['mainNavigation' => [$herreraCatalogNavigation], 'herreraCatalogHeader' => true])
+                </nav>
+                <a class="herrera-header-quick-order" href="{{ route('account.b2b.quick-order') }}" data-herrera-quick-order>
+                    <x-fa-icon name="list-check" style="regular" />
+                    <span>{{ __('herrera.header.quick_order') }}</span>
+                </a>
+            @endif
 
             <div class="header-search-panel-shell" data-header-search-panel data-header-search-persistent>
                 <form
@@ -164,7 +230,7 @@
                         type="search"
                         name="q"
                         value="{{ (string) request()->query('q', '') }}"
-                        placeholder="{{ __('ui.shop.filters.header_search_placeholder') }}"
+                        placeholder="{{ $herreraStorefront ? __('herrera.header.search_placeholder') : __('ui.shop.filters.header_search_placeholder') }}"
                         class="header-search-input"
                         aria-label="{{ __('ui.front.desktop.search') }}"
                         autocomplete="off"
@@ -218,7 +284,7 @@
                 @else
                     <a href="{{ route('front.auth.login') }}" class="inline-flex min-w-[136px] items-center justify-center gap-2 border-r border-slate-200 px-4 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-black">
                         <x-fa-icon name="user" style="regular" class="h-5 w-5" />
-                        {{ __('ui.front.desktop.account') }}
+                        {{ $herreraStorefront ? __('herrera.header.login') : __('ui.front.desktop.account') }}
                     </a>
                 @endauth
 
@@ -262,7 +328,7 @@
                     </a>
                 @endauth
 
-                <a href="{{ route('wishlist.index') }}" class="responsive-header-action relative inline-flex w-12 items-center justify-center border-r border-slate-200 text-slate-700 transition hover:bg-slate-50 hover:text-black sm:w-14 lg:w-16" aria-label="{{ __('ui.front.desktop.favorites') }}: {{ $wishlistCount }}" data-wishlist-link data-wishlist-always-visible>
+                <a href="{{ route('wishlist.index') }}" class="responsive-header-action relative inline-flex w-12 items-center justify-center border-r border-slate-200 text-slate-700 transition hover:bg-slate-50 hover:text-black sm:w-14 lg:w-16 {{ $herreraStorefront && $wishlistCount === 0 ? 'hidden' : '' }}" aria-label="{{ __('ui.front.desktop.favorites') }}: {{ $wishlistCount }}" data-wishlist-link @unless($herreraStorefront) data-wishlist-always-visible @endunless>
                     <x-fa-icon name="heart" style="regular" class="h-5 w-5" />
                     <span class="header-count-badge absolute right-0.5 top-2.5 h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold {{ $wishlistCount > 0 ? 'inline-flex' : 'hidden' }}" data-wishlist-count>
                         {{ $wishlistCount }}
@@ -281,8 +347,35 @@
                 </button>
             </div>
         </div>
+        @if ($herreraStorefront)
+            @php
+                $herreraMobileCatalogExpandable = collect($mainNavigation)->contains(
+                    fn ($item) => ($item['type'] ?? '') === 'catalog' && collect($item['children'] ?? [])->isNotEmpty()
+                );
+            @endphp
+            <div class="herrera-mobile-shortcuts herrera-layout-container">
+                @if ($herreraMobileCatalogExpandable)
+                <button type="button" data-mobile-menu-open data-mobile-menu-open-categories aria-label="{{ __('herrera.header.categories') }}">
+                    <x-fa-icon name="bars" />
+                    <span>{{ __('herrera.header.categories') }}</span>
+                    <x-fa-icon name="chevron-down" />
+                </button>
+                @else
+                <a href="{{ route('categories.index') }}" aria-label="{{ __('herrera.header.categories') }}">
+                    <x-fa-icon name="bars" />
+                    <span>{{ __('herrera.header.categories') }}</span>
+                    <x-fa-icon name="arrow-right" />
+                </a>
+                @endif
+                <a href="{{ route('account.b2b.quick-order') }}">
+                    <x-fa-icon name="list-check" style="regular" />
+                    <span>{{ __('herrera.header.quick_order') }}</span>
+                </a>
+            </div>
+        @endif
     </div>
 
+    @unless ($herreraStorefront)
     <div class="site-main-nav-shell hidden bg-white lg:block">
         <nav
             class="site-main-nav-row storefront-container relative mx-auto grid w-full grid-flow-col auto-cols-fr items-stretch"
@@ -290,6 +383,7 @@
             @include('front.desktop.partials.main-nav')
         </nav>
     </div>
+    @endunless
 
     @if ((bool) ($benefitsBar['enabled'] ?? true) && !empty($benefitsBar['items']))
         <div class="store-benefits-shell storefront-container">
@@ -320,7 +414,7 @@
     @endif
 
     @if ((bool) ($storeSettings['announcement']['enabled'] ?? true))
-        <div class="store-announcement-shell storefront-container">
+        <div class="store-announcement-shell storefront-container {{ $herreraStorefront ? 'herrera-layout-container'.($topBar['is_enabled'] ? ' herrera-announcement-in-topbar' : '') : '' }}">
             <div class="store-announcement-bar {{ $announcementScrollEnabled ? 'is-scrolling' : '' }} py-2 text-center text-xs font-semibold uppercase tracking-wide">
                 @if ($announcementUrl !== '')
                     <a href="{{ $announcementUrl }}" class="store-announcement-content hover:underline" @if($announcementNewTab) target="_blank" rel="noopener noreferrer" @endif>
@@ -353,7 +447,10 @@
     </aside>
 </div>
 
-<main class="@yield('main_class', 'mx-auto w-full max-w-7xl px-6 py-8')">
+@php
+    $mainClasses = trim(($herreraStorefront ? 'herrera-main herrera-layout-container ' : '').$__env->yieldContent('main_class', 'mx-auto w-full max-w-7xl px-6 py-8'));
+@endphp
+<main class="{{ $mainClasses }}" @if ($herreraStorefront) data-herrera-main @endif>
     @include('front.desktop.partials.flash')
     @yield('content')
 </main>
@@ -361,7 +458,7 @@
 @include('front.partials.analytics-ecommerce')
 
 <footer class="site-footer {{ request()->routeIs('home') ? 'mt-0' : 'mt-5' }} bg-white">
-    <div class="site-footer-shell storefront-header-container">
+    <div class="site-footer-shell storefront-header-container {{ $herreraStorefront ? 'herrera-layout-container' : '' }}">
         <div class="site-footer-accent" aria-hidden="true"></div>
         <div class="site-footer-content">
         @php
@@ -369,13 +466,15 @@
             $newsletterCaptchaSiteKey = trim((string) ($storeSettings['captcha']['recaptcha_v3_site_key'] ?? ''));
             $newsletterCaptchaEnabled = (bool) ($storeSettings['captcha']['recaptcha_v3_enabled'] ?? false) && $newsletterCaptchaSiteKey !== '';
             $newsletterSettings = is_array($storeSettings['newsletter'] ?? null) ? $storeSettings['newsletter'] : [];
-            $newsletterTitle = trim((string) ($newsletterSettings['title'] ?? '')) ?: __('ui.front.desktop.newsletter.title');
-            $newsletterSubtitle = trim((string) ($newsletterSettings['subtitle'] ?? '')) ?: __('ui.front.desktop.newsletter.subtitle');
-            $newsletterButtonLabel = trim((string) ($newsletterSettings['button_label'] ?? '')) ?: __('ui.front.desktop.newsletter.button');
+            $newsletterTitle = trim((string) ($newsletterSettings['title'] ?? '')) ?: __($herreraStorefront ? 'herrera.footer.newsletter_title' : 'ui.front.desktop.newsletter.title');
+            $newsletterSubtitle = trim((string) ($newsletterSettings['subtitle'] ?? '')) ?: __($herreraStorefront ? 'herrera.footer.newsletter_subtitle' : 'ui.front.desktop.newsletter.subtitle');
+            $newsletterButtonLabel = trim((string) ($newsletterSettings['button_label'] ?? '')) ?: __($herreraStorefront ? 'herrera.footer.newsletter_button' : 'ui.front.desktop.newsletter.button');
             $newsletterConsentLabel = trim((string) ($newsletterSettings['consent_label'] ?? '')) ?: __('ui.front.desktop.newsletter.consent');
             $footerContactTitle = trim((string) ($storeSettings['footer']['contact_title'] ?? '')) ?: __('ui.front.desktop.footer.support');
             $footerContactIntro = trim((string) ($storeSettings['footer']['contact_intro'] ?? '')) ?: __('ui.front.desktop.footer.webshop_queries');
             $footerContactAddress = trim((string) ($storeSettings['footer']['address'] ?? ''));
+            $footerContactEmails = \App\Support\FooterContactPresenter::emails($storeSettings['footer'] ?? []);
+            $footerContactAddressBlocks = \App\Support\FooterContactPresenter::addressBlocks($footerContactAddress);
             $footerBenefits = collect($benefitsBar['items'] ?? [])
                 ->map(fn ($item) => trim((string) $item))
                 ->filter()
@@ -383,9 +482,13 @@
                 ->values();
         @endphp
 
+        @if ((bool) ($newsletterSettings['enabled'] ?? true))
         <section class="site-footer-newsletter">
             <div class="grid gap-4 lg:grid-cols-[1.2fr_1fr] lg:items-center">
                 <div>
+                    @if ($herreraStorefront)
+                        <p class="herrera-newsletter-eyebrow">{{ __('herrera.footer.newsletter_eyebrow') }}</p>
+                    @endif
                     <h3 class="text-xl font-bold leading-tight text-slate-900">{{ $newsletterTitle }}</h3>
                     <p class="mt-1 text-sm text-slate-600">{{ $newsletterSubtitle }}</p>
                 </div>
@@ -407,6 +510,7 @@
                     <div class="space-y-1.5">
                         <input
                             type="email"
+                            aria-label="{{ __('ui.front.desktop.newsletter.placeholder') }}"
                             name="newsletter_email"
                             value="{{ (string) old('newsletter_email', '') }}"
                             placeholder="{{ __('ui.front.desktop.newsletter.placeholder') }}"
@@ -415,6 +519,7 @@
                             aria-describedby="footer-newsletter-error"
                             aria-invalid="{{ $newsletterErrors->has('newsletter_email') ? 'true' : 'false' }}"
                             autocomplete="email"
+                            required
                         >
                         <p
                             id="footer-newsletter-error"
@@ -424,13 +529,14 @@
                         >{{ $newsletterErrors->first('newsletter_email') }}</p>
                         <p class="mt-2 hidden text-xs font-semibold" data-newsletter-status aria-live="polite"></p>
                     </div>
-                    <button type="submit" class="inline-flex h-11 items-center justify-center border border-slate-300 bg-white px-5 text-xs font-semibold uppercase tracking-wide transition">{{ $newsletterButtonLabel }}</button>
+                    <button type="submit" class="inline-flex h-11 items-center justify-center border border-slate-300 bg-white px-5 text-xs font-semibold uppercase tracking-wide transition">{{ $newsletterButtonLabel }} @if($herreraStorefront)<x-fa-icon name="arrow-right" style="regular" />@endif</button>
                     <div class="sm:col-span-2">
                         <label class="flex items-start gap-2 text-[11px] text-slate-500">
                             <input
                                 type="checkbox"
                                 name="newsletter_accept_terms"
                                 value="1"
+                                required
                                 class="mt-0.5 h-4 w-4 border-slate-400 text-slate-700 focus:ring-0 focus:ring-offset-0"
                                 @checked((bool) old('newsletter_accept_terms'))
                                 data-newsletter-accept-terms
@@ -443,6 +549,9 @@
                 </form>
             </div>
         </section>
+        @endif
+
+        @include('front.partials.legal-warranty-notice', ['warrantyVariant' => 'footer'])
 
         @if ((bool) ($benefitsBar['enabled'] ?? true) && $footerBenefits->isNotEmpty())
             <div class="site-footer-benefits grid md:grid-cols-3">
@@ -496,6 +605,9 @@
 
                 return ['title' => $title, 'links' => $links];
             })->values();
+            if ($herreraStorefront) {
+                $footerColumns = \App\Support\HerreraFooterNavigation::columns($footerColumns);
+            }
         @endphp
 
         <div class="site-footer-mobile-links lg:hidden">
@@ -512,18 +624,15 @@
                     @if (!empty($storeSettings['footer']['phone'] ?? ''))
                         <p><a href="tel:{{ preg_replace('/\\s+/', '', (string) $storeSettings['footer']['phone']) }}" class="text-base font-semibold text-slate-900 transition hover:text-slate-700">{{ $storeSettings['footer']['phone'] }}</a></p>
                     @endif
-                    @if (!empty($storeSettings['footer']['email_sales'] ?? ''))
-                        <p><a href="mailto:{{ $storeSettings['footer']['email_sales'] }}" class="transition hover:text-slate-900">{{ $storeSettings['footer']['email_sales'] }}</a></p>
-                    @endif
-                    @if (!empty($storeSettings['footer']['email_support'] ?? ''))
-                        <p><a href="mailto:{{ $storeSettings['footer']['email_support'] }}" class="transition hover:text-slate-900">{{ $storeSettings['footer']['email_support'] }}</a></p>
-                    @endif
+                    @foreach ($footerContactEmails as $footerContactEmail)
+                        <p><a href="mailto:{{ $footerContactEmail }}" class="transition hover:text-slate-900">{{ $footerContactEmail }}</a></p>
+                    @endforeach
                     @if (!empty($storeSettings['footer']['hours'] ?? ''))
                         <p>{{ $storeSettings['footer']['hours'] }}</p>
                     @endif
-                    @if ($footerContactAddress !== '')
-                        <p>{{ $footerContactAddress }}</p>
-                    @endif
+                    @foreach ($footerContactAddressBlocks as $footerAddressBlock)
+                        <p>{!! nl2br(e($footerAddressBlock)) !!}</p>
+                    @endforeach
                 </div>
             </details>
 
@@ -539,6 +648,9 @@
                             <li><a href="{{ $link['url'] }}" class="transition hover:text-slate-900">{{ $link['label'] }}</a></li>
                         @endforeach
                     </ul>
+                    @if ($herreraStorefront && $loop->last)
+                        @include('front.partials.herrera-footer-socials')
+                    @endif
                 </details>
             @endforeach
         </div>
@@ -553,20 +665,18 @@
                     @if (!empty($storeSettings['footer']['phone'] ?? ''))
                         <p><a href="tel:{{ preg_replace('/\\s+/', '', (string) $storeSettings['footer']['phone']) }}" class="site-footer-contact-phone transition">{{ $storeSettings['footer']['phone'] }}</a></p>
                     @endif
-                    @if (!empty($storeSettings['footer']['email_sales'] ?? ''))
-                        <p><a href="mailto:{{ $storeSettings['footer']['email_sales'] }}" class="transition">{{ $storeSettings['footer']['email_sales'] }}</a></p>
-                    @endif
-                    @if (!empty($storeSettings['footer']['email_support'] ?? ''))
-                        <p><a href="mailto:{{ $storeSettings['footer']['email_support'] }}" class="transition">{{ $storeSettings['footer']['email_support'] }}</a></p>
-                    @endif
+                    @foreach ($footerContactEmails as $footerContactEmail)
+                        <p><a href="mailto:{{ $footerContactEmail }}" class="transition">{{ $footerContactEmail }}</a></p>
+                    @endforeach
                     @if (!empty($storeSettings['footer']['hours'] ?? ''))
                         <p>{{ $storeSettings['footer']['hours'] }}</p>
                     @endif
-                    @if ($footerContactAddress !== '')
-                        <p>{{ $footerContactAddress }}</p>
-                    @endif
+                    @foreach ($footerContactAddressBlocks as $footerAddressBlock)
+                        <p>{!! nl2br(e($footerAddressBlock)) !!}</p>
+                    @endforeach
                 </div>
                 <div class="site-footer-socials flex items-center gap-2">
+                    @unless ($herreraStorefront)
                     @if (!empty($storeSettings['branding']['social']['facebook']['url'] ?? '') && (bool) ($storeSettings['branding']['social']['facebook']['enabled'] ?? true))
                         <a href="{{ (string) $storeSettings['branding']['social']['facebook']['url'] }}" aria-label="{{ __('ui.front.desktop.social.facebook') }}" target="_blank" rel="noopener noreferrer">
                             <x-fa-icon name="facebook-f" style="brands" class="h-4 w-4" />
@@ -587,6 +697,7 @@
                             <x-fa-icon name="youtube" style="brands" class="h-4 w-4" />
                         </a>
                     @endif
+                    @endunless
                 </div>
             </div>
 
@@ -598,10 +709,14 @@
                             <li><a href="{{ $link['url'] }}" class="transition">{{ $link['label'] }}</a></li>
                         @endforeach
                     </ul>
+                    @if ($herreraStorefront && $loop->last)
+                        @include('front.partials.herrera-footer-socials')
+                    @endif
                 </div>
             @endforeach
         </div>
 
+        @unless ($herreraStorefront)
         <div class="site-footer-payments">
             <div class="site-footer-payment-logos flex flex-wrap items-center justify-center gap-2.5">
                 <span class="site-footer-payment-logo inline-flex h-12 w-28 items-center justify-center px-1">
@@ -627,6 +742,7 @@
                 </span>
             </div>
         </div>
+        @endunless
 
         @php
             $copyrightText = trim((string) ($storeSettings['footer']['bottom_copyright_text'] ?? ''));
@@ -634,8 +750,12 @@
                 $copyrightText = (string) __('ui.front.desktop.footer.copyright');
             }
             $storeName = (string) ($storeSettings['branding']['store_name'] ?? config('app.name', 'AG Shop'));
+            $footerColumnUrls = $herreraStorefront
+                ? $footerColumns->flatMap(fn ($column) => $column['links'])->pluck('url')->all()
+                : [];
             $bottomLinks = collect($storeSettings['footer']['bottom_links'] ?? [])
                 ->filter(fn ($link) => is_array($link) && trim((string) ($link['url'] ?? '')) !== '' && trim((string) ($link['label'] ?? '')) !== '')
+                ->reject(fn ($link) => in_array((string) $link['url'], $footerColumnUrls, true))
                 ->map(fn ($link) => ['label' => (string) $link['label'], 'url' => (string) $link['url']])
                 ->values()
                 ->all();
@@ -659,6 +779,11 @@
         </div>
     </div>
 </footer>
+
+@if ($storeSettings['legal_warranty']['enabled'] ?? false)
+    @include('front.partials.legal-warranty-modal', ['warranty' => $storeSettings['legal_warranty']])
+    <script defer src="{{ asset('front-theme/scripts/legal-warranty.js') }}?v={{ filemtime(public_path('front-theme/scripts/legal-warranty.js')) }}"></script>
+@endif
 
 <script>
     (function () {

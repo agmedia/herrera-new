@@ -62,7 +62,9 @@
         <div class="rounded-2xl border border-white/20 bg-white/10 p-5">
             <div class="flex items-center justify-between">
                 <span class="text-sm text-white/75">{{ $badge }}</span>
-                <span class="text-sm font-semibold text-emerald-200">{{ $status }}</span>
+                @if ($canViewPrices)
+                    <span class="text-sm font-semibold text-emerald-200">{{ $status }}</span>
+                @endif
             </div>
 
             <div class="mt-5 grid grid-cols-2 gap-3">
@@ -73,7 +75,7 @@
 
                 <div class="rounded-xl bg-white/10 p-3">
                     <p class="text-xs uppercase tracking-[0.14em] text-white/70">{{ $priceLabel }}</p>
-                    <p class="mt-1 text-sm font-semibold">{{ $price }}</p>
+                    <p class="mt-1 text-sm font-semibold">{{ $canViewPrices ? $price : __('ui.b2b.pricing.access_required') }}</p>
                 </div>
 
                 @if ($specs !== '')

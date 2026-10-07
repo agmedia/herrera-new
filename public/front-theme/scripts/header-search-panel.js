@@ -1,6 +1,8 @@
 (() => {
     const MIN_QUERY_LENGTH = 2;
-    const DEBOUNCE_MS = 180;
+    const DEBOUNCE_MS = 250;
+    const RESULT_CACHE_TTL_MS = 20000;
+    const RESULT_CACHE_LIMIT = 20;
 
     const init = function () {
         if (window.__headerSearchPanelInit === true) {
@@ -49,7 +51,39 @@
         let debounceId = 0;
         let activeIndex = -1;
         let abortController = null;
+        let activeRequestQuery = '';
         let resultLinks = [];
+        // Keep results within this document only: personalized prices must never
+        // be shared through browser storage or survive a page/account change.
+        const resultCache = new Map();
+
+        const abortActiveRequest = function () {
+            if (abortController) {
+                abortController.abort();
+                abortController = null;
+            }
+            activeRequestQuery = '';
+        };
+
+        const cachedResult = function (key) {
+            const entry = resultCache.get(key);
+            if (!entry) {
+                return null;
+            }
+            if (entry.expiresAt <= Date.now()) {
+                resultCache.delete(key);
+                return null;
+            }
+            return entry.payload;
+        };
+
+        const rememberResult = function (key, payload) {
+            resultCache.delete(key);
+            resultCache.set(key, { payload, expiresAt: Date.now() + RESULT_CACHE_TTL_MS });
+            while (resultCache.size > RESULT_CACHE_LIMIT) {
+                resultCache.delete(resultCache.keys().next().value);
+            }
+        };
 
         const ensurePanelVisible = function () {
             if (!isMobileViewport()) {
@@ -88,10 +122,7 @@
                 debounceId = 0;
             }
 
-            if (abortController) {
-                abortController.abort();
-                abortController = null;
-            }
+            abortActiveRequest();
 
             activeIndex = -1;
             resultLinks = [];
@@ -367,29 +398,45 @@
         };
 
         const requestAutocomplete = function () {
+            if (debounceId) {
+                window.clearTimeout(debounceId);
+                debounceId = 0;
+            }
             if (!autocompleteEnabled || !isOpen) {
                 return;
             }
 
-            debounceId = 0;
             const query = input.value.trim();
             if (query.length < MIN_QUERY_LENGTH) {
                 closeSuggestions();
                 return;
             }
 
-            renderLoading();
-
-            if (abortController) {
-                abortController.abort();
+            if (abortController && activeRequestQuery === query && !abortController.signal.aborted) {
+                return;
             }
+            abortActiveRequest();
+
+            const endpoint = new URL(form.dataset.autocompleteEndpoint, window.location.origin);
+            endpoint.searchParams.set('q', query);
+            const requestKey = endpoint.toString();
+            const cachedPayload = cachedResult(requestKey);
+            if (cachedPayload) {
+                renderResults(cachedPayload, query);
+                return;
+            }
+
+            renderLoading();
 
             const requestController = new AbortController();
             abortController = requestController;
-            const endpoint = new URL(form.dataset.autocompleteEndpoint, window.location.origin);
-            endpoint.searchParams.set('q', query);
+            activeRequestQuery = query;
+            const isCurrentRequest = () => abortController === requestController
+                && !requestController.signal.aborted
+                && input.value.trim() === query
+                && isOpen;
 
-            window.fetch(endpoint.toString(), {
+            window.fetch(requestKey, {
                 headers: {
                     'X-Requested-With': 'XMLHttpRequest',
                     'Accept': 'application/json',
@@ -404,14 +451,15 @@
                     return response.json();
                 })
                 .then((payload) => {
-                    if (input.value.trim() !== query) {
+                    if (!isCurrentRequest()) {
                         return;
                     }
 
+                    rememberResult(requestKey, payload);
                     renderResults(payload, query);
                 })
                 .catch((error) => {
-                    if (error && error.name === 'AbortError') {
+                    if (!isCurrentRequest() || (error && error.name === 'AbortError')) {
                         return;
                     }
 
@@ -420,6 +468,7 @@
                 .finally(() => {
                     if (abortController === requestController) {
                         abortController = null;
+                        activeRequestQuery = '';
                     }
                 });
         };
@@ -431,8 +480,21 @@
 
             if (debounceId) {
                 window.clearTimeout(debounceId);
+                debounceId = 0;
             }
 
+            const query = input.value.trim();
+            if (query.length < MIN_QUERY_LENGTH) {
+                closeSuggestions();
+                return;
+            }
+            if (abortController && activeRequestQuery !== query) {
+                // Cancel as soon as the text changes, before the next debounce.
+                abortActiveRequest();
+            }
+            if (abortController && activeRequestQuery === query) {
+                return;
+            }
             debounceId = window.setTimeout(requestAutocomplete, DEBOUNCE_MS);
         };
 
@@ -514,6 +576,11 @@
         });
 
         form.addEventListener('submit', function () {
+            closeSuggestions();
+        });
+
+        window.addEventListener('pagehide', function () {
+            resultCache.clear();
             closeSuggestions();
         });
 

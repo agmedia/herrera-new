@@ -341,7 +341,22 @@
             </div>
         @endif
 
-        @if ($this->isItemBlock)
+        @if (($form['type'] ?? '') === 'featured_categories')
+            <div class="admin-panel admin-form-panel p-6">
+                <p class="admin-section-title">{{ __('Prikaz kategorija') }}</p>
+                <div class="mt-4 md:max-w-md">
+                    <label for="featured-category-source" class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Kategorije u modulu') }}</label>
+                    <select id="featured-category-source" wire:model.live="form.category_source" class="admin-select w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                        <option value="all_root">{{ __('Sve glavne kategorije') }}</option>
+                        <option value="manual">{{ __('Ručni odabir i redoslijed') }}</option>
+                    </select>
+                    <p class="mt-2 text-xs text-slate-500">{{ __('Sve glavne kategorije prikazuju se prema redoslijedu u katalogu. Ručnim odabirom možete složiti vlastiti popis i redoslijed.') }}</p>
+                    @error('form.category_source') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                </div>
+            </div>
+        @endif
+
+        @if ($this->isItemBlock && !(($form['type'] ?? '') === 'featured_categories' && ($form['category_source'] ?? 'manual') === 'all_root'))
             <div class="admin-panel admin-form-panel p-6">
                 <p class="admin-section-title">
                     @if (($form['type'] ?? '') === 'category_products_carousel')

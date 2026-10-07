@@ -16,6 +16,7 @@ use App\Services\Payments\BankTransferUpiService;
 use App\Services\Payments\CorvusPayFormService;
 use App\Services\Payments\KeksPayService;
 use App\Services\Payments\WSPayFormService;
+use App\Services\Pricing\B2BAccessService;
 use App\Services\User\DefaultCustomerGroupAssigner;
 use App\Support\Currency;
 use App\Support\GlsShipping;
@@ -63,7 +64,7 @@ class CheckoutController extends Controller
 
         $addressDirectory = app(AddressDirectoryService::class);
         $shippingMethods = $this->checkout->availableShippingMethods(
-            (float) ($summary['subtotal_after_discount'] ?? $summary['subtotal']),
+            (float) ($summary['raw_subtotal_after_discount'] ?? $summary['subtotal_after_discount'] ?? $summary['subtotal']),
             $shippingCountry,
             $shippingState,
             $shippingPostal,
@@ -72,17 +73,17 @@ class CheckoutController extends Controller
         $defaultShippingMethod = $shippingMethods->first();
         $defaultShippingCode = (string) $defaultShippingMethod?->code;
         $defaultPaymentCode = (string) ($paymentMethods = $this->checkout->availablePaymentMethods(
-            (float) ($summary['subtotal_after_discount'] ?? $summary['subtotal']),
+            (float) ($summary['raw_subtotal_after_discount'] ?? $summary['subtotal_after_discount'] ?? $summary['subtotal']),
             $billingCountry,
             $billingState,
             $billingPostal,
             $defaultShippingMethod,
         ))->first()?->code;
         $checkoutTotals = $this->checkout->estimateCheckoutTotals(
-            (float) ($summary['subtotal'] ?? 0),
-            (float) ($summary['discount_total'] ?? 0),
-            (float) ($summary['subtotal_after_discount'] ?? $summary['subtotal'] ?? 0),
-            (float) ($summary['tax_total'] ?? 0),
+            (float) ($summary['raw_subtotal'] ?? $summary['subtotal'] ?? 0),
+            (float) ($summary['raw_discount_total'] ?? $summary['discount_total'] ?? 0),
+            (float) ($summary['raw_subtotal_after_discount'] ?? $summary['subtotal_after_discount'] ?? $summary['subtotal'] ?? 0),
+            (float) ($summary['raw_tax_total'] ?? $summary['tax_total'] ?? 0),
             $defaultShippingCode,
             $defaultPaymentCode,
             $shippingCountry,
@@ -315,7 +316,7 @@ class CheckoutController extends Controller
     public function options(Request $request): JsonResponse
     {
         $summary = $this->cart->summary();
-        $subtotal = (float) ($summary['subtotal_after_discount'] ?? $summary['subtotal'] ?? 0);
+        $subtotal = (float) ($summary['raw_subtotal_after_discount'] ?? $summary['subtotal_after_discount'] ?? $summary['subtotal'] ?? 0);
 
         $billingCountry = strtoupper((string) $request->query('billing_country_code', 'HR'));
         $billingState = '';
@@ -346,10 +347,10 @@ class CheckoutController extends Controller
             ->values();
         $selectedPaymentCode = (string) $request->query('payment_method_code', '');
         $totals = $this->checkout->estimateCheckoutTotals(
-            (float) ($summary['subtotal'] ?? 0),
-            (float) ($summary['discount_total'] ?? 0),
+            (float) ($summary['raw_subtotal'] ?? $summary['subtotal'] ?? 0),
+            (float) ($summary['raw_discount_total'] ?? $summary['discount_total'] ?? 0),
             $subtotal,
-            (float) ($summary['tax_total'] ?? 0),
+            (float) ($summary['raw_tax_total'] ?? $summary['tax_total'] ?? 0),
             $selectedShippingCode,
             $selectedPaymentCode,
             $shippingCountry,
@@ -366,6 +367,7 @@ class CheckoutController extends Controller
             'shipping_methods' => $shippingMethods->map(fn ($method) => [
                 'code' => (string) $method->code,
                 'name' => (string) $method->name,
+                'description' => trim((string) $method->description),
                 'price' => round((float) ($method->resolved_price ?? $method->price), 2),
                 'price_formatted' => (string) $method->pricing_type === 'quote'
                     ? __('Cijena na upit')
@@ -379,6 +381,7 @@ class CheckoutController extends Controller
             'payment_methods' => $paymentMethods->map(fn ($method) => [
                 'code' => (string) $method->code,
                 'name' => (string) $method->name,
+                'description' => trim((string) $method->description),
             ])->all(),
             'totals' => [
                 'subtotal' => round((float) $totals['subtotal'], 2),
@@ -466,6 +469,11 @@ class CheckoutController extends Controller
         $allowedByUser = $request->user() && ((int) $request->user()->id === (int) $order->user_id);
 
         abort_unless($allowedBySession || $allowedByUser, 404);
+
+        if ((bool) config('commerce.local_safe_mode')) {
+            return redirect()->route('checkout.success', ['orderNumber' => $order->order_number])
+                ->with('status', __('ui.checkout.wspay.local_preview'));
+        }
 
         $formData = app(WSPayFormService::class)->buildFormData($order);
         if (! is_array($formData)) {
@@ -693,8 +701,12 @@ class CheckoutController extends Controller
 
         $wspay = app(WSPayFormService::class);
         $result = $wspay->handleCallback($order, $request->all(), $context);
+        $allowedBySession = (int) $request->session()->get('front.checkout.last_order_id', 0) === (int) $order->id;
+        $allowedByUser = $request->user() && (int) $request->user()->id === (int) $order->user_id;
+        abort_unless($allowedBySession || $allowedByUser || (bool) ($result['callback_authorized'] ?? false), 404);
+        $isPaid = (bool) ($result['paid'] ?? false) || $order->fresh()?->paid_at !== null;
 
-        if (strtolower($context) === 'cancel' && ! (bool) ($result['paid'] ?? false)) {
+        if (strtolower($context) === 'cancel' && ! $isPaid) {
             $wspay->handleCancellationEffects($order);
             $freshOrder = Order::query()->with('items')->find($order->id);
             if ($freshOrder) {
@@ -702,7 +714,7 @@ class CheckoutController extends Controller
             }
         }
 
-        if ((bool) ($result['paid'] ?? false)) {
+        if ((bool) ($result['newly_paid'] ?? false)) {
             $freshOrder = Order::query()->find($order->id);
             if ($freshOrder) {
                 $this->sendWspayNotificationOnce($freshOrder);
@@ -719,7 +731,7 @@ class CheckoutController extends Controller
             default => 'ui.checkout.wspay.status.declined',
         };
 
-        if (strtolower($context) === 'cancel') {
+        if (strtolower($context) === 'cancel' && ! $isPaid) {
             return redirect()
                 ->route('cart.index')
                 ->with('status', __('ui.checkout.wspay.status.cancelled_to_cart'));
@@ -732,6 +744,11 @@ class CheckoutController extends Controller
 
     private function restoreCartFromOrder(Order $order): void
     {
+        // A payment callback remains valid after a contract expires, but may not restore a purchasable cart.
+        if (! app(B2BAccessService::class)->canViewPrices(auth()->user())) {
+            return;
+        }
+
         $lines = [];
         foreach ($order->items as $item) {
             $qty = max(0, (int) $item->quantity);

@@ -6,6 +6,7 @@
     }
 
     $authStoreName = trim((string) (($authBranding['store_name'] ?? null) ?: config('app.name', 'AG Shop')));
+    $isHerreraAuth = str_contains(strtolower($authStoreName), 'herrera');
     $authLogoUrl = trim((string) ($authBranding['logo_url'] ?? ''));
     $authLogoWidth = max(1, (int) ($authBranding['logo_width'] ?? 320));
     $authLogoHeight = max(1, (int) ($authBranding['logo_height'] ?? 145));
@@ -60,17 +61,22 @@
         <link rel="icon" type="image/png" sizes="16x16" href="{{ $authFavicons['16_url'] }}">
     @endif
 
+    @unless ($isHerreraAuth)
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'">
     <noscript><link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"></noscript>
+    @endunless
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="stylesheet" href="{{ route('front.storefront.styles') }}">
     <link rel="stylesheet" href="{{ asset('front-theme/styles/commerce-pages.css') }}?v={{ filemtime(public_path('front-theme/styles/commerce-pages.css')) }}">
     <link rel="stylesheet" href="{{ asset('front-theme/styles/auth-pages.css') }}?v={{ filemtime(public_path('front-theme/styles/auth-pages.css')) }}">
+    @if ($isHerreraAuth)
+        <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-typography.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-typography.css')) }}">
+    @endif
 </head>
-<body class="commerce-body store-auth-body">
+<body class="commerce-body store-auth-body{{ $isHerreraAuth ? ' herrera-storefront' : '' }}">
     <header class="store-auth-header">
         <div class="store-auth-header-inner">
             <a href="{{ route('home') }}" class="store-auth-brand" aria-label="{{ $authStoreName }}">

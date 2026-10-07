@@ -350,6 +350,7 @@
         const forceClosedState = () => {
             root.classList.add('pointer-events-none');
             root.dataset.menuOpen = '0';
+            root.inert = true;
             overlay?.classList.remove('opacity-100');
             overlay?.classList.add('opacity-0');
             panel?.classList.add('-translate-x-full');
@@ -550,7 +551,14 @@
             }
             root.classList.remove('pointer-events-none');
             root.dataset.menuOpen = '1';
+            root.inert = false;
             syncMenuState();
+            if (event?.currentTarget?.hasAttribute('data-mobile-menu-open-categories')) {
+                const catalogSection = root.querySelector('[data-mobile-menu-catalog]');
+                if (catalogSection instanceof HTMLDetailsElement) {
+                    catalogSection.open = true;
+                }
+            }
             overlay?.classList.remove('opacity-0');
             overlay?.classList.add('opacity-100');
             panel?.classList.remove('-translate-x-full');

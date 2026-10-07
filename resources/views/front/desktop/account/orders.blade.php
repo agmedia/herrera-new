@@ -42,7 +42,7 @@
                                         <a href="{{ route('account.orders.show', ['orderNumber' => $order->order_number]) }}" class="commerce-secondary-action px-3 text-xs uppercase tracking-wide">
                                             {{ __('ui.account.orders.table.details') }}
                                         </a>
-                                        @if ($b2bAccount?->contractIsActive())
+                                        @if ($canViewPrices && $b2bAccount?->contractIsActive())
                                             <form method="POST" action="{{ route('account.orders.reorder', ['orderNumber' => $order->order_number]) }}">
                                                 @csrf
                                                 <button type="submit" class="commerce-secondary-action px-3 text-xs uppercase tracking-wide">{{ __('Ponovi') }}</button>

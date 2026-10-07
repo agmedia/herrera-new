@@ -29,11 +29,18 @@
 
     $accountUser = auth()->user();
     $accountUser?->loadMissing('b2bAccount');
-    if ($accountUser?->b2bAccount?->contractIsActive()) {
+    $b2bAccess = app(\App\Services\Pricing\B2BAccessService::class);
+    $b2bNavigationAvailable = $b2bAccess->canViewPrices($accountUser)
+        && $accountUser?->b2bAccount?->contractIsActive();
+    $showB2BApprovalNotice = $accountUser
+        && $b2bAccess->requiresApprovedAccount()
+        && ! $b2bNavigationAvailable
+        && $accountUser->customerGroups()->exists();
+    if ($b2bNavigationAvailable) {
         array_splice($items, 2, 0, [
             [
                 'key' => 'b2b_quick_order',
-                'label' => __('B2B brza kupnja'),
+                'label' => __('Brza narudžba'),
                 'url' => route('account.b2b.quick-order'),
                 'active' => $current === 'b2b_quick_order',
             ],
@@ -83,6 +90,12 @@
                 </li>
             @endforeach
         </ul>
+
+        @if ($showB2BApprovalNotice)
+            <p class="mt-4 border-t border-slate-200 pt-4 text-xs leading-relaxed text-slate-600" data-b2b-approval-notice>
+                {{ __('Za brzu narudžbu potreban je odobren B2B poslovni račun. Sama grupa kupaca ne omogućuje pristup.') }}
+            </p>
+        @endif
 
         <form method="POST" action="{{ route('logout') }}" class="mt-4">
             @csrf

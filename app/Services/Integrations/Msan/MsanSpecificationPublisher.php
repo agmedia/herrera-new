@@ -44,6 +44,8 @@ class MsanSpecificationPublisher
      */
     public function publishSnapshot(MsanSpecificationSnapshot $snapshot): array
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $this->filterAttributeCache = [];
         $this->filterValueCountCache = [];
         $this->preparedFilterTranslations = [];
@@ -114,6 +116,8 @@ class MsanSpecificationPublisher
 
     public function clearPublishedProjection(): void
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $this->filterAttributeCache = [];
         $this->filterValueCountCache = [];
         $this->preparedFilterTranslations = [];
@@ -155,6 +159,8 @@ class MsanSpecificationPublisher
     /** @return array{specifications:int,energy_declarations:int,filter_attributes:int} */
     public function publishProductFromActiveSnapshot(MsanProduct $source): array
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $snapshot = MsanSpecificationSnapshot::query()
             ->where('status', MsanSpecificationSnapshot::STATUS_ACTIVE)
             ->latest('id')
@@ -171,6 +177,8 @@ class MsanSpecificationPublisher
         MsanProduct $source,
         MsanSpecificationSnapshot $snapshot,
     ): array {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         if (! $source->local_product_id || $snapshot->status !== MsanSpecificationSnapshot::STATUS_ACTIVE) {
             return ['specifications' => 0, 'energy_declarations' => 0, 'filter_attributes' => 0];
         }

@@ -4,7 +4,9 @@ namespace App\Services\Front;
 
 use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Product\ProductOptionValue;
+use App\Models\Sales\Order\OrderItem;
 use App\Models\User;
+use App\Services\Pricing\B2BAccessService;
 use App\Services\Pricing\ProductPricePresentationService;
 use Illuminate\Support\Collection;
 
@@ -19,6 +21,8 @@ class B2BQuickOrderSearchService
      */
     public function search(string $search, User $user, int $limit = 12): Collection
     {
+        app(B2BAccessService::class)->ensureCanPurchase($user);
+
         $search = trim($search);
         $limit = max(1, min(20, $limit));
 
@@ -32,16 +36,7 @@ class B2BQuickOrderSearchService
         $normalizedSearch = mb_strtolower($search);
 
         $products = Product::query()
-            ->where('products.is_active', true)
-            ->where(function ($query): void {
-                $query
-                    ->where('products.stock_qty', '>', 0)
-                    ->orWhereHas('optionValues', function ($optionQuery): void {
-                        $optionQuery
-                            ->where('is_active', true)
-                            ->where('stock_qty', '>', 0);
-                    });
-            })
+            ->visibleOnStorefront(true)
             ->where(function ($query) use ($like, $locale, $fallbackLocale): void {
                 $query
                     ->where('products.code', 'like', $like)
@@ -108,7 +103,7 @@ class B2BQuickOrderSearchService
 
             if ($visibleOptions->isNotEmpty()) {
                 foreach ($visibleOptions as $option) {
-                    if ((int) $option->stock_qty <= 0) {
+                    if (! $this->canSelect($product, $option)) {
                         continue;
                     }
 
@@ -126,7 +121,7 @@ class B2BQuickOrderSearchService
                 continue;
             }
 
-            if ((int) $product->stock_qty > 0) {
+            if ($this->canSelect($product)) {
                 $results->push($this->present($product, null, $user));
             }
 
@@ -147,6 +142,8 @@ class B2BQuickOrderSearchService
         User $user,
         ?int $quantity = null,
     ): array {
+        app(B2BAccessService::class)->ensureCanPurchase($user);
+
         $locale = (string) app()->getLocale();
         $fallbackLocale = (string) config('app.locale');
 
@@ -170,8 +167,12 @@ class B2BQuickOrderSearchService
 
         $minimum = max(1, (int) ($product->minimum_order_quantity ?? 1));
         $step = max(1, (int) ($product->order_quantity_step ?? 1));
-        $stock = max(0, (int) ($option?->stock_qty ?? $product->stock_qty));
-        $selectedQuantity = max($minimum, (int) ($quantity ?? $minimum));
+        $stock = $option ? max(0, (int) $option->stock_qty) : $product->availableStockQuantity();
+        $available = min(999, $stock);
+        $maximum = $available < $minimum
+            ? 0
+            : $minimum + (int) floor(($available - $minimum) / $step) * $step;
+        $selectedQuantity = min($maximum, $minimum + (int) ceil((max($minimum, (int) ($quantity ?? $minimum)) - $minimum) / $step) * $step);
         $storedBase = $option?->price_override !== null
             ? (float) $option->price_override
             : (float) $product->base_price;
@@ -180,11 +181,7 @@ class B2BQuickOrderSearchService
             ?? $product->getFirstMedia('product_gallery');
         $imageUrl = null;
 
-        if ($media) {
-            $imageUrl = $media->hasGeneratedConversion('thumb_100x100')
-                ? $media->getUrl('thumb_100x100')
-                : $media->getUrl();
-        }
+        $imageUrl = \App\Support\Media\LegacyCatalogImage::first($product, ['thumb_100x100']);
 
         return [
             'key' => (int) $product->getKey().':'.(int) ($option?->getKey() ?? 0),
@@ -197,16 +194,123 @@ class B2BQuickOrderSearchService
             'name' => $this->localizedProductName($product, $locale, $fallbackLocale),
             'option_label' => $this->optionLabel($option, $locale, $fallbackLocale),
             'image_url' => $imageUrl,
-            'unit_price' => round((float) ($price['current_gross'] ?? 0), 2),
-            'base_unit_price' => round((float) ($price['base_gross'] ?? 0), 2),
+            'unit_price' => (float) ($price['display_current'] ?? $price['current_gross'] ?? 0),
+            'base_unit_price' => ($price['display_includes_tax'] ?? true) === false
+                ? app(\App\Services\Pricing\TaxPricingService::class)->netFromGross((float) ($price['base_gross'] ?? 0), $product, user: $user)
+                : round((float) ($price['base_gross'] ?? 0), 2),
+            'display_includes_tax' => (bool) ($price['display_includes_tax'] ?? true),
             'price_source' => (string) ($price['price_source'] ?? 'base'),
             'is_b2b_price' => (bool) ($price['is_b2b_price'] ?? false),
             'has_promotional_discount' => (bool) ($price['has_promotional_discount'] ?? false),
             'minimum_quantity' => $minimum,
             'quantity_step' => $step,
-            'maximum_quantity' => min(999, $stock),
-            'quantity' => min(min(999, $stock), $selectedQuantity),
+            'maximum_quantity' => $maximum,
+            'quantity' => $selectedQuantity,
         ];
+    }
+
+    public function canSelect(Product $product, ?ProductOptionValue $option = null): bool
+    {
+        if (! $product->is_active) {
+            return false;
+        }
+
+        if ($option && (! $option->is_active || (int) $option->product_id !== (int) $product->getKey() || ! $option->showsOnProductPage())) {
+            return false;
+        }
+
+        if (! $option && $product->hasVisibleOptionRows()) {
+            return false;
+        }
+
+        $stock = $option ? (int) $option->stock_qty : $product->availableStockQuantity();
+
+        return min(999, $stock) >= max(1, (int) ($product->minimum_order_quantity ?? 1));
+    }
+
+    /** Resolve exact identifiers only: a product with variants requires a variant SKU. */
+    public function resolve(string $identifier, User $user, int $quantity = 1): array
+    {
+        app(B2BAccessService::class)->ensureCanPurchase($user);
+        $identifier = trim($identifier);
+        $products = Product::query()->visibleOnStorefront()
+            ->where(fn ($query) => $query->where('code', $identifier)->orWhere('sku', $identifier)->orWhere('barcode', $identifier))
+            ->limit(2)->get();
+        $options = ProductOptionValue::query()->where('is_active', true)->where('sku', $identifier)
+            ->whereHas('product', fn ($query) => $query->visibleOnStorefront())
+            ->with('product')->limit(2)->get();
+
+        if ($products->count() + $options->count() > 1) {
+            return ['error' => __('Šifra nije jednoznačna. Odaberite artikl u pretraživanju.')];
+        }
+
+        $option = $options->first();
+        $product = $option?->product ?? $products->first();
+        if (! $product) {
+            return ['error' => __('Artikl nije pronađen.')];
+        }
+        if (! $option && $product->hasVisibleOptionRows()) {
+            return ['error' => __('Artikl ima varijante. Unesite SKU varijante ili je odaberite u pretraživanju.')];
+        }
+        if (! $this->canSelect($product, $option)) {
+            return ['error' => __('Artikl trenutno nema dovoljnu raspoloživu zalihu.')];
+        }
+
+        $item = $this->present($product, $option, $user, $quantity);
+
+        return [
+            'item' => $item,
+            'warning' => $item['quantity'] !== $quantity
+                ? __('Količina je prilagođena pakiranju i raspoloživoj zalihi: :quantity.', ['quantity' => $item['quantity']])
+                : null,
+        ];
+    }
+
+    /** @return array<string, Collection<int, array<string, mixed>>> */
+    public function suggestions(User $user): array
+    {
+        $history = OrderItem::query()->whereNotNull('product_id')
+            ->whereHas('order', fn ($query) => $query->where('user_id', $user->id)
+                ->withoutCancelled());
+        $frequent = (clone $history)->select('product_id', 'product_option_value_id')
+            ->selectRaw('SUM(quantity) as ordered_quantity')->groupBy('product_id', 'product_option_value_id')
+            ->orderByDesc('ordered_quantity')->limit(18)->get();
+        $recent = (clone $history)->select('product_id', 'product_option_value_id')
+            ->selectRaw('MAX(id) as last_item_id')->groupBy('product_id', 'product_option_value_id')
+            ->orderByDesc('last_item_id')->limit(18)->get();
+        $favoriteIds = $user->wishlistItems()->latest('id')->limit(18)->pluck('product_id');
+        $products = Product::query()->visibleOnStorefront()
+            ->whereIn('id', $frequent->pluck('product_id')->merge($recent->pluck('product_id'))->merge($favoriteIds)->unique())
+            ->with(['optionValues.optionValue.option', 'optionValues.parentOptionValue.option'])
+            ->get()->keyBy('id');
+        $presentHistory = function (Collection $rows) use ($products, $user): Collection {
+            return $rows->map(function (OrderItem $row) use ($products, $user): ?array {
+                $product = $products->get($row->product_id);
+                $option = $product?->optionValues->firstWhere('id', $row->product_option_value_id);
+                if (! $product || ($row->product_option_value_id && ! $option) || ! $this->canSelect($product, $option)) {
+                    return null;
+                }
+
+                return $this->present($product, $option, $user);
+            })->filter()->take(6)->values();
+        };
+        $favorites = $favoriteIds->map(function ($id) use ($products, $user): ?array {
+            $product = $products->get($id);
+            if (! $product) {
+                return null;
+            }
+            if ($product->hasVisibleOptionRows()) {
+                if (! $product->optionValues->contains(fn ($option) => $this->canSelect($product, $option))) {
+                    return null;
+                }
+
+                return [...$this->present($product, null, $user), 'requires_variant' => true];
+            }
+
+            return $this->canSelect($product) ? $this->present($product, null, $user) : null;
+        })->filter()->take(6)->values();
+
+        return ['frequent' => $presentHistory($frequent), 'favorites' => $favorites, 'recent' => $presentHistory($recent)];
     }
 
     private function localizedProductName(Product $product, string $locale, string $fallbackLocale): string

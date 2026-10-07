@@ -4,8 +4,12 @@ namespace Tests\Feature\Admin;
 
 use App\Jobs\GenerateWebpConversionsJob;
 use App\Livewire\Admin\Settings\System\StoreSettings;
+use App\Models\Catalog\Attribute\Attribute;
+use App\Models\Catalog\Category\Category;
+use App\Models\Catalog\Option\Option;
 use App\Models\Catalog\Product\Product;
 use App\Models\Content\ContentBlock;
+use App\Models\Content\Page\InfoPage;
 use App\Models\Settings\Local\Language;
 use App\Models\User;
 use App\Services\Front\StoreSettingsService as FrontStoreSettingsService;
@@ -17,6 +21,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Silber\Bouncer\BouncerFacade as Bouncer;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\TestCase;
@@ -43,6 +48,280 @@ class StoreSettingsFeatureTest extends TestCase
         $this->actingAs($editor)
             ->get('/admin/settings/system/store-settings')
             ->assertForbidden();
+    }
+
+    public function test_guests_are_redirected_to_login(): void
+    {
+        $this->get('/admin/settings/system/store-settings')
+            ->assertRedirect(route('login'));
+    }
+
+    public function test_editor_cannot_mount_store_settings_component_directly(): void
+    {
+        Livewire::actingAs($this->makeUserWithRole('editor'))
+            ->test(StoreSettings::class)
+            ->assertForbidden();
+    }
+
+    #[DataProvider('tabSettingsProvider')]
+    public function test_each_settings_tab_saves_and_preserves_settings_from_other_tabs(string $tab, array $values): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $settings = app(SystemSettingsService::class);
+        $otherKey = $tab === 'branding' ? 'store_seo_default_title' : 'store_brand_name';
+        $settings->put($otherKey, 'Original setting');
+
+        $component = Livewire::actingAs($admin)
+            ->test(StoreSettings::class)
+            ->set('tab', $tab)
+            ->set('form.'.$otherKey, 'Unsaved change from another tab');
+
+        foreach ($values as $key => $value) {
+            $component->set('form.'.$key, $value);
+        }
+
+        if ($tab === 'og') {
+            Storage::fake('public');
+            $component->set('ogDefaultImageUpload', UploadedFile::fake()->image('social.png'));
+        }
+
+        $component->call('save')
+            ->assertHasNoErrors()
+            ->assertDispatched('notify');
+
+        foreach ($values as $key => $value) {
+            $this->assertSame($value, $settings->get($key), $key);
+        }
+        $this->assertSame('Original setting', $settings->get($otherKey));
+
+        if ($tab === 'og') {
+            Storage::disk('public')->assertExists($settings->get('store_og_default_image_path'));
+            $component->assertSet('ogDefaultImageUpload', null);
+        }
+    }
+
+    public static function tabSettingsProvider(): array
+    {
+        return [
+            'email' => ['email', ['store_email_enabled' => true, 'store_email_mailer' => 'log', 'store_email_from_address' => 'shop@example.com']],
+            'branding' => ['branding', ['store_brand_name' => 'Test Shop', 'store_footer_email_sales' => 'sales@example.com']],
+            'newsletter' => ['newsletter', ['store_newsletter_provider' => 'database', 'store_newsletter_title' => 'Shop news']],
+            'integrations' => ['integrations', ['store_captcha_recaptcha_v3_min_score' => 0.7, 'store_analytics_ga4_measurement_id' => 'G-TEST123']],
+            'pricing' => ['pricing', ['store_pricing_prices_include_tax' => true]],
+            'images' => ['images', ['store_images_use_webp' => false]],
+            'products' => ['products', ['store_product_desktop_default_cols' => 5, 'store_product_mobile_default_cols' => 1]],
+            'seo' => ['seo', ['store_seo_default_title' => 'Test Shop SEO', 'store_seo_canonical_policy' => 'none']],
+            'og' => ['og', []],
+            'schema' => ['schema', ['store_schema_business_email' => 'company@example.com', 'store_schema_faq_limit' => 10]],
+            'announcement' => ['announcement', ['store_announcement_text' => 'Free shipping', 'store_announcement_url' => '/akcije', 'store_announcement_scroll_duration_seconds' => 30]],
+            'cookies' => ['cookies', ['store_cookie_consent_enabled' => false, 'store_cookie_consent_title' => 'Cookie settings', 'store_cookie_consent_policy_url' => '/pravila-kolacica']],
+        ];
+    }
+
+    #[DataProvider('invalidTabSettingsProvider')]
+    public function test_invalid_settings_are_rejected_without_changing_saved_values(string $tab, string $key, mixed $invalidValue): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $settings = app(SystemSettingsService::class);
+        $settings->put('store_brand_name', 'Original shop');
+        $originalValue = $settings->get($key);
+
+        Livewire::actingAs($admin)
+            ->test(StoreSettings::class)
+            ->set('tab', $tab)
+            ->set('form.'.$key, $invalidValue)
+            ->call('save')
+            ->assertHasErrors('form.'.$key)
+            ->assertNotDispatched('notify');
+
+        $this->assertSame('Original shop', $settings->get('store_brand_name'));
+        $this->assertSame($originalValue, $settings->get($key));
+    }
+
+    public static function invalidTabSettingsProvider(): array
+    {
+        return [
+            'email address' => ['email', 'store_email_from_address', 'invalid-address'],
+            'SMTP port' => ['email', 'store_email_smtp_port', 70000],
+            'newsletter provider' => ['newsletter', 'store_newsletter_provider', 'unknown'],
+            'captcha score' => ['integrations', 'store_captcha_recaptcha_v3_min_score', 1.5],
+            'SEO canonical policy' => ['seo', 'store_seo_canonical_policy', 'external'],
+            'schema currency' => ['schema', 'store_schema_product_currency', 'EURO'],
+            'announcement duration' => ['announcement', 'store_announcement_scroll_duration_seconds', 5],
+            'announcement color' => ['announcement', 'store_announcement_background_color', '#xyz123'],
+            'cookie policy URL' => ['cookies', 'store_cookie_consent_policy_url', 'invalid-url'],
+            'cookie script URL' => ['cookies', 'store_cookie_consent_policy_url', 'javascript:alert(1)'],
+            'announcement malformed URL' => ['announcement', 'store_announcement_url', 'https://'],
+            'announcement protocol-relative URL' => ['announcement', 'store_announcement_url', '//external.example.com'],
+            'announcement URL with whitespace' => ['announcement', 'store_announcement_url', '/invalid path'],
+            'announcement URL with backslash' => ['announcement', 'store_announcement_url', '/\\external.example.com'],
+            'product columns' => ['products', 'store_product_desktop_default_cols', 6],
+        ];
+    }
+
+    public function test_admin_can_clear_localized_text_in_the_default_language(): void
+    {
+        config(['app.locale' => 'hr']);
+        $admin = $this->makeUserWithRole('admin');
+        app(SystemSettingsService::class)->putMany([
+            'store_footer_contact_intro' => 'Stari opis',
+            'store_footer_contact_intro_translations' => ['hr' => 'Stari opis', 'en' => 'English description'],
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(StoreSettings::class)
+            ->set('tab', 'branding')
+            ->set('form.store_footer_contact_intro', '')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSet('form.store_footer_contact_intro', '');
+
+        $settings = app(SystemSettingsService::class);
+        $this->assertSame('', $settings->get('store_footer_contact_intro'));
+        $this->assertSame(['en' => 'English description'], $settings->get('store_footer_contact_intro_translations'));
+
+        Livewire::actingAs($admin)
+            ->test(StoreSettings::class)
+            ->assertSet('form.store_footer_contact_intro', '');
+    }
+
+    public function test_locale_switch_preserves_a_cleared_default_text_and_other_language_drafts(): void
+    {
+        config(['app.locale' => 'hr']);
+        $admin = $this->makeUserWithRole('admin');
+        app(SystemSettingsService::class)->put('store_cookie_consent_title', 'Stari naslov');
+
+        Livewire::actingAs($admin)
+            ->test(StoreSettings::class)
+            ->set('tab', 'cookies')
+            ->set('form.store_cookie_consent_title', '')
+            ->set('locale', 'en')
+            ->set('form.store_cookie_consent_title', 'English cookies')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->set('locale', 'hr')
+            ->assertSet('form.store_cookie_consent_title', '');
+
+        $settings = app(SystemSettingsService::class);
+        $this->assertSame('', $settings->get('store_cookie_consent_title'));
+        $this->assertSame(['en' => 'English cookies'], $settings->get('store_cookie_consent_title_translations'));
+    }
+
+    public function test_validation_errors_do_not_prevent_saving_another_tab(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+
+        Livewire::actingAs($admin)
+            ->test(StoreSettings::class)
+            ->set('form.store_email_from_address', 'invalid')
+            ->call('save')
+            ->assertHasErrors('form.store_email_from_address')
+            ->set('tab', 'pricing')
+            ->set('form.store_pricing_prices_include_tax', true)
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertDispatched('notify');
+
+        $this->assertTrue(app(SystemSettingsService::class)->get('store_pricing_prices_include_tax'));
+        $this->assertNull(app(SystemSettingsService::class)->get('store_email_from_address'));
+    }
+
+    public function test_webp_processing_rechecks_permissions_after_the_page_has_been_opened(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $editor = $this->makeUserWithRole('editor');
+        $component = Livewire::actingAs($admin)->test(StoreSettings::class);
+
+        $this->actingAs($editor);
+        $component->call('processWebpGenerationStep')->assertForbidden();
+    }
+
+    public function test_save_rechecks_permissions_after_the_page_has_been_opened(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $editor = $this->makeUserWithRole('editor');
+        $component = Livewire::actingAs($admin)->test(StoreSettings::class);
+
+        $this->actingAs($editor);
+        $component->call('save')->assertForbidden();
+    }
+
+    public function test_branding_removes_deleted_and_unselectable_footer_links(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $catalogCategory = Category::query()->create(['scope' => Category::SCOPE_CATALOG, 'code' => 'catalog-footer', 'is_active' => true]);
+        $blogCategory = Category::query()->create(['scope' => Category::SCOPE_BLOG, 'code' => 'blog-footer', 'is_active' => true]);
+        $activePage = InfoPage::query()->create(['code' => 'active-footer', 'is_active' => true]);
+        $inactivePage = InfoPage::query()->create(['code' => 'inactive-footer', 'is_active' => false]);
+
+        Livewire::actingAs($admin)
+            ->test(StoreSettings::class)
+            ->set('tab', 'branding')
+            ->set('form.store_footer_col_1_category_ids', [$catalogCategory->id, $blogCategory->id, 999999, $catalogCategory->id])
+            ->set('form.store_footer_col_1_page_ids', [$activePage->id, $inactivePage->id, 999999])
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $settings = app(SystemSettingsService::class);
+        $this->assertSame([$catalogCategory->id], $settings->get('store_footer_col_1_category_ids'));
+        $this->assertSame([$activePage->id], $settings->get('store_footer_col_1_page_ids'));
+    }
+
+    public function test_disabled_catalog_features_hide_their_filter_panels(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        Option::query()->create(['code' => 'unused-size-option', 'type' => 'select', 'is_active' => true]);
+        Attribute::query()->create(['code' => 'screen-size', 'group_code' => 'screen-specifications', 'type' => 'text', 'is_active' => true]);
+
+        $settings = app(SystemSettingsService::class);
+        $settings->putMany(['catalog_use_options' => false, 'catalog_use_attributes' => false]);
+
+        Livewire::actingAs($admin)
+            ->test(StoreSettings::class)
+            ->set('tab', 'products')
+            ->assertDontSee('unused-size-option')
+            ->assertDontSee('screen-specifications');
+
+        $settings->putMany(['catalog_use_options' => true, 'catalog_use_attributes' => true]);
+
+        Livewire::actingAs($admin)
+            ->test(StoreSettings::class)
+            ->set('tab', 'products')
+            ->assertSee('unused-size-option')
+            ->assertSee('screen-specifications');
+    }
+
+    public function test_saving_another_tab_does_not_process_or_discard_a_pending_logo_upload(): void
+    {
+        Storage::fake('public');
+        $admin = $this->makeUserWithRole('admin');
+
+        $component = Livewire::actingAs($admin)
+            ->test(StoreSettings::class)
+            ->set('logoUpload', UploadedFile::fake()->image('shop.png'))
+            ->set('tab', 'pricing')
+            ->call('save')
+            ->assertHasNoErrors();
+
+        $this->assertNotNull($component->get('logoUpload'));
+        $this->assertNull(app(SystemSettingsService::class)->get('store_brand_logo_path'));
+        $this->assertSame([], Storage::disk('public')->allFiles('store-settings'));
+    }
+
+    public function test_og_tab_rejects_non_image_uploads(): void
+    {
+        Storage::fake('public');
+        $admin = $this->makeUserWithRole('admin');
+
+        Livewire::actingAs($admin)
+            ->test(StoreSettings::class)
+            ->set('tab', 'og')
+            ->set('ogDefaultImageUpload', UploadedFile::fake()->create('document.pdf', 20, 'application/pdf'))
+            ->call('save')
+            ->assertHasErrors('ogDefaultImageUpload');
+
+        $this->assertNull(app(SystemSettingsService::class)->get('store_og_default_image_path'));
+        $this->assertSame([], Storage::disk('public')->allFiles('store-settings'));
     }
 
     public function test_products_tab_can_save_even_when_newsletter_tab_is_invalid(): void

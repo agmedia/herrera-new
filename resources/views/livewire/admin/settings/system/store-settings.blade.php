@@ -882,7 +882,8 @@
                     </div>
                     <div class="md:col-span-2">
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Link URL (optional)') }}</label>
-                        <input type="url" wire:model="form.store_announcement_url" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+                        <input type="text" inputmode="url" wire:model="form.store_announcement_url" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+                        @error('form.store_announcement_url') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                     </div>
                     <label class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 md:col-span-2">
                         <input type="checkbox" wire:model="form.store_announcement_new_tab" class="rounded border-slate-300 text-cyan-700 focus:ring-cyan-500" />
@@ -967,7 +968,7 @@
                     </div>
                     <div class="md:col-span-2">
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('URL politike kolačića (optional)') }}</label>
-                        <input type="url" wire:model="form.store_cookie_consent_policy_url" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+                        <input type="text" inputmode="url" wire:model="form.store_cookie_consent_policy_url" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
                         @error('form.store_cookie_consent_policy_url') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                     </div>
                     <div class="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4">

@@ -1,0 +1,31 @@
+@font-face {
+    font-family: "Sora";
+    src: url("../../assets/fonts/sora/Sora-Variable.woff2") format("woff2");
+    font-style: normal;
+    font-weight: 100 800;
+    font-display: swap;
+}
+
+body.herrera-storefront {
+    --herrera-font-family: "Sora", Arial, Helvetica, sans-serif;
+    --font-sans: var(--herrera-font-family);
+    --default-font-family: var(--herrera-font-family);
+    --cc-font-family: var(--herrera-font-family);
+    font-family: var(--herrera-font-family);
+    font-synthesis: none;
+}
+
+body.herrera-storefront :where(input, button, select, textarea, optgroup),
+body.herrera-storefront .font-sans,
+body.herrera-storefront .font-risingsun,
+body.herrera-storefront .site-main-header,
+body.herrera-storefront .site-main-nav-shell,
+body.herrera-storefront .commerce-main,
+body.herrera-storefront .site-footer,
+body.herrera-storefront.store-auth-body {
+    font-family: var(--herrera-font-family);
+}
+
+body.herrera-storefront #cc-main {
+    --cc-font-family: var(--herrera-font-family);
+}

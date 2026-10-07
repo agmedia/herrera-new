@@ -78,11 +78,29 @@ class Manager extends Component
         $loyaltyEnabled = $loyaltyService->enabled();
 
         $rowsQuery = User::query()
-            ->with(['roles:id,name,title', 'customerGroups:id,name,is_active'])
+            ->with([
+                'roles:id,name,title',
+                'customerGroups:id,name,is_active',
+                'b2bAccount:id,user_id,company_name,oib',
+                'profile:id,user_id,company,oib',
+                'addresses' => fn ($query) => $query->where('type', 'billing'),
+            ])
             ->when($this->search !== '', function (Builder $query): void {
-                $query->where(function (Builder $q): void {
-                    $q->where('name', 'like', '%'.$this->search.'%')
-                        ->orWhere('email', 'like', '%'.$this->search.'%');
+                $term = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], trim($this->search)).'%';
+                $query->where(function (Builder $q) use ($term): void {
+                    $q->whereRaw("users.name LIKE ? ESCAPE '!'", [$term])
+                        ->orWhereRaw("users.email LIKE ? ESCAPE '!'", [$term])
+                        ->orWhereHas('b2bAccount', fn (Builder $account) => $account
+                            ->whereRaw("company_name LIKE ? ESCAPE '!'", [$term])
+                            ->orWhereRaw("oib LIKE ? ESCAPE '!'", [$term]))
+                        ->orWhereHas('profile', fn (Builder $profile) => $profile
+                            ->whereRaw("company LIKE ? ESCAPE '!'", [$term])
+                            ->orWhereRaw("oib LIKE ? ESCAPE '!'", [$term]))
+                        ->orWhereHas('addresses', fn (Builder $address) => $address
+                            ->where('type', 'billing')
+                            ->where(fn (Builder $fields) => $fields
+                                ->whereRaw("company LIKE ? ESCAPE '!'", [$term])
+                                ->orWhereRaw("oib LIKE ? ESCAPE '!'", [$term])));
                 });
             })
             ->when($this->role !== '', function (Builder $query): void {

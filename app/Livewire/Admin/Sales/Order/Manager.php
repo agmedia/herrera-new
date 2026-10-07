@@ -7,6 +7,7 @@ use App\Models\Settings\Local\OrderStatus;
 use App\Services\Settings\SystemSettingsService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -17,14 +18,22 @@ class Manager extends Component
     private const PAGE_NAME = 'adminOrdersPage';
 
     public string $search = '';
+
     public string $status = '';
+
     public string $dateFrom = '';
+
     public string $dateTo = '';
+
+    #[Locked]
     public string $sortBy = 'placed_at';
+
+    #[Locked]
     public string $sortDir = 'desc';
 
     public function mount(): void
     {
+        $this->authorizeAccess();
         $this->search = (string) request()->query('search', '');
 
         $status = (string) request()->query('status', '');
@@ -65,6 +74,7 @@ class Manager extends Component
 
     public function delete(int $orderId): void
     {
+        $this->authorizeAccess('sales.orders.update');
         $order = Order::query()->find($orderId);
         if (! $order) {
             $this->dispatch('notify', type: 'warning', message: __('Order not found.'));
@@ -113,6 +123,7 @@ class Manager extends Component
 
     public function render()
     {
+        $this->authorizeAccess();
         $perPage = app(SystemSettingsService::class)->getInt(
             'admin_items_per_page',
             (int) config('admin_ui.pagination.admin_items_per_page', 20),
@@ -165,5 +176,14 @@ class Manager extends Component
     private function looksLikeDate(string $value): bool
     {
         return (bool) preg_match('/^\d{4}-\d{2}-\d{2}$/', $value);
+    }
+
+    private function authorizeAccess(string $ability = 'sales.orders.view'): void
+    {
+        $user = auth()->user();
+        abort_unless(
+            $user && ($user->isA('superadmin') || ($user->can('admin.access') && $user->can($ability))),
+            403
+        );
     }
 }

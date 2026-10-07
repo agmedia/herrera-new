@@ -1,0 +1,30 @@
+<?php
+
+// Keys follow catalog names/slugs, including imported supplier aliases.
+return array_replace(require __DIR__.'/herrera-brand-logos.php', [
+    'a-plastic' => ['path' => 'assets/brands/a-plastic.png'],
+    'apecs' => ['path' => 'assets/brands/apecs.jpg'],
+    'as-schwabe' => ['path' => 'assets/brands/as-schwabe.svg'],
+    'brock' => ['path' => 'assets/brands/brock.svg'],
+    'camelion' => ['path' => 'assets/brands/camelion.png'],
+    'daze' => ['path' => 'assets/brands/daze.png'],
+    'dpm' => ['path' => 'assets/brands/dpm.png'],
+    'emo' => ['path' => 'assets/brands/emo.png'],
+    'enovalite' => ['path' => 'assets/brands/enovalite.jpg'],
+    'pawbol' => ['path' => 'assets/brands/pawbol.png'],
+    'mandeks' => ['path' => 'assets/brands/mandeks.png'],
+    'maxpuls' => ['path' => 'assets/brands/maxpuls.jpg'],
+    'esper' => ['path' => 'assets/brands/esper.png'],
+    'knauf' => ['path' => 'assets/brands/knauf-official.png'],
+    'master' => ['path' => 'assets/brands/master.jpg'],
+    'tehnoplast' => ['path' => 'assets/brands/tehnoplast.svg'],
+    'vayox' => ['path' => 'assets/brands/vayox.svg'],
+    'weicon' => ['path' => 'assets/brands/weicon.svg'],
+    'primo' => ['path' => 'assets/brands/primo.png'],
+    'tem' => ['path' => 'assets/brands/tem.svg', 'variant' => 'on-dark'],
+    'toshiba' => ['path' => 'assets/brands/toshiba.png'],
+    'verkatto' => ['path' => 'assets/brands/verkatto.jpg'],
+    'videx' => ['path' => 'assets/brands/videx.svg'],
+    'plat' => ['path' => 'assets/brands/plat.svg'],
+    'uni-trend' => ['path' => 'assets/brands/uni-trend.png', 'variant' => 'on-red'],
+]);

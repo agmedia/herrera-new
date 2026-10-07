@@ -19,6 +19,7 @@ use Tests\TestCase;
 class MsanProductImagePreviewFeatureTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\EnablesLegacyMsanModule;
 
     public function test_preview_service_caches_a_small_webp_thumbnail_and_refreshes_it_for_a_new_catalog_revision(): void
     {

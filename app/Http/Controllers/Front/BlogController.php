@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Front;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Front\Concerns\ResolvesFrontendView;
+use App\Models\Catalog\Category\Category;
 use App\Models\Catalog\Product\Product;
 use App\Models\Content\Blog\BlogPost;
 use App\Services\Catalog\CatalogFeatureService;
@@ -30,9 +31,19 @@ class BlogController extends Controller
         $locale = app()->getLocale();
         $fallbackLocale = (string) config('app.locale');
         $variant = $this->frontendVariant($request);
+        $blogCategory = null;
+        $blogCategoryTranslation = null;
+        $categorySlug = is_string($request->query('category')) ? trim($request->query('category')) : '';
+        if ($categorySlug !== '') {
+            $blogCategory = Category::query()->where('scope', Category::SCOPE_BLOG)->currentlyVisible()
+                ->whereHas('translations', fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale])->where('slug', $categorySlug))
+                ->with(['translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale])])->firstOrFail();
+            $blogCategoryTranslation = $blogCategory->translations->firstWhere('locale', $locale) ?? $blogCategory->translations->firstWhere('locale', $fallbackLocale);
+        }
 
         $posts = BlogPost::query()
             ->where('is_active', true)
+            ->when($blogCategory, fn ($q) => $q->whereHas('categories', fn ($categories) => $categories->where('categories.id', $blogCategory->id)))
             ->where(function ($q): void {
                 $q->whereNull('published_at')
                     ->orWhere('published_at', '<=', now());
@@ -43,7 +54,7 @@ class BlogController extends Controller
             ])
             ->orderByDesc('published_at')
             ->orderByDesc('id')
-            ->paginate(12);
+            ->paginate(12)->withQueryString();
 
         $topBlocks = app(ContentBlockResolver::class)->forPlacement('blog.top', $locale, null, null, $variant);
         $bottomBlocks = app(ContentBlockResolver::class)->forPlacement('blog.bottom', $locale, null, null, $variant);
@@ -54,6 +65,8 @@ class BlogController extends Controller
             'bottomBlocks' => $bottomBlocks,
             'locale' => $locale,
             'fallbackLocale' => $fallbackLocale,
+            'blogCategory' => $blogCategory,
+            'blogCategoryTranslation' => $blogCategoryTranslation,
         ]);
     }
 
@@ -167,7 +180,7 @@ class BlogController extends Controller
                     $price = $pricing->forProduct($product, $viewer);
                     $imageUrl = MediaUrl::conversionOrNull($mainMedia, 'card_320w', $preferWebp)
                         ?? MediaUrl::conversionOrNull($mainMedia, 'card_480w', $preferWebp)
-                        ?? ($mainMedia ? (string) $mainMedia->getUrl() : null);
+                        ?? \App\Support\Media\LegacyCatalogImage::first($product, ['card_320w', 'card_480w'], $preferWebp);
 
                     return [
                         (int) $product->id => [
@@ -175,7 +188,9 @@ class BlogController extends Controller
                             'name' => (string) $translation->name,
                             'slug' => (string) $translation->slug,
                             'url' => route('products.show', ['slug' => $translation->slug]),
-                            'price' => number_format((float) ($price['current_gross'] ?? 0), 2).' €',
+                            'price' => ($price['can_view_price'] ?? true)
+                                ? number_format((float) ($price['display_current'] ?? $price['current_gross'] ?? 0), 2).' €'.(($price['display_includes_tax'] ?? true) === false ? ' '.__('ui.b2b.pricing.excludes_tax') : '')
+                                : null,
                             'image_url' => $imageUrl,
                         ],
                     ];

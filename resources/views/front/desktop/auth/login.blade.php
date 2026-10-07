@@ -74,8 +74,8 @@
             <h2 class="mt-2 text-2xl font-bold text-slate-900">{{ __('ui.auth.login.new_customer_title') }}</h2>
             <p class="mt-3 text-sm text-slate-600">{{ __('ui.auth.login.new_customer_text') }}</p>
 
-            <a href="{{ route('front.auth.register', ['intended' => (string) request('intended', route('account.dashboard'))]) }}" class="commerce-secondary-action mt-5 px-6 py-2.5 text-sm">
-                {{ __('ui.auth.login.go_to_register') }}
+            <a href="{{ route(config('commerce.b2b_only') ? 'front.auth.b2b-register' : 'front.auth.register', ['intended' => (string) request('intended', route('account.dashboard'))]) }}" class="commerce-secondary-action mt-5 px-6 py-2.5 text-sm">
+                {{ config('commerce.b2b_only') ? __('ui.b2b.pricing.register') : __('ui.auth.login.go_to_register') }}
             </a>
         </aside>
     </section>

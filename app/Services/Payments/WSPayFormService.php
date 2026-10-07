@@ -7,16 +7,19 @@ use App\Models\Sales\Order\OrderHistory;
 use App\Models\Sales\Order\OrderTransaction;
 use App\Models\Settings\Local\OrderStatus;
 use App\Models\Settings\Local\PaymentMethod;
-use App\Models\Catalog\Product\Product;
-use App\Models\Catalog\Product\ProductOptionValue;
+use App\Services\Front\OrderStockAllocationService;
 use Illuminate\Support\Facades\DB;
 
 class WSPayFormService
 {
     public const PAYLOAD_KEY = 'wspay';
+
     public const MODE_TEST = 'test';
+
     public const MODE_LIVE = 'live';
+
     public const FORM_URL_TEST = 'https://formtest.wspay.biz/authorization.aspx';
+
     public const FORM_URL_LIVE = 'https://form.wspay.biz/authorization.aspx';
 
     public function isWspayCode(string $code): bool
@@ -30,11 +33,33 @@ class WSPayFormService
     }
 
     /**
+     * @param  array<string, mixed>  $settings
+     */
+    public function hasRequiredSettings(array $settings): bool
+    {
+        return trim((string) ($settings['wspay_shop_id'] ?? '')) !== ''
+            && trim((string) ($settings['wspay_secret_key'] ?? '')) !== '';
+    }
+
+    public function canBeOffered(PaymentMethod $method): bool
+    {
+        if (! $this->isWspayCode((string) $method->code)) {
+            return true;
+        }
+
+        return $this->hasRequiredSettings(is_array($method->settings) ? $method->settings : []);
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function buildFormData(Order $order): ?array
     {
-        if (! $this->isWspayOrder($order)) {
+        if (! $this->isWspayOrder($order)
+            || (bool) config('commerce.local_safe_mode', false)
+            || $order->paid_at !== null
+            || ! empty(data_get($order->payload, self::PAYLOAD_KEY.'.cancel_restocked_at'))
+            || (float) $order->grand_total <= 0) {
             return null;
         }
 
@@ -44,7 +69,7 @@ class WSPayFormService
         $shopId = trim((string) ($settings['wspay_shop_id'] ?? ''));
         $secret = trim((string) ($settings['wspay_secret_key'] ?? ''));
 
-        if ($formUrl === '' || $shopId === '' || $secret === '') {
+        if (! $this->hasRequiredSettings($settings)) {
             return null;
         }
 
@@ -103,15 +128,17 @@ class WSPayFormService
 
     /**
      * @param  array<string, mixed>  $input
-     * @return array{paid:bool,status:string,signature_valid:bool,message:string}
+     * @return array{paid:bool,newly_paid:bool,status:string,signature_valid:bool,callback_authorized:bool,message:string}
      */
     public function handleCallback(Order $order, array $input, string $context): array
     {
         if (! $this->isWspayOrder($order)) {
             return [
                 'paid' => false,
+                'newly_paid' => false,
                 'status' => 'ignored',
                 'signature_valid' => false,
+                'callback_authorized' => false,
                 'message' => 'Order is not WSPay.',
             ];
         }
@@ -128,59 +155,74 @@ class WSPayFormService
         $errorMessage = trim((string) ($input['ErrorMessage'] ?? $input['errormessage'] ?? ''));
 
         $signatureValid = false;
-        if ($shopId !== '' && $secret !== '' && $shoppingCartId !== '' && $signature !== '') {
+        if ($shopId !== '' && $secret !== '' && $shoppingCartId !== '' && $signature !== ''
+            && hash_equals((string) $order->order_number, $shoppingCartId)) {
             $expected = $this->buildResponseSignature($shopId, $secret, $shoppingCartId, $success, $approvalCode);
             $signatureValid = hash_equals(strtolower($expected), strtolower($signature));
         }
 
-        $isPaid = $signatureValid
-            && $shoppingCartId === (string) $order->order_number
-            && $success === '1'
-            && $approvalCode !== '';
-
-        $status = $isPaid ? 'approved' : match (strtolower($context)) {
-            'cancel' => 'cancelled',
-            'error' => 'error',
-            default => 'declined',
-        };
         if (! $signatureValid) {
-            $status = 'invalid_signature';
+            return [
+                'paid' => false,
+                'newly_paid' => false,
+                'status' => 'invalid_signature',
+                'signature_valid' => false,
+                'callback_authorized' => false,
+                'message' => 'Payment callback signature is invalid.',
+            ];
         }
 
         $rawPayload = $input;
-        if (array_key_exists('SecretKey', $rawPayload)) {
-            unset($rawPayload['SecretKey']);
+        foreach (array_keys($rawPayload) as $key) {
+            if (strtolower((string) $key) === 'secretkey') {
+                unset($rawPayload[$key]);
+            }
         }
 
-        DB::transaction(function () use (
+        $result = DB::transaction(function () use (
             $order,
-            $isPaid,
-            $status,
+            $success,
             $signatureValid,
             $wsPayOrderId,
             $approvalCode,
             $errorMessage,
             $context,
             $rawPayload
-        ): void {
-            OrderTransaction::query()->create([
-                'order_id' => $order->id,
+        ): array {
+            /** @var Order $locked */
+            $locked = Order::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+            $payload = is_array($locked->payload) ? $locked->payload : [];
+            $existing = is_array($payload[self::PAYLOAD_KEY] ?? null) ? $payload[self::PAYLOAD_KEY] : [];
+            $wasPaid = $locked->paid_at !== null;
+            $wasRestocked = ! empty($existing['cancel_restocked_at']);
+            $isPaid = $success === '1' && $approvalCode !== '' && ! $wasRestocked;
+            $newlyPaid = $isPaid && ! $wasPaid;
+            $status = match (true) {
+                $wasPaid => 'approved',
+                $success === '1' && $wasRestocked => 'late_success_after_cancel',
+                $isPaid => 'approved',
+                strtolower($context) === 'cancel' => 'cancelled',
+                strtolower($context) === 'error' => 'error',
+                default => 'declined',
+            };
+
+            OrderTransaction::query()->firstOrCreate([
+                'order_id' => $locked->id,
                 'provider' => 'wspay',
-                'transaction_ref' => $wsPayOrderId !== '' ? $wsPayOrderId : $approvalCode,
+                'transaction_ref' => $wsPayOrderId !== '' ? $wsPayOrderId : ($approvalCode !== '' ? $approvalCode : (string) $locked->order_number),
                 'status' => $status,
-                'amount' => (float) $order->grand_total,
-                'currency_code' => (string) ($order->currency_code ?: 'EUR'),
+            ], [
+                'amount' => (float) $locked->grand_total,
+                'currency_code' => (string) ($locked->currency_code ?: 'EUR'),
                 'processed_at' => now(),
                 'payload' => [
                     'context' => $context,
                     'signature_valid' => $signatureValid,
                     'raw' => $rawPayload,
                 ],
-                'created_by' => $order->user_id,
+                'created_by' => $locked->user_id,
             ]);
 
-            $payload = is_array($order->payload) ? $order->payload : [];
-            $existing = is_array($payload[self::PAYLOAD_KEY] ?? null) ? $payload[self::PAYLOAD_KEY] : [];
             $history = is_array($existing['callbacks'] ?? null) ? $existing['callbacks'] : [];
             $history[] = [
                 'at' => now()->toIso8601String(),
@@ -191,44 +233,49 @@ class WSPayFormService
                 'wspay_order_id' => $wsPayOrderId,
                 'error_message' => $errorMessage,
             ];
+            $history = array_slice($history, -50);
 
             $payload[self::PAYLOAD_KEY] = array_merge($existing, [
-                'status' => $status,
-                'approval_code' => $approvalCode,
-                'wspay_order_id' => $wsPayOrderId,
+                'status' => $wasRestocked ? (string) ($existing['status'] ?? 'cancelled') : $status,
+                'latest_callback_status' => $status,
+                'approval_code' => $wasPaid ? (string) ($existing['approval_code'] ?? $approvalCode) : $approvalCode,
+                'wspay_order_id' => $wasPaid ? (string) ($existing['wspay_order_id'] ?? $wsPayOrderId) : $wsPayOrderId,
                 'error_message' => $errorMessage,
                 'signature_valid' => $signatureValid,
+                'callback_authorized' => true,
                 'callbacks' => $history,
             ]);
 
-            $beforeStatusId = (int) $order->status_id;
-            if ($isPaid) {
+            $beforeStatusId = (int) $locked->status_id;
+            if ($newlyPaid) {
                 $paidStatus = $this->resolvePaidStatus();
-                if ($paidStatus && (int) $order->status_id !== (int) $paidStatus->id) {
-                    $order->status_id = (int) $paidStatus->id;
+                if ($paidStatus && (int) $locked->status_id !== (int) $paidStatus->id) {
+                    $locked->status_id = (int) $paidStatus->id;
                     OrderHistory::query()->create([
-                        'order_id' => $order->id,
+                        'order_id' => $locked->id,
                         'from_status_id' => $beforeStatusId > 0 ? $beforeStatusId : null,
                         'to_status_id' => (int) $paidStatus->id,
-                        'changed_by' => $order->user_id,
+                        'changed_by' => $locked->user_id,
                         'comment' => 'WSPay callback: payment approved.',
                     ]);
                 }
 
-                if (! $order->paid_at) {
-                    $order->paid_at = now();
-                }
+                $locked->paid_at = now();
             }
 
-            $order->payload = $payload;
-            $order->save();
+            $locked->payload = $payload;
+            $locked->save();
+
+            return ['paid' => $isPaid || $wasPaid, 'newly_paid' => $newlyPaid, 'status' => $status];
         });
 
         return [
-            'paid' => $isPaid,
-            'status' => $status,
+            'paid' => (bool) $result['paid'],
+            'newly_paid' => (bool) $result['newly_paid'],
+            'status' => (string) $result['status'],
             'signature_valid' => $signatureValid,
-            'message' => $isPaid
+            'callback_authorized' => true,
+            'message' => (bool) $result['paid']
                 ? 'Payment approved.'
                 : ($errorMessage !== '' ? $errorMessage : 'Payment was not approved.'),
         ];
@@ -250,34 +297,14 @@ class WSPayFormService
 
             $payload = is_array($locked->payload) ? $locked->payload : [];
             $existing = is_array($payload[self::PAYLOAD_KEY] ?? null) ? $payload[self::PAYLOAD_KEY] : [];
-            if (! empty($existing['cancel_restocked_at'])) {
+            if ($locked->paid_at !== null
+                || ($existing['status'] ?? null) === 'approved'
+                || ! empty($existing['cancel_restocked_at'])) {
                 return;
             }
 
             foreach ($locked->items as $item) {
-                $qty = max(0, (int) $item->quantity);
-                if ($qty <= 0) {
-                    continue;
-                }
-
-                $optionValueId = (int) ($item->product_option_value_id ?? 0);
-                if ($optionValueId > 0) {
-                    $optionRow = ProductOptionValue::query()->lockForUpdate()->find($optionValueId);
-                    if ($optionRow) {
-                        $optionRow->stock_qty = max(0, (int) $optionRow->stock_qty) + $qty;
-                        $optionRow->save();
-                    }
-                    continue;
-                }
-
-                $productId = (int) ($item->product_id ?? 0);
-                if ($productId > 0) {
-                    $product = Product::query()->lockForUpdate()->find($productId);
-                    if ($product) {
-                        $product->stock_qty = max(0, (int) $product->stock_qty) + $qty;
-                        $product->save();
-                    }
-                }
+                app(OrderStockAllocationService::class)->restore($item);
             }
 
             $beforeStatusId = (int) $locked->status_id;
@@ -294,6 +321,7 @@ class WSPayFormService
             }
 
             $payload[self::PAYLOAD_KEY] = array_merge($existing, [
+                'status' => 'cancelled',
                 'cancel_restocked_at' => now()->toIso8601String(),
             ]);
 

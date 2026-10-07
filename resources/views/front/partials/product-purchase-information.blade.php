@@ -6,6 +6,7 @@
 @endphp
 
 <div class="product-purchase-information" data-product-purchase-information>
+    @include('front.partials.legal-warranty-notice', ['warrantyVariant' => 'product'])
     <details class="product-information-panel" open>
         <summary class="product-information-summary">
             <span class="product-information-summary-icon">
@@ -35,12 +36,14 @@
                         <dd>{{ $categoryName }}</dd>
                     </div>
                 @endif
+                @if ($canViewPrices)
                 <div class="product-information-row">
                     <dt>{{ __('ui.product.availability') }}</dt>
                     <dd class="{{ $productAvailable ? 'is-available' : 'is-unavailable' }}">
                         {{ $productAvailable ? __('ui.product.available') : __('ui.product.unavailable') }}
                     </dd>
                 </div>
+                @endif
             </dl>
         </div>
     </details>
@@ -58,11 +61,46 @@
         </summary>
         <div class="product-information-content">
             @forelse (($shippingMethods ?? collect()) as $method)
-                <article class="product-method">
+                @php
+                    $shippingRanges = $method->getAttribute('storefront_ranges');
+                @endphp
+                <article class="product-method" data-product-shipping-method="{{ $method->code }}">
                     <h3>{{ $method->name }}</h3>
+                    @if (trim((string) $method->getAttribute('storefront_destinations')) !== '')
+                        <p>{{ __('ui.product.shipping_destinations', ['destinations' => $method->getAttribute('storefront_destinations')]) }}</p>
+                    @endif
                     @if (trim((string) $method->description) !== '')
                         <p>{{ $method->description }}</p>
                     @endif
+                    @if ($canViewPrices)
+                    @if ($shippingRanges !== null)
+                        <div class="product-method-meta">
+                            @foreach ($shippingRanges as $range)
+                                @php
+                                    $isFree = (float) $range['price'] <= 0;
+                                    $fromAmount = \App\Support\Currency::format($range['min_subtotal']);
+                                    $toAmount = $range['max_subtotal'] !== null ? \App\Support\Currency::format($range['max_subtotal']) : null;
+                                    $rangeLabel = $isFree || $toAmount === null
+                                        ? __('ui.product.shipping_order_from', ['amount' => $fromAmount])
+                                        : ($range['min_subtotal'] > 0
+                                            ? __('ui.product.shipping_order_range', ['from' => $fromAmount, 'to' => $toAmount])
+                                            : __('ui.product.shipping_order_up_to', ['amount' => $toAmount]));
+                                    $priceLabel = \App\Support\Currency::format($range['display_price']);
+                                    if (! $isFree && $method->getAttribute('storefront_display_net')) {
+                                        $priceLabel = $range['tax_rate'] > 0
+                                            ? __('ui.product.shipping_price_net_vat', ['price' => $priceLabel, 'rate' => rtrim(rtrim(number_format($range['tax_rate'], 2), '0'), '.')])
+                                            : $priceLabel.' '.__('ui.b2b.pricing.excludes_tax');
+                                    } elseif (! $isFree && $range['tax_rate'] > 0) {
+                                        $priceLabel = __('ui.product.shipping_price_with_vat', ['price' => $priceLabel]);
+                                    }
+                                @endphp
+                                <span data-product-shipping-range>{{ $rangeLabel }}: {{ $isFree ? __('ui.product.shipping_free') : $priceLabel }}</span>
+                            @endforeach
+                        </div>
+                        @if (data_get($method->settings, 'subtotal_basis') === 'before_discount')
+                            <p class="mt-2 text-xs text-slate-600">{{ __('ui.product.shipping_subtotal_basis') }}</p>
+                        @endif
+                    @else
                     <div class="product-method-meta">
                         @if (strtolower((string) $method->pricing_type) === 'quote')
                             <span>{{ __('ui.product.shipping_quote') }}</span>
@@ -77,6 +115,8 @@
                             <span>{{ __('ui.product.shipping_free_over', ['amount' => number_format((float) $method->free_over, 2).' €']) }}</span>
                         @endif
                     </div>
+                    @endif
+                    @endif
                 </article>
             @empty
                 <p class="product-method-empty">{{ __('ui.product.no_shipping_methods') }}</p>
@@ -102,7 +142,7 @@
                     @if (trim((string) $method->description) !== '')
                         <p>{{ $method->description }}</p>
                     @endif
-                    @if ((float) $method->fee_value > 0)
+                    @if ($canViewPrices && (float) $method->fee_value > 0)
                         <div class="product-method-meta">
                             <span>
                                 {{ __('ui.product.payment_fee', [

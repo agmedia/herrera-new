@@ -8,7 +8,7 @@ use App\Http\Controllers\Api\V1\Wholesale\ProductQuantityController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1/wholesale')
-    ->middleware(['catalog.feature:catalog_use_api', 'auth:sanctum', 'api.user.enabled', 'throttle:wholesale-api'])
+    ->middleware(['catalog.feature:catalog_use_api', 'api.user.enabled', 'auth:sanctum', 'throttle:wholesale-api'])
     ->group(function (): void {
         Route::get('products', [ProductController::class, 'index'])
             ->middleware('ability:products.read,wholesale.read');

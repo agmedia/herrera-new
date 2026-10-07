@@ -29,6 +29,7 @@ use Tests\TestCase;
 class MsanCatalogSyncAndImportTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\EnablesLegacyMsanModule;
 
     public function test_complete_snapshot_is_committed_with_prices_stock_categories_and_barcodes(): void
     {

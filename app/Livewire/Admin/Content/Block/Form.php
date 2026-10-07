@@ -8,6 +8,7 @@ use App\Models\Catalog\Product\Product;
 use App\Models\Content\Blog\BlogPost;
 use App\Models\Content\ContentBlock;
 use App\Services\Content\ContentBlockResolver;
+use App\Services\Content\FeaturedCategoriesService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -262,6 +263,7 @@ class Form extends Component
         }
 
         if ($type === 'featured_categories' && $this->lastType !== $type) {
+            $this->form['category_source'] = 'all_root';
             if (array_key_exists('home.categories', $this->placements)) {
                 $this->form['slot_placement'] = 'home.categories';
             }
@@ -460,6 +462,13 @@ class Form extends Component
         }
 
         $itemType = $this->itemTypeForBlockType((string) $validated['form']['type']);
+        $automaticCategories = (string) $validated['form']['type'] === 'featured_categories'
+            && ($validated['form']['category_source'] ?? 'manual') === 'all_root';
+
+        if ((string) $validated['form']['type'] === 'featured_categories') {
+            $existingBlockPayload = $existingBlockPayload ?? [];
+            $existingBlockPayload['category_source'] = (string) ($validated['form']['category_source'] ?? 'manual');
+        }
         $selectedIds = collect((array) ($validated['form']['selected_item_ids'] ?? []))
             ->map(fn ($id) => (int) $id)
             ->filter()
@@ -473,7 +482,7 @@ class Form extends Component
             return null;
         }
 
-        if ($itemType !== null && $selectedIds === []) {
+        if ($itemType !== null && $selectedIds === [] && ! $automaticCategories) {
             $this->addError('form.selected_item_ids', __('Select at least one item for this block type.'));
             $this->dispatch('notify', type: 'warning', message: __('Select at least one item.'));
 
@@ -610,6 +619,7 @@ class Form extends Component
             'form.manufacturer_ids' => ['nullable', 'array'],
             'form.manufacturer_ids.*' => ['integer', Rule::exists('catalog_manufacturers', 'id')],
             'form.product_sort' => ['nullable', Rule::in(self::CATEGORY_PRODUCT_SORTS)],
+            'form.category_source' => ['nullable', Rule::in(FeaturedCategoriesService::SOURCES)],
             'form.reviews_featured_only' => ['boolean'],
             'form.blog_source' => ['nullable', Rule::in(['latest', 'featured'])],
             'form.material_craftsmanship' => ['nullable', 'array'],
@@ -660,6 +670,7 @@ class Form extends Component
             'items_limit' => 6,
             'manufacturer_ids' => [],
             'product_sort' => 'category_order',
+            'category_source' => 'manual',
             'reviews_featured_only' => false,
             'blog_source' => 'latest',
             'material_craftsmanship' => $this->materialCraftsmanshipFormValues(null),
@@ -703,6 +714,7 @@ class Form extends Component
         $this->form['code'] = $block->code;
         $this->form['name'] = $block->name;
         $this->form['type'] = $block->type;
+        $this->form['category_source'] = FeaturedCategoriesService::source(is_array($block->payload) ? $block->payload : null);
         $this->form['is_active'] = (bool) $block->is_active;
         $this->form['locale'] = $preferredLocale;
 

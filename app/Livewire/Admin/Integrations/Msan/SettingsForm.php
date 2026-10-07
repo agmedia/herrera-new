@@ -252,12 +252,16 @@ class SettingsForm extends Component
 
     private function authorizeSettings(): void
     {
+        abort_unless(\App\Support\Integrations\MsanModule::available(), 404);
+
         $user = auth()->user();
         abort_unless($user && (Bouncer::is($user)->an('superadmin') || $user->can('integrations.msan.settings.manage')), 403);
     }
 
     private function authorizeSync(): void
     {
+        abort_unless(\App\Support\Integrations\MsanModule::available(), 404);
+
         abort_unless($this->canSync(), 403);
     }
 

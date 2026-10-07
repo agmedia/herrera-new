@@ -58,6 +58,8 @@ class MsanCategoryBranchImportService
         array $preferredLocales = ['hr'],
         ?int $destinationLocalParentId = null,
     ): array {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         return DB::transaction(function () use ($root, $userId, $locale, $preferredLocales, $destinationLocalParentId): array {
             $branch = $this->branch($root);
             $rootCategory = $branch->first();

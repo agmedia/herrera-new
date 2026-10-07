@@ -1,0 +1,36 @@
+{
+  "fetched": "2026-10-07",
+  "family": "Sora",
+  "repository": "https://github.com/sora-xor/sora-font",
+  "commit": "7f9a9c5d0ccd1c099cfac420aa27133df1c5fdc4",
+  "license": "SIL Open Font License 1.1",
+  "modified": false,
+  "conversion": null,
+  "source_format": "official complete variable WOFF2",
+  "weight_axes": {
+    "wght": {
+      "minimum": 100.0,
+      "default": 400.0,
+      "maximum": 800.0
+    }
+  },
+  "glyph_count": 513,
+  "validated_characters": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ČĆĐŠŽčćđšž€",
+  "public_url_path": "/assets/fonts/sora/Sora-Variable.woff2",
+  "assets": [
+    {
+      "file": "Sora-Variable.woff2",
+      "original_source_path": "fonts/woff2/Sora[wght].woff2",
+      "source_url": "https://raw.githubusercontent.com/sora-xor/sora-font/7f9a9c5d0ccd1c099cfac420aa27133df1c5fdc4/fonts/woff2/Sora%5Bwght%5D.woff2",
+      "bytes": 59912,
+      "sha256": "ab33ad8fceb925a49379a69245892da448b49229c3c97ffb28cc9d74aa95fc36"
+    },
+    {
+      "file": "OFL.txt",
+      "original_source_path": "OFL.txt",
+      "source_url": "https://raw.githubusercontent.com/sora-xor/sora-font/7f9a9c5d0ccd1c099cfac420aa27133df1c5fdc4/OFL.txt",
+      "bytes": 4385,
+      "sha256": "ba0b9729c9428ba79a0459ab8ec575791b51509dbec213e383d0316d37fec299"
+    }
+  ]
+}

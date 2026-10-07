@@ -64,7 +64,7 @@
         if (trim((string) ($ogSettings['category_image_url'] ?? '')) !== '') {
             $ogImage = (string) $ogSettings['category_image_url'];
         } elseif (method_exists($category, 'getFirstMediaUrl')) {
-            $categoryImage = (string) ($category->getFirstMediaUrl('category_main') ?: $category->getFirstMediaUrl());
+            $categoryImage = (string) \App\Support\Media\LegacyCatalogImage::first($category);
             if ($categoryImage !== '') {
                 $ogImage = $categoryImage;
             }
@@ -81,7 +81,7 @@
         if (trim((string) ($ogSettings['product_image_url'] ?? '')) !== '') {
             $ogImage = (string) $ogSettings['product_image_url'];
         } elseif (method_exists($product, 'getFirstMediaUrl')) {
-            $productImage = (string) ($product->getFirstMediaUrl('product_main') ?: $product->getFirstMediaUrl('product_gallery') ?: $product->getFirstMediaUrl());
+            $productImage = (string) \App\Support\Media\LegacyCatalogImage::first($product);
             if ($productImage !== '') {
                 $ogImage = $productImage;
             }
@@ -104,6 +104,12 @@
     if (request()->routeIs('blog.*')) {
         $ogType = request()->routeIs('blog.show') ? 'article' : 'website';
 
+        if (isset($blogCategoryTranslation) && $blogCategoryTranslation) {
+            $title = $cleanupText($blogCategoryTranslation->meta_title ?: $blogCategoryTranslation->name ?: $title, 191);
+            $description = $cleanupText($blogCategoryTranslation->meta_description ?: $blogCategoryTranslation->description ?: $description, 320);
+            if ($canonicalPolicy === 'self') { $canonicalUrl = route('blog.index', ['category' => $blogCategoryTranslation->slug]); }
+        }
+
         if (isset($post)) {
             $postTranslation = $post->translations->firstWhere('locale', $locale)
                 ?? $post->translations->firstWhere('locale', $fallbackLocale);
@@ -113,7 +119,7 @@
             if (trim((string) ($ogSettings['blog_image_url'] ?? '')) !== '') {
                 $ogImage = (string) $ogSettings['blog_image_url'];
             } elseif (method_exists($post, 'getFirstMediaUrl')) {
-                $postImage = (string) ($post->getFirstMediaUrl('blog_main') ?: $post->getFirstMediaUrl());
+                $postImage = (string) \App\Support\Media\LegacyCatalogImage::first($post);
                 if ($postImage !== '') {
                     $ogImage = $postImage;
                 }

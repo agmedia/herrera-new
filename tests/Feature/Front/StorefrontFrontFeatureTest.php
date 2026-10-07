@@ -555,6 +555,7 @@ class StorefrontFrontFeatureTest extends TestCase
     public function test_front_registration_collects_and_saves_the_complete_default_address(): void
     {
         Bouncer::role()->firstOrCreate(['name' => 'customer'], ['title' => 'Customer']);
+        $termsUrl = $this->seedTermsPage();
 
         $inactiveDefault = CustomerGroup::query()->create([
             'code' => 'inactive-default',
@@ -591,9 +592,13 @@ class StorefrontFrontFeatureTest extends TestCase
             ->assertSee('name="country_code"', false)
             ->assertSee('data-address-country', false)
             ->assertSee('name="terms_accepted"', false)
-            ->assertSee('/page/uvjeti-koristenja', false)
+            ->assertSee('href="'.$termsUrl.'"', false)
             ->assertSee('front-theme/scripts/address-autofill.js', false)
             ->assertDontSee('name="address_line_2"', false);
+
+        $this->get($termsUrl)
+            ->assertOk()
+            ->assertSee(__('ui.auth.register.terms_link'));
 
         $this->from('/auth/register')
             ->post('/auth/register', [
@@ -704,13 +709,18 @@ class StorefrontFrontFeatureTest extends TestCase
 
         [$category, $categorySlug] = $this->seedCategory();
 
+        $productIds = [];
         foreach (range(1, 25) as $index) {
-            $this->seedProduct($category->id);
+            [$product] = $this->seedProduct($category->id);
+            $productIds[] = $product->id;
         }
 
-        app(SystemSettingsService::class)->put('front_category_products_per_page_desktop', 24);
+        app(SystemSettingsService::class)->putMany([
+            'store_brand_name' => 'Herrera',
+            'front_category_products_per_page_desktop' => 24,
+        ]);
 
-        $response = $this->get('/category/'.$categorySlug.'?cols=5');
+        $response = $this->get('/category/'.$categorySlug.'?cols=5&sort=oldest');
 
         $response->assertOk();
 
@@ -719,6 +729,16 @@ class StorefrontFrontFeatureTest extends TestCase
         $this->assertSame(24, $products->perPage());
         $this->assertCount(24, $products->items());
         $this->assertSame(2, $products->lastPage());
+        $this->assertSame(array_slice($productIds, 0, 24), $products->pluck('id')->all());
+        $this->assertStringContainsString('cols=5', $products->nextPageUrl());
+        $this->assertStringContainsString('sort=oldest', $products->nextPageUrl());
+
+        $lastResponse = $this->get($products->nextPageUrl())->assertOk();
+        $lastProducts = $lastResponse->viewData('products');
+        $this->assertSame(24, $lastProducts->perPage());
+        $this->assertSame(25, $lastProducts->total());
+        $this->assertSame(array_slice($productIds, 24), $lastProducts->pluck('id')->all());
+        $this->assertSame($productIds, array_merge($products->pluck('id')->all(), $lastProducts->pluck('id')->all()));
     }
 
     public function test_category_grid_controls_render_responsive_column_sync_hooks(): void
@@ -1684,7 +1704,9 @@ class StorefrontFrontFeatureTest extends TestCase
         $desktopResponse
             ->assertOk()
             ->assertSee(__('ui.account.dashboard.subtitle_without_loyalty'))
-            ->assertSee('class="grid gap-5 md:grid-cols-2"', false)
+            ->assertSee(__('ui.account.dashboard.cards.user'))
+            ->assertSee(__('ui.account.dashboard.cards.orders'))
+            ->assertSee(__('Vrijednost narudžbi'))
             ->assertDontSee('id="loyalty"', false)
             ->assertDontSee(__('ui.account.nav.loyalty'));
 
@@ -2055,6 +2077,7 @@ class StorefrontFrontFeatureTest extends TestCase
 
     public function test_checkout_renders_the_wide_accessible_ui_on_desktop_and_the_reduced_form_on_mobile(): void
     {
+        $termsUrl = $this->seedTermsPage();
         [$category] = $this->seedCategory();
         [$product] = $this->seedProduct($category->id);
 
@@ -2109,12 +2132,33 @@ class StorefrontFrontFeatureTest extends TestCase
             ->assertSee('aria-controls="shipping-address-fields"', false)
             ->assertSee('items-center justify-start', false)
             ->assertSee('lg:justify-between', false)
-            ->assertSee('href="'.route('pages.show', ['slug' => 'uvjeti-koristenja']).'"', false)
+            ->assertSeeInOrder([
+                'for="accept-terms"',
+                'name="accept_terms"',
+                'href="'.$termsUrl.'"',
+            ], false)
             ->assertSee(__('ui.auth.register.terms_link'))
             ->assertDontSee('name="billing_state"', false)
             ->assertDontSee('name="shipping_state"', false)
             ->assertDontSee('name="shipping_company"', false);
 
+        $this
+            ->withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+            ])
+            ->get('/checkout')
+            ->assertOk()
+            ->assertViewIs('front.desktop.checkout.create')
+            ->assertHeader('Vary', 'User-Agent')
+            ->assertSee('class="checkout-shell"', false)
+            ->assertSee('autocomplete="billing given-name"', false)
+            ->assertSee('aria-controls="shipping-address-fields"', false)
+            ->assertSee('data-boxnow-selection-summary aria-live="polite"', false)
+            ->assertSee('data-gls-dpm-selection-summary aria-live="polite"', false)
+            ->assertSee('href="'.$termsUrl.'"', false)
+            ->assertDontSee('name="billing_state"', false)
+            ->assertDontSee('name="shipping_state"', false)
+            ->assertDontSee('name="shipping_company"', false);
     }
 
     public function test_category_shows_only_option_filters_available_in_that_category_scope(): void
@@ -2518,7 +2562,7 @@ class StorefrontFrontFeatureTest extends TestCase
             ->assertSee('data-product-floating-qty-input', false)
             ->assertSee('data-product-floating-submit', false)
             ->assertSee('class="product-information-panel" open', false)
-            ->assertSee('solid.svg#bag-shopping', false)
+            ->assertSee(\App\Support\FontAwesomeIcon::url('bag-shopping'), false)
             ->assertDontSee('<style', false)
             ->assertDontSee(' style=', false);
     }
@@ -3512,5 +3556,26 @@ class StorefrontFrontFeatureTest extends TestCase
         ]);
 
         return [$page, $slug];
+    }
+
+    private function seedTermsPage(): string
+    {
+        $page = InfoPage::query()->create([
+            'code' => 'terms-of-use',
+            'layout' => 'default',
+            'is_active' => true,
+            'published_at' => now()->subDay(),
+        ]);
+
+        foreach (['hr', 'en'] as $locale) {
+            $page->translations()->create([
+                'locale' => $locale,
+                'title' => trans('ui.auth.register.terms_link', [], $locale),
+                'slug' => 'uvjeti-koristenja',
+                'body_html' => '<p>Terms of use</p>',
+            ]);
+        }
+
+        return route('pages.show', ['slug' => 'uvjeti-koristenja']);
     }
 }

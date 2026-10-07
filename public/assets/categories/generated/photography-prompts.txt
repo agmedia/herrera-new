@@ -1,0 +1,245 @@
+HERRERA – 19 FOTOGRAFIJA KATEGORIJA
+
+Ugrađeni ImageGen. Originali: originals/<slug>-v1.png. Web verzije: <slug>-v1.jpg (768 × 768).
+
+# Herrera primary category photography
+
+Created 2026-10-07 with the built-in `image_gen.imagegen` tool. Seven separate assets use the existing Herrera category images as motif references. The generated lighting image is the shared photographic style reference for the remaining six assets. These images illustrate category types; they do not identify a specific SKU or claim a manufacturer's product.
+
+The series uses a square commercial/editorial photograph composition, warm-grey plaster, a neutral limestone surface, soft daylight from upper left, restrained natural colours and real contact shadows. No brands or readable captions were requested. All input photographs were inspected before generation.
+
+Original PNGs are preserved unchanged under `originals/`. Browser versions are 768 × 768 progressive JPEGs, resized with Lanczos and encoded at quality 88; no content editing was performed during optimization. The original built-in output files remain at the returned paths recorded in the metadata.
+
+| Category | Optimized image | Existing category motif source |
+| --- | --- | --- |
+| `rasvjeta` | [rasvjeta-v1.jpg](rasvjeta-v1.jpg) | [reference](https://www.herrera.hr/image/catalog/BY45-00200_2.jpg) |
+| `elektromaterijal` | [elektromaterijal-v1.jpg](elektromaterijal-v1.jpg) | [reference](https://www.herrera.hr/image/catalog/Elektromaterijal.png) |
+| `uticnice-i-prekidaci` | [uticnice-i-prekidaci-v1.jpg](uticnice-i-prekidaci-v1.jpg) | [reference](https://www.herrera.hr/image/catalog/Uticnice%20i%20prekidaci23.png) |
+| `produzni-kabeli-i-motalice` | [produzni-kabeli-i-motalice-v1.jpg](produzni-kabeli-i-motalice-v1.jpg) | [reference](https://www.herrera.hr/image/catalog/motalice2.png) |
+| `oprema-za-mjerenje-i-ispitivanje` | [oprema-za-mjerenje-i-ispitivanje-v1.jpg](oprema-za-mjerenje-i-ispitivanje-v1.jpg) | [reference](https://www.herrera.hr/image/catalog/oprema%20za%20mjerenje.png) |
+| `senzori` | [senzori-v1.jpg](senzori-v1.jpg) | [reference](https://www.herrera.hr/image/catalog/senzori234.jpg) |
+| `alati` | [alati-v1.jpg](alati-v1.jpg) | [reference](https://www.herrera.hr/image/catalog/Verkatto%20alati2.png) |
+
+The exact shared prompt, final prompt for each asset, reference URL, returned source path, original and derivative paths, image dimensions and file sizes are in [metadata-primary-categories.json](metadata-primary-categories.json).
+
+
+# Herrera category photographs — design_critique
+
+Created 2026-10-07 using the built-in ImageGen tool, one independent call per category. These are illustrative category photographs; existing product catalog images were not changed. Every final image was inspected visually. All share warm-grey plaster, a pale stone surface and soft upper-left daylight. Existing category source images were used only as object/motif references.
+
+Original PNGs are retained in `originals/`; serving JPEGs are resized to a maximum 768 px and re-encoded at quality 88 using Pillow. No image content editing was performed by Pillow.
+
+## mali-kucanski-aparati
+
+- Source reference: [mali-kucanski-aparati](https://www.herrera.hr/image/catalog/M-MF-TN40D2_g-1000x1000.png)
+- Final original: `originals/mali-kucanski-aparati-v1.png`
+- Optimized asset: `mali-kucanski-aparati-v1.jpg`
+
+Prompt used:
+
+```text
+Use case: product-mockup.
+Asset type: square category photograph for a Croatian professional wholesale ecommerce catalog.
+Style direction: square commercial/editorial product photograph, medium close natural three-quarter angle; recognizable technically accurate category objects like the reference motive; pale warm-grey plaster background and lightly textured neutral stone/light oak surface, soft window daylight from upper left, realistic contact shadows, neutral subdued grading with natural object colors, tactile real materials and slight camera imperfections.
+Composition: one coherent real photograph, objects centered with crop breathing room, entirely visible inside the square, modest empty area at the upper left reserved for a small UI icon; do not draw that icon. A gentle horizontal transition between surface and plaster background. Simple studio tabletop setup, 50mm lens perspective.
+Constraints: no people or hands, no text or captions, no brand logos, no watermark, no collage or split panels, no CGI or render look, no floating objects, no exaggerated saturation or cinematic glow. No words or labels on product surfaces. Reference is subject/type guidance only: create a new photograph with the above consistent setting, not a copy of the reference composition.
+Subject: a single matte black compact countertop air fryer of the type shown in the reference, approximately 4 litre size, physically credible pull-out basket with black handle, two unlabeled mechanical knobs on the upper front panel. Photograph from front-right three-quarter angle on the neutral surface. Drawer closed, no food, no kitchen accessories, no other objects.
+```
+
+## ljepota-i-zdravlje
+
+- Source reference: [ljepota-i-zdravlje](https://www.herrera.hr/image/catalog/ghf86054_2.jpg)
+- Final original: `originals/ljepota-i-zdravlje-v1.png`
+- Optimized asset: `ljepota-i-zdravlje-v1.jpg`
+
+Prompt used:
+
+```text
+Use case: product-mockup.
+Asset type: square category photograph for a Croatian professional wholesale ecommerce catalog.
+Style direction: square commercial/editorial product photograph, medium close natural three-quarter angle; recognizable technically accurate category objects like the reference motive; pale warm-grey plaster background and lightly textured neutral stone/light oak surface, soft window daylight from upper left, realistic contact shadows, neutral subdued grading with natural object colors, tactile real materials and slight camera imperfections.
+Composition: one coherent real photograph, objects centered with crop breathing room, entirely visible inside the square, modest empty area at the upper left reserved for a small UI icon; do not draw that icon. A gentle horizontal transition between surface and plaster background. Simple studio tabletop setup, 50mm lens perspective.
+Constraints: no people or hands, no text or captions, no brand logos, no watermark, no collage or split panels, no CGI or render look, no floating objects, no exaggerated saturation or cinematic glow. No words or labels on product surfaces. Reference is subject/type guidance only: create a new photograph with the above consistent setting, not a copy of the reference composition.
+Subject: a credible rose-copper and matte-black hairdryer with a fitted concentrator nozzle and one matching black/rose hair straightening iron. Lay the two hair styling appliances naturally on the surface at a shallow three-quarter view, with a short neatly resting segment of each cord visible. No flowers, candles, bottles, brushes, people or additional props.
+```
+
+## internet-audio-video-tv
+
+- Source reference: [internet-audio-video-tv](https://www.herrera.hr/image/catalog/Herrera%20-%20kategorije%20400x400%20antenska%20oprema.jpg)
+- Final original: `originals/internet-audio-video-tv-v1.png`
+- Optimized asset: `internet-audio-video-tv-v1.jpg`
+
+Prompt used:
+
+```text
+Use case: product-mockup.
+Asset type: square category photograph for a Croatian professional wholesale ecommerce catalog.
+Style direction: square commercial/editorial product photograph, medium close natural three-quarter angle; recognizable technically accurate category objects like the reference motive; pale warm-grey plaster background and lightly textured neutral stone/light oak surface, soft window daylight from upper left, realistic contact shadows, neutral subdued grading with natural object colors, tactile real materials and slight camera imperfections.
+Composition: one coherent real photograph, objects centered with crop breathing room, entirely visible inside the square, modest empty area at the upper left reserved for a small UI icon; do not draw that icon. A gentle horizontal transition between surface and plaster background. Simple studio tabletop setup, 50mm lens perspective.
+Constraints: no people or hands, no text or captions, no brand logos, no watermark, no collage or split panels, no CGI or render look, no floating objects, no exaggerated saturation or cinematic glow. No words or labels on product surfaces. Reference is subject/type guidance only: create a new photograph with the above consistent setting, not a copy of the reference composition.
+Subject: a small real tabletop set of antenna/coax equipment: a compact black indoor television aerial with two slim metal rods, a loose neatly coiled white coaxial cable, and one small silver two-way coax splitter. Correct mechanical threaded coax connectors and simple credible forms. No packaging, no labels, no additional television or computer, no floating equipment. One arranged group on the surface, not a collage.
+```
+
+## baterije
+
+- Source reference: [baterije](https://www.herrera.hr/image/catalog/lr6-20b-aa-1.5v.1800x1800w.jpg)
+- Final original: `originals/baterije-v1.png`
+- Optimized asset: `baterije-v1.jpg`
+
+Prompt used:
+
+```text
+Use case: product-mockup.
+Asset type: square category photograph for a Croatian professional wholesale ecommerce catalog.
+Style direction: square commercial/editorial product photograph, medium close natural three-quarter angle; recognizable technically accurate category objects like the reference motive; pale warm-grey plaster background and lightly textured neutral stone/light oak surface, soft window daylight from upper left, realistic contact shadows, neutral subdued grading with natural object colors, tactile real materials and slight camera imperfections.
+Composition: one coherent real photograph, objects centered with crop breathing room, entirely visible inside the square, modest empty area at the upper left reserved for a small UI icon; do not draw that icon. A gentle horizontal transition between surface and plaster background. Simple studio tabletop setup, 50mm lens perspective.
+Constraints: no people or hands, no text or captions, no brand logos, no watermark, no collage or split panels, no CGI or render look, no floating objects, no exaggerated saturation or cinematic glow. No words or labels on product surfaces. Reference is subject/type guidance only: create a new photograph with the above consistent setting, not a copy of the reference composition.
+Subject: six physically credible AA alkaline batteries without any printed words, logos, symbols or numbers, with subdued charcoal/grey metal sleeves and silver positive terminals. Four stand upright and two lie naturally in front, grouped close together; photograph the small set in a realistic close-up on the neutral surface. Keep exact cylindrical geometry and technically correct positive terminals. No packaging or other objects.
+```
+
+## dom-i-dizajn
+
+- Source reference: [dom-i-dizajn](https://www.herrera.hr/image/catalog/Esper/Home-decor2.png)
+- Final original: `originals/dom-i-dizajn-v1.png`
+- Optimized asset: `dom-i-dizajn-v1.jpg`
+
+Prompt used:
+
+```text
+Use case: product-mockup.
+Asset type: square category photograph for a Croatian professional wholesale ecommerce catalog.
+Style direction: square commercial/editorial product photograph, medium close natural three-quarter angle; recognizable technically accurate category objects like the reference motive; pale warm-grey plaster background and lightly textured neutral stone/light oak surface, soft window daylight from upper left, realistic contact shadows, neutral subdued grading with natural object colors, tactile real materials and slight camera imperfections.
+Composition: one coherent real photograph, objects centered with crop breathing room, entirely visible inside the square, modest empty area at the upper left reserved for a small UI icon; do not draw that icon. A gentle horizontal transition between surface and plaster background. Simple studio tabletop setup, 50mm lens perspective.
+Constraints: no people or hands, no text or captions, no brand logos, no watermark, no collage or split panels, no CGI or render look, no floating objects, no exaggerated saturation or cinematic glow. No words or labels on product surfaces. Reference is subject/type guidance only: create a new photograph with the above consistent setting, not a copy of the reference composition.
+Subject: a tasteful compact home decor arrangement: one small warm-grey tactile ceramic vase with just three restrained dried stems, a clear glass candle holder containing an unlit cream pillar candle, and a shallow natural oak bowl. Three objects form one centered group on the same neutral tabletop; no large wall clock, furniture, books, flames, printed labels or additional clutter.
+```
+
+## grijanje-hladenje-i-zastita-od-insekata
+
+- Source reference: [grijanje-hladenje-i-zastita-od-insekata](https://www.herrera.hr/image/catalog/M-NTH20-22ER-5.jpg)
+- Final original: `originals/grijanje-hladenje-i-zastita-od-insekata-v1.png`
+- Optimized asset: `grijanje-hladenje-i-zastita-od-insekata-v1.jpg`
+
+Prompt used:
+
+```text
+Use case: product-mockup.
+Asset type: square category photograph for a Croatian professional wholesale ecommerce catalog.
+Style direction: square commercial/editorial product photograph, medium close natural three-quarter angle; recognizable technically accurate category objects like the reference motive; pale warm-grey plaster background and lightly textured neutral stone/light oak surface, soft window daylight from upper left, realistic contact shadows, neutral subdued grading with natural object colors, tactile real materials and slight camera imperfections.
+Composition: one coherent real photograph, objects centered with crop breathing room, entirely visible inside the square, modest empty area at the upper left reserved for a small UI icon; do not draw that icon. A gentle horizontal transition between surface and plaster background. Simple studio tabletop setup, 50mm lens perspective.
+Constraints: no people or hands, no text or captions, no brand logos, no watermark, no collage or split panels, no CGI or render look, no floating objects, no exaggerated saturation or cinematic glow. No words or labels on product surfaces. Reference is subject/type guidance only: create a new photograph with the above consistent setting, not a copy of the reference composition.
+Subject: a single slim matte black ceramic tower space heater with a physically credible vertical protective mesh grille, plain unlit top control panel and stable small oval base, similar in general silhouette to the reference. The whole freestanding appliance is centered on the light neutral surface, photographed from front-right three-quarter view. Show only this heating appliance: no fan blades, no air conditioner, no insect zapper, no sofa, plants or other objects.
+```
+
+
+# Herrera category photography — audit images
+
+Generated on 2026-10-07 using the built-in image_gen tool, one call per asset. The six outputs were visually inspected for credible product geometry, consistent natural lighting, neutral materials, and absence of text, logos, people and decorative plants.
+
+Original full-resolution PNGs are retained in `originals/<slug>-v1.png`. Web copies are 768 × 768 progressive JPEGs, quality 92, resized and re-encoded with Pillow without any compositing or image editing.
+
+Shared style reference (viewed before use): `/Users/tomek/.codex/generated_images/01a11514-55e1-7900-9b1e-79b1897d00fe/exec-35ba7141-72fd-4e77-b239-5cc39d9142da.png`.
+
+The existing category reference URLs below were read from the local storefront database. Each retrieval timed out; no unavailable category reference was supplied to generation. The approved subject motifs and the shared local photograph were used instead. These are category editorial images, not exact photographs of a particular SKU.
+
+## osobna-zastitna-oprema
+
+- Web asset: `osobna-zastitna-oprema-v1.jpg`
+- Original: `originals/osobna-zastitna-oprema-v1.png`
+- Existing category reference: https://www.herrera.hr/image/catalog/large-DX481_DX442_FE01%20%2816%29.jpg (retrieval timed out)
+
+Exact generation prompt:
+
+```text
+Use case: photorealistic-natural.
+Asset type: square category photograph for a Croatian professional wholesale catalog.
+Input Image 1 is STYLE REFERENCE ONLY: match the believable commercial editorial photography, soft window daylight from upper left, pale warm-grey plaster wall, neutral pale limestone work surface, subdued neutral grading and tactile material textures. Do not include its bulb, window frame, plant, or decor.
+Primary request: photograph the specified ordinary real category products. Natural three-quarter medium close view, objects centered with room around all edges for category crop. Clear, physically plausible geometry and real contact shadows. Slight surface imperfections, authentic material finish and photographic detail. A single real photographed arrangement, not a collage, flat lay, CGI or render.
+Constraints: no people, hands, visible words, logos, watermarks, packaging captions or signs; no floating objects, exaggerated colors, artificial glamour, symmetry gimmicks or extra decor. No plants.
+Subject: professional personal protective work equipment on the pale limestone workbench: a realistically folded navy and charcoal durable work jacket with modest reflective trim, one neutral off-white safety helmet and a pair of used-looking but clean grey protective work gloves. Treat textiles with visible weave and seams and molded plastic with subtle scuffs. Authentic ordinary PPE, scale and folds are natural. Frame the complete arrangement comfortably in a square image.
+```
+
+## vodovodni-materijal-i-sanitarije
+
+- Web asset: `vodovodni-materijal-i-sanitarije-v1.jpg`
+- Original: `originals/vodovodni-materijal-i-sanitarije-v1.png`
+- Existing category reference: https://www.herrera.hr/image/catalog/VA0321-9.jpg (retrieval timed out)
+
+Exact generation prompt:
+
+```text
+Use case: photorealistic-natural.
+Asset type: square category photograph for a Croatian professional wholesale catalog.
+Input Image 1 is STYLE REFERENCE ONLY: match the believable commercial editorial photography, soft window daylight from upper left, pale warm-grey plaster wall, neutral pale limestone work surface, subdued neutral grading and tactile material textures. Do not include its bulb, window frame, plant, or decor.
+Primary request: photograph the specified ordinary real category products. Natural three-quarter medium close view, objects centered with room around all edges for category crop. Clear, physically plausible geometry and real contact shadows. Slight surface imperfections, authentic material finish and photographic detail. A single real photographed arrangement, not a collage, flat lay, CGI or render.
+Constraints: no people, hands, visible words, logos, watermarks, packaging captions or signs; no floating objects, exaggerated colors, artificial glamour, symmetry gimmicks or extra decor. No plants.
+Subject: real plumbing and sanitary equipment on the pale limestone workbench: one simple upright chrome mixer faucet with a normal straight lever and short gently curved spout, next to a small restrained group of brass pipe elbow fittings and metal flexible connector hose. The faucet has believable round base, realistic joints, reflected daylight and fine finger-mark imperfections; ordinary workable plumbing fittings, no fanciful geometry. Frame the complete arrangement comfortably in a square image.
+```
+
+## punionice-za-ev-vozila
+
+- Web asset: `punionice-za-ev-vozila-v1.jpg`
+- Original: `originals/punionice-za-ev-vozila-v1.png`
+- Existing category reference: https://www.herrera.hr/image/catalog/71VW91nKwYL._AC_UF894%2C1000_QL80_.jpg (retrieval timed out)
+
+Exact generation prompt:
+
+```text
+Use case: photorealistic-natural.
+Asset type: square category photograph for a Croatian professional wholesale catalog.
+Input Image 1 is STYLE REFERENCE ONLY: match the believable commercial editorial photography, soft window daylight from upper left, pale warm-grey plaster wall, neutral pale limestone work surface, subdued neutral grading and tactile material textures. Do not include its bulb, window frame, plant, or decor.
+Primary request: photograph the specified ordinary real category products. Natural three-quarter medium close view, objects centered with room around all edges for category crop. Clear, physically plausible geometry and real contact shadows. Slight surface imperfections, authentic material finish and photographic detail. A single real photographed arrangement, not a collage, flat lay, CGI or render.
+Constraints: no people, hands, visible words, logos, watermarks, packaging captions or signs; no floating objects, exaggerated colors, artificial glamour, symmetry gimmicks or extra decor. No plants.
+Subject: one ordinary real modern home EV wall charging unit, compact matte charcoal and off-white housing securely mounted on the warm-grey plaster wall just above the pale limestone work surface. Its realistically thick black cable is neatly but naturally coiled beneath it with a recognizable European Type 2 charging connector resting on the surface. Physically coherent cable connections, no detached or impossible loop, slight fine molding marks, unbranded front with no readable labels. Natural three-quarter medium close photo of the complete charger and coiled cable with room around all edges. No car, no people, no decor.
+```
+
+## extra-popusti
+
+- Web asset: `extra-popusti-v1.jpg`
+- Original: `originals/extra-popusti-v1.png`
+- Existing category reference: https://www.herrera.hr/image/catalog/sale%20discount1.png (retrieval timed out)
+
+Exact generation prompt:
+
+```text
+Use case: photorealistic-natural.
+Asset type: square category photograph for a Croatian professional wholesale catalog.
+Input Image 1 is STYLE REFERENCE ONLY: match the believable commercial editorial photography, soft window daylight from upper left, pale warm-grey plaster wall, neutral pale limestone work surface, subdued neutral grading and tactile material textures. Do not include its bulb, window frame, plant, or decor.
+Primary request: photograph the specified ordinary real category products. Natural three-quarter medium close view, objects centered with room around all edges for category crop. Clear, physically plausible geometry and real contact shadows. Slight surface imperfections, authentic material finish and photographic detail. A single real photographed arrangement, not a collage, flat lay, CGI or render.
+Constraints: no people, hands, visible words, logos, watermarks, packaging captions or signs; no floating objects, exaggerated colors, artificial glamour, symmetry gimmicks or extra decor. No plants.
+Subject: a small clearance selection of ordinary real household electrical and hardware products: two everyday LED bulbs (one frosted white, one clear filament), a white grounded plug adapter, a compact pair of simple steel pliers with dark grey grip and a small roll of neutral electrical tape, arranged casually together on the pale limestone workbench. Every product has credible functional geometry and appropriate relative scale. This represents a range of actual catalog stock, photographed as one coherent product selection, not fantasy objects. No discount numbers, SALE signs, price tags, words or visual sale graphics. Natural three-quarter medium close view centered in a square composition.
+```
+
+## zeljezarija
+
+- Web asset: `zeljezarija-v1.jpg`
+- Original: `originals/zeljezarija-v1.png`
+- Existing category reference: https://www.herrera.hr/image/catalog/96f1f3c6474eb8aef17e13e6220f.jpg (retrieval timed out)
+
+Exact generation prompt:
+
+```text
+Use case: photorealistic-natural.
+Asset type: square category photograph for a Croatian professional wholesale catalog.
+Input Image 1 is STYLE REFERENCE ONLY: match the believable commercial editorial photography, soft window daylight from upper left, pale warm-grey plaster wall, neutral pale limestone work surface, subdued neutral grading and tactile material textures. Do not include its bulb, window frame, plant, or decor.
+Primary request: photograph the specified ordinary real category products. Natural three-quarter medium close view, objects centered with room around all edges for category crop. Clear, physically plausible geometry and real contact shadows. Slight surface imperfections, authentic material finish and photographic detail. A single real photographed arrangement, not a collage, flat lay, CGI or render.
+Constraints: no people, hands, visible words, logos, watermarks, packaging captions or signs; no floating objects, exaggerated colors, artificial glamour, symmetry gimmicks or extra decor. No plants.
+Subject: ordinary real hardware essentials on the pale limestone workbench: a few galvanized steel bolts with matching nuts and washers, two brass-toned door hinges with physically correct knuckles and countersunk holes, and one steel combination plier with charcoal handles. A restrained casually arranged stock assortment, credible useful objects with real thread details and brushed metal surface imperfections; not decorative abstract hardware. Photograph them from a natural three-quarter medium close angle centered with generous room around the complete group, in a square composition.
+```
+
+## svijece-i-upaljaci
+
+- Web asset: `svijece-i-upaljaci-v1.jpg`
+- Original: `originals/svijece-i-upaljaci-v1.png`
+- Existing category reference: https://www.herrera.hr/image/catalog/svijece%20i%20upaljaci%20234.jpg (retrieval timed out)
+
+Exact generation prompt:
+
+```text
+Use case: photorealistic-natural.
+Asset type: square category photograph for a Croatian professional wholesale catalog.
+Input Image 1 is STYLE REFERENCE ONLY: match the believable commercial editorial photography, soft window daylight from upper left, pale warm-grey plaster wall, neutral pale limestone work surface, subdued neutral grading and tactile material textures. Do not include its bulb, window frame, plant, or decor.
+Primary request: photograph the specified ordinary real category products. Natural three-quarter medium close view, objects centered with room around all edges for category crop. Clear, physically plausible geometry and real contact shadows. Slight surface imperfections, authentic material finish and photographic detail. A single real photographed arrangement, not a collage, flat lay, CGI or render.
+Constraints: no people, hands, visible words, logos, watermarks, packaging captions or signs; no floating objects, exaggerated colors, artificial glamour, symmetry gimmicks or extra decor. No plants.
+Subject: an ordinary real pair of unlit ivory wax candles, one short pillar candle and one modest clear glass jar candle with exposed wax and wick, beside one simple unbranded grey refillable lighter with a normal metallic top, arranged on the pale limestone workbench. Real wax has slight unevenness and a delicate matte surface; clear glass refracts daylight naturally, and lighter plastic has fine molding texture. Three-quarter medium close commercial photo centered in a square frame with room around the group. No flame, decorative styling, flowers, extra vessels, text or logos.
+```

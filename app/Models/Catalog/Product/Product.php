@@ -7,6 +7,7 @@ use App\Models\Catalog\Attribute\Attribute;
 use App\Models\Catalog\Category\Category;
 use App\Models\Catalog\Manufacturer\Manufacturer;
 use App\Models\Catalog\Option\Option;
+use App\Models\Concerns\HasB2BMonetaryPrecision;
 use App\Models\Concerns\HasConfiguredMedia;
 use App\Models\Content\Support\Comment;
 use App\Models\Settings\Local\TaxRate;
@@ -23,7 +24,10 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Product extends Model implements HasMedia
 {
+    use HasB2BMonetaryPrecision;
     use HasConfiguredMedia;
+
+    protected array $b2bMonetaryAttributes = ['base_price'];
 
     /** @var array<string, array{count:int,avg:float}> */
     private static array $approvedCommentSummaryCache = [];
@@ -43,6 +47,7 @@ class Product extends Model implements HasMedia
         'erp_cash_discount_percent',
         'erp_cash_selling_price',
         'stock_qty',
+        'supplier_stock_qty',
         'weight_kg',
         'length_cm',
         'width_cm',
@@ -73,6 +78,7 @@ class Product extends Model implements HasMedia
         'erp_cash_discount_percent' => 'decimal:4',
         'erp_cash_selling_price' => 'decimal:4',
         'stock_qty' => 'int',
+        'supplier_stock_qty' => 'int',
         'minimum_order_quantity' => 'int',
         'order_quantity_step' => 'int',
         'weight_kg' => 'decimal:3',
@@ -225,8 +231,13 @@ class Product extends Model implements HasMedia
                 'is_primary',
                 'source',
                 'synced_at',
+                'payload',
             ]),
             'energyMedia',
+            'technicalSpecificationRows' => fn ($query) => $query
+                ->select(['id', 'product_id', 'source', 'item_name', 'values'])
+                ->where('source', 'herrera-opencart')
+                ->whereIn('item_name', ['Razina energetske učinkovitosti', 'Klasa energetske učinkovitosti EEi']),
         ]);
     }
 
@@ -298,6 +309,24 @@ class Product extends Model implements HasMedia
         $query->where('products.is_active', true);
 
         if (! $hideOutOfStock) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $stockQuery): void {
+            $stockQuery
+                ->where('products.stock_qty', '>', 0)
+                ->orWhere('products.supplier_stock_qty', '>', 0)
+                ->orWhereHas('optionValues', function (Builder $optionQuery): void {
+                    $optionQuery
+                        ->where('is_active', true)
+                        ->where('stock_qty', '>', 0);
+                });
+        });
+    }
+
+    public function scopeAvailableWithin48Hours(Builder $query, bool $enabled = true): Builder
+    {
+        if (! $enabled) {
             return $query;
         }
 
@@ -404,6 +433,12 @@ class Product extends Model implements HasMedia
             return $this->hasAvailableOptionRows();
         }
 
-        return (int) $this->stock_qty > 0;
+        return $this->availableStockQuantity() > 0;
+    }
+
+    /** Zaliha artikla: vlastito skladište i dobavljač; zalihe varijanti ostaju zasebne. */
+    public function availableStockQuantity(): int
+    {
+        return max(0, (int) $this->stock_qty) + max(0, (int) $this->supplier_stock_qty);
     }
 }

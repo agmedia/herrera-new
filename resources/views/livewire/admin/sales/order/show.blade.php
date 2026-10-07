@@ -137,6 +137,8 @@
                     <div class="mt-2 text-sm text-slate-700">
                         <p>{{ trim(($order->billing_first_name ?? '').' '.($order->billing_last_name ?? '')) ?: '-' }}</p>
                         @if ($order->billing_company)<p>{{ $order->billing_company }}</p>@endif
+                        @if ($order->billing_oib)<p>{{ __('ui.account.fields.oib') }}: {{ $order->billing_oib }}</p>@endif
+                        @if ($order->billing_vat_id)<p>VAT ID: {{ $order->billing_vat_id }}</p>@endif
                         <p>{{ $order->billing_address_line_1 ?: '-' }}</p>
                         @if ($order->billing_address_line_2)<p>{{ $order->billing_address_line_2 }}</p>@endif
                         <p>{{ trim(($order->billing_postal_code ?? '').' '.($order->billing_city ?? '')) ?: '-' }}</p>

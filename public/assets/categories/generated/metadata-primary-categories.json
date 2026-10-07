@@ -1,0 +1,141 @@
+{
+  "created": "2026-10-07",
+  "asset_type": "ecommerce category photograph",
+  "generation_mode": "built-in image_gen.imagegen",
+  "shared_prompt": "Use case: product-mockup. Asset type: square ecommerce category photograph, 1:1 composition.\nPrimary request: Create one convincingly photographic image for a cohesive seven-image category series. Use the provided existing category image only as a subject/motif reference; replace its scene, lighting and styling.\nShared art direction: medium close view at a natural three-quarter angle, pale warm-grey plaster wall behind a lightly textured neutral limestone work surface, soft window daylight entering from upper left, real contact shadows, subdued neutral grading and natural product colors. Delicate material wear and ordinary camera imperfections; realistic glass, metal and plastic. Product fills about 65–75% of the frame, centered, with crop-safe margins and quiet upper-left space for a small UI icon. All objects physically supported.\nConstraints: no people, hands, readable text, captions, logos, watermark, collage, CGI/render appearance, levitating objects, exaggerated saturation or cinematic glow. No invented branded product claims. Technically plausible category objects, photograph-like detail rather than decorative 3D design.",
+  "assets": [
+    {
+      "slug": "rasvjeta",
+      "version": "v1",
+      "reference_source_url": "https://www.herrera.hr/image/catalog/BY45-00200_2.jpg",
+      "mode": "built-in image_gen.imagegen",
+      "returned_source_path": "/Users/tomek/.codex/generated_images/01a11514-55e1-7900-9b1e-79b1897d00fe/exec-35ba7141-72fd-4e77-b239-5cc39d9142da.png",
+      "original_path": "public/assets/categories/generated/originals/rasvjeta-v1.png",
+      "derivative_path": "public/assets/categories/generated/rasvjeta-v1.jpg",
+      "prompt": "Use case: product-mockup. Asset type: square ecommerce category photograph, 1:1 composition.\nPrimary request: Create one convincingly photographic image for a cohesive seven-image category series. Use the provided existing category image only as a subject/motif reference; replace its scene, lighting and styling.\nShared art direction: medium close view at a natural three-quarter angle, pale warm-grey plaster wall behind a lightly textured neutral limestone work surface, soft window daylight entering from upper left, real contact shadows, subdued neutral grading and natural product colors. Delicate material wear and ordinary camera imperfections; realistic glass, metal and plastic. Product fills about 65–75% of the frame, centered, with crop-safe margins and quiet upper-left space for a small UI icon. All objects physically supported.\nConstraints: no people, hands, readable text, captions, logos, watermark, collage, CGI/render appearance, levitating objects, exaggerated saturation or cinematic glow. No invented branded product claims. Technically plausible category objects, photograph-like detail rather than decorative 3D design.\nSubject for RASVJETA / lighting: preserve the original motif of a clear round glass filament bulb and its simple matte black cylindrical pendant socket. A large transparent globe bulb is securely held in the socket, hanging vertically from a real black braided electrical cord extending beyond the top edge. Frame at medium close distance, see the fine filament and genuine glass reflections; lamp switched off, no glowing beam. Soft daylight and neutral plaster background, limestone surface visible subtly along the bottom. The bulb and socket occupy center-right; leave adequate air at every edge. One coherent photograph, without the original collage of enlarged and miniature lamps.",
+      "original_dimensions": [
+        1254,
+        1254
+      ],
+      "derivative_dimensions": [
+        768,
+        768
+      ],
+      "derivative_bytes": 90478
+    },
+    {
+      "slug": "elektromaterijal",
+      "version": "v1",
+      "reference_source_url": "https://www.herrera.hr/image/catalog/Elektromaterijal.png",
+      "mode": "built-in image_gen.imagegen",
+      "returned_source_path": "/Users/tomek/.codex/generated_images/01a11514-55e1-7900-9b1e-79b1897d00fe/exec-c5de9a18-a050-42fd-a2d2-44c21eb04eb3.png",
+      "original_path": "public/assets/categories/generated/originals/elektromaterijal-v1.png",
+      "derivative_path": "public/assets/categories/generated/elektromaterijal-v1.jpg",
+      "prompt": "Use case: product-mockup. Asset type: square ecommerce category photograph, 1:1 composition.\nPrimary request: Create one convincingly photographic image for a cohesive seven-image category series. Use the provided existing category image only as a subject/motif reference; replace its scene, lighting and styling.\nShared art direction: medium close view at a natural three-quarter angle, pale warm-grey plaster wall behind a lightly textured neutral limestone work surface, soft window daylight entering from upper left, real contact shadows, subdued neutral grading and natural product colors. Delicate material wear and ordinary camera imperfections; realistic glass, metal and plastic. Product fills about 65–75% of the frame, centered, with crop-safe margins and quiet upper-left space for a small UI icon. All objects physically supported.\nConstraints: no people, hands, readable text, captions, logos, watermark, collage, CGI/render appearance, levitating objects, exaggerated saturation or cinematic glow. No invented branded product claims. Technically plausible category objects, photograph-like detail rather than decorative 3D design.\nInput images: Image 1 is the existing category subject/motif reference. Image 2 is the approved visual-series style reference: use only its warm-grey plaster, pale limestone, natural daylight, neutral grading and photographic realism; do not copy its lamp, plant, bowls or window. Keep background simple, no greenery or decor.\nSubject: electrical installation equipment similar to reference Image 1, presented as a smaller clear arrangement of real objects: an upright open compact white electrical distribution enclosure with one neat row of four modular circuit breakers on a DIN rail, their proper terminals and a few neatly routed wires visible; a short coil of grey corrugated flexible conduit, one small white junction box and three compact orange lever wire connectors beside it. All objects rest naturally on the limestone worktop. Preserve technically plausible shapes and genuine plastic and metal texture, simplify the crowded reference. No printed brand or circuit labels. No industrial plugs, plants, decorations or extra objects. Dominant enclosure centered, medium close at natural three-quarter camera angle.",
+      "original_dimensions": [
+        1254,
+        1254
+      ],
+      "derivative_dimensions": [
+        768,
+        768
+      ],
+      "derivative_bytes": 116758
+    },
+    {
+      "slug": "uticnice-i-prekidaci",
+      "version": "v1",
+      "reference_source_url": "https://www.herrera.hr/image/catalog/Uticnice%20i%20prekidaci23.png",
+      "mode": "built-in image_gen.imagegen",
+      "returned_source_path": "/Users/tomek/.codex/generated_images/01a11514-55e1-7900-9b1e-79b1897d00fe/exec-c59c48d0-66b7-44fa-ae31-7109b5a9e7f7.png",
+      "original_path": "public/assets/categories/generated/originals/uticnice-i-prekidaci-v1.png",
+      "derivative_path": "public/assets/categories/generated/uticnice-i-prekidaci-v1.jpg",
+      "prompt": "Use case: product-mockup. Asset type: square ecommerce category photograph, 1:1 composition.\nPrimary request: Create one convincingly photographic image for a cohesive seven-image category series. Use the provided existing category image only as a subject/motif reference; replace its scene, lighting and styling.\nShared art direction: medium close view at a natural three-quarter angle, pale warm-grey plaster wall behind a lightly textured neutral limestone work surface, soft window daylight entering from upper left, real contact shadows, subdued neutral grading and natural product colors. Delicate material wear and ordinary camera imperfections; realistic glass, metal and plastic. Product fills about 65–75% of the frame, centered, with crop-safe margins and quiet upper-left space for a small UI icon. All objects physically supported.\nConstraints: no people, hands, readable text, captions, logos, watermark, collage, CGI/render appearance, levitating objects, exaggerated saturation or cinematic glow. No invented branded product claims. Technically plausible category objects, photograph-like detail rather than decorative 3D design.\nInput images: Image 1 is the existing category subject/motif reference. Image 2 is the approved visual-series style reference: use only its warm-grey plaster, pale limestone, natural daylight, neutral grading and photographic realism; do not copy its lamp, plant, bowls or window. Keep background simple, no greenery or decor.\nSubject: preserve the reference's clean white European square rocker light switch as the main object. Add one matching square white Schuko wall socket beside it, two round pin holes with correct earth contacts, both flush wall assemblies installed next to one another in a small upright warm-grey plaster wall sample resting on the limestone work surface. Matte white plastic, thin real seams and very gentle wear; real soft shadows around the mounts. Camera at mild three-quarter angle so both fronts remain fully identifiable. Main objects large, centered and crop safe. Remove the family scene entirely. No people, no hands, no fruit, no flowers, no plants, no decorations, no logos or readable markings. One real-looking architectural product photograph.",
+      "original_dimensions": [
+        1254,
+        1254
+      ],
+      "derivative_dimensions": [
+        768,
+        768
+      ],
+      "derivative_bytes": 110882
+    },
+    {
+      "slug": "produzni-kabeli-i-motalice",
+      "version": "v1",
+      "reference_source_url": "https://www.herrera.hr/image/catalog/motalice2.png",
+      "mode": "built-in image_gen.imagegen",
+      "returned_source_path": "/Users/tomek/.codex/generated_images/01a11514-55e1-7900-9b1e-79b1897d00fe/exec-349904f6-ce48-4323-9222-f0b12ad501f2.png",
+      "original_path": "public/assets/categories/generated/originals/produzni-kabeli-i-motalice-v1.png",
+      "derivative_path": "public/assets/categories/generated/produzni-kabeli-i-motalice-v1.jpg",
+      "prompt": "Use case: product-mockup. Asset type: square ecommerce category photograph, 1:1 composition.\nPrimary request: Create one convincingly photographic image for a cohesive seven-image category series. Use the provided existing category image only as a subject/motif reference; replace its scene, lighting and styling.\nShared art direction: medium close view at a natural three-quarter angle, pale warm-grey plaster wall behind a lightly textured neutral limestone work surface, soft window daylight entering from upper left, real contact shadows, subdued neutral grading and natural product colors. Delicate material wear and ordinary camera imperfections; realistic glass, metal and plastic. Product fills about 65–75% of the frame, centered, with crop-safe margins and quiet upper-left space for a small UI icon. All objects physically supported.\nConstraints: no people, hands, readable text, captions, logos, watermark, collage, CGI/render appearance, levitating objects, exaggerated saturation or cinematic glow. No invented branded product claims. Technically plausible category objects, photograph-like detail rather than decorative 3D design.\nInput images: Image 1 is the existing category subject/motif reference. Image 2 is the approved visual-series style reference: use only its warm-grey plaster, pale limestone, natural daylight, neutral grading and photographic realism; do not copy its lamp, plant, bowls or window. Keep background simple, no greenery or decor.\nSubject: preserve the reference's upright professional electrical cable reel: a zinc-coated steel round drum carrying a neatly wound black electrical cable, tubular steel support stand with two feet, orange handle with dark blue grip, a realistic dark central face with four standard European grounded sockets and modest blue safety covers. One cable length and an unbranded European plug lie naturally on the limestone worktop in front. Keep the structure technically convincing and the sockets symmetrical and functional. Entire reel fits within frame, centered at natural three-quarter angle, subtle use marks on metal. No construction worker, saw, debris, plants, decorative props or brand marks.",
+      "original_dimensions": [
+        1254,
+        1254
+      ],
+      "derivative_dimensions": [
+        768,
+        768
+      ],
+      "derivative_bytes": 115915
+    },
+    {
+      "slug": "oprema-za-mjerenje-i-ispitivanje",
+      "version": "v1",
+      "reference_source_url": "https://www.herrera.hr/image/catalog/oprema%20za%20mjerenje.png",
+      "mode": "built-in image_gen.imagegen",
+      "returned_source_path": "/Users/tomek/.codex/generated_images/01a11514-55e1-7900-9b1e-79b1897d00fe/exec-eed0a7f1-af8c-4983-a17a-df91b4934ef6.png",
+      "original_path": "public/assets/categories/generated/originals/oprema-za-mjerenje-i-ispitivanje-v1.png",
+      "derivative_path": "public/assets/categories/generated/oprema-za-mjerenje-i-ispitivanje-v1.jpg",
+      "prompt": "Use case: product-mockup. Asset type: square ecommerce category photograph, 1:1 composition.\nPrimary request: Create one convincingly photographic image for a cohesive seven-image category series. Use the provided existing category image only as a subject/motif reference; replace its scene, lighting and styling.\nShared art direction: medium close view at a natural three-quarter angle, pale warm-grey plaster wall behind a lightly textured neutral limestone work surface, soft window daylight entering from upper left, real contact shadows, subdued neutral grading and natural product colors. Delicate material wear and ordinary camera imperfections; realistic glass, metal and plastic. Product fills about 65–75% of the frame, centered, with crop-safe margins and quiet upper-left space for a small UI icon. All objects physically supported.\nConstraints: no people, hands, readable text, captions, logos, watermark, collage, CGI/render appearance, levitating objects, exaggerated saturation or cinematic glow. No invented branded product claims. Technically plausible category objects, photograph-like detail rather than decorative 3D design.\nInput images: Image 1 is the existing category subject/motif reference. Image 2 is the approved visual-series style reference: use only its warm-grey plaster, pale limestone, natural daylight, neutral grading and photographic realism; do not copy its lamp, plant, bowls or window. Keep background simple, no greenery or decor.\nSubject: preserve the reference's red and black electrical measurement equipment but simplify into a convincing small still life: one upright professional handheld digital multimeter with a red protective rubber bumper, dark matte front, large central rotary dial and an inactive grey LCD, supported by its normal fold-out rear stand. A pair of disconnected red and black insulated test probes and their neatly looped wires rest naturally in front; include one compact matching red laser distance meter lying beside it and one narrow voltage-test pen. Instruments look carefully used with restrained realistic scuffs and precise molded plastic geometry. No displayed readings or printed logos, no readable text, no hand, drill, power strip, plant or decorative props. Main multimeter centered and larger than the secondary objects, view from a natural three-quarter angle.",
+      "original_dimensions": [
+        1254,
+        1254
+      ],
+      "derivative_dimensions": [
+        768,
+        768
+      ],
+      "derivative_bytes": 127406
+    },
+    {
+      "slug": "senzori",
+      "version": "v1",
+      "reference_source_url": "https://www.herrera.hr/image/catalog/senzori234.jpg",
+      "mode": "built-in image_gen.imagegen",
+      "returned_source_path": "/Users/tomek/.codex/generated_images/01a11514-55e1-7900-9b1e-79b1897d00fe/exec-55260958-44c2-4896-9cf3-34d430c6e751.png",
+      "original_path": "public/assets/categories/generated/originals/senzori-v1.png",
+      "derivative_path": "public/assets/categories/generated/senzori-v1.jpg",
+      "prompt": "Use case: product-mockup. Asset type: square ecommerce category photograph, 1:1 composition.\nPrimary request: Create one convincingly photographic image for a cohesive seven-image category series. Use the provided existing category image only as a subject/motif reference; replace its scene, lighting and styling.\nShared art direction: medium close view at a natural three-quarter angle, pale warm-grey plaster wall behind a lightly textured neutral limestone work surface, soft window daylight entering from upper left, real contact shadows, subdued neutral grading and natural product colors. Delicate material wear and ordinary camera imperfections; realistic glass, metal and plastic. Product fills about 65–75% of the frame, centered, with crop-safe margins and quiet upper-left space for a small UI icon. All objects physically supported.\nConstraints: no people, hands, readable text, captions, logos, watermark, collage, CGI/render appearance, levitating objects, exaggerated saturation or cinematic glow. No invented branded product claims. Technically plausible category objects, photograph-like detail rather than decorative 3D design.\nInput images: Image 1 is the existing category subject/motif reference. Image 2 is the approved visual-series style reference: use only its warm-grey plaster, pale limestone, natural daylight, neutral grading and photographic realism; do not copy its lamp, plant, bowls or window. Keep background simple, no greenery or decor.\nSubject: preserve the current reference's black wall-mounted adjustable PIR motion sensor with its white segmented Fresnel detection lens. One realistic compact dark graphite sensor is correctly attached to its matching vertical mounting base via a small pivoting bracket, mounted on a warm-grey plaster wall sample or short wall section directly above the limestone surface. The sensor head is angled slightly down toward camera so its pale curved Fresnel lens is clearly visible. Make the product large and centered with room for crop, authentic matte plastic and small seam details, credible screw mount and realistic wall contact shadows. Camera at gentle three-quarter angle. Remove the wide living-room scene; no windows in frame, plants, decor, labels, readable text or logo. One quiet close photographic composition in the same series.",
+      "original_dimensions": [
+        1254,
+        1254
+      ],
+      "derivative_dimensions": [
+        768,
+        768
+      ],
+      "derivative_bytes": 106377
+    },
+    {
+      "slug": "alati",
+      "version": "v1",
+      "reference_source_url": "https://www.herrera.hr/image/catalog/Verkatto%20alati2.png",
+      "mode": "built-in image_gen.imagegen",
+      "returned_source_path": "/Users/tomek/.codex/generated_images/01a11514-55e1-7900-9b1e-79b1897d00fe/exec-79b50595-5402-4977-81c6-279c915601a5.png",
+      "original_path": "public/assets/categories/generated/originals/alati-v1.png",
+      "derivative_path": "public/assets/categories/generated/alati-v1.jpg",
+      "prompt": "Use case: product-mockup. Asset type: square ecommerce category photograph, 1:1 composition.\nPrimary request: Create one convincingly photographic image for a cohesive seven-image category series. Use the provided existing category image only as a subject/motif reference; replace its scene, lighting and styling.\nShared art direction: medium close view at a natural three-quarter angle, pale warm-grey plaster wall behind a lightly textured neutral limestone work surface, soft window daylight entering from upper left, real contact shadows, subdued neutral grading and natural product colors. Delicate material wear and ordinary camera imperfections; realistic glass, metal and plastic. Product fills about 65–75% of the frame, centered, with crop-safe margins and quiet upper-left space for a small UI icon. All objects physically supported.\nConstraints: no people, hands, readable text, captions, logos, watermark, collage, CGI/render appearance, levitating objects, exaggerated saturation or cinematic glow. No invented branded product claims. Technically plausible category objects, photograph-like detail rather than decorative 3D design.\nInput images: Image 1 is the existing category subject/motif reference. Image 2 is the approved visual-series style reference: use only its warm-grey plaster, pale limestone, natural daylight, neutral grading and photographic realism; do not copy its lamp, plant, bowls or window. Keep background simple, no greenery or decor.\nSubject: a clear, physically plausible small assortment of mechanic and electrician hand tools using the reference's natural orange/black grips and steel finishes: four orange-and-black handled screwdrivers arranged in a compact low holder with four separate straight metal shafts, one combination pliers, two correctly shaped steel combination spanners of different sizes, one small claw hammer and one retracted orange/black tape measure. All objects rest naturally on the limestone worktop, grouped compactly with mild ordinary use marks. Slightly elevated natural three-quarter camera view, main tool arrangement occupies center with generous crop-safe margins. Avoid duplicated or merged tools, excessive clutter, surreal geometry, labels, text, product logos, numbers, woodworking dust, plants, background tool wall or decorative props.",
+      "original_dimensions": [
+        1254,
+        1254
+      ],
+      "derivative_dimensions": [
+        768,
+        768
+      ],
+      "derivative_bytes": 139382
+    }
+  ]
+}

@@ -7,8 +7,8 @@ use App\Http\Controllers\Front\Concerns\ResolvesFrontendView;
 use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Product\ProductOptionValue;
 use App\Services\Front\CartService;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -19,8 +19,7 @@ class CartController extends Controller
 
     public function __construct(
         private readonly CartService $cart
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): View
     {
@@ -135,7 +134,7 @@ class CartController extends Controller
         $optionValueId = isset($validated['product_option_value_id'])
             ? (int) $validated['product_option_value_id']
             : null;
-        $availableStock = (int) $product->stock_qty;
+        $availableStock = $product->availableStockQuantity();
         if ($optionValueId !== null) {
             $availableStock = (int) (ProductOptionValue::query()
                 ->where('id', $optionValueId)

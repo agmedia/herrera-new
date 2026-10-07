@@ -259,7 +259,7 @@ class Manager extends Component
             'form.top_bar.links.*.is_active' => ['required', 'boolean'],
             'form.top_bar.links.*.sort_order' => ['required', 'integer', 'min:0', 'max:9999'],
             'form.top_bar.socials' => ['array'],
-            'form.top_bar.socials.*.network' => ['required', 'in:facebook,youtube,instagram'],
+            'form.top_bar.socials.*.network' => ['required', 'in:facebook,youtube,instagram,linkedin,twitter'],
             'form.top_bar.socials.*.url' => ['required', 'string', 'max:2048'],
             'form.top_bar.socials.*.is_active' => ['required', 'boolean'],
             'form.top_bar.socials.*.sort_order' => ['required', 'integer', 'min:0', 'max:9999'],

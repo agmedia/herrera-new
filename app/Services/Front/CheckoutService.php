@@ -13,8 +13,12 @@ use App\Models\Settings\Local\GeoZoneCountry;
 use App\Models\Settings\Local\OrderStatus;
 use App\Models\Settings\Local\PaymentMethod;
 use App\Models\Settings\Local\ShippingMethod;
+use App\Models\Settings\Local\TaxRate;
 use App\Models\User;
 use App\Services\Payments\CorvusPayFormService;
+use App\Services\Payments\WSPayFormService;
+use App\Services\Pricing\B2BAccessService;
+use App\Services\Pricing\TaxPricingService;
 use App\Services\Shipping\CroatianIslandDestinationClassifier;
 use App\Services\Shipping\ShippingCalculator;
 use App\Support\GlsShipping;
@@ -47,6 +51,7 @@ class CheckoutService
     ): Collection {
         $zoneIds = $this->resolveGeoZoneIdsForAddress($countryCode, $regionCode, $postalCode);
         $corvusPay = app(CorvusPayFormService::class);
+        $wspay = app(WSPayFormService::class);
 
         return PaymentMethod::query()
             ->where('is_active', true)
@@ -54,6 +59,7 @@ class CheckoutService
             ->orderBy('id')
             ->get()
             ->filter(fn (PaymentMethod $method) => $corvusPay->canBeOffered($method))
+            ->filter(fn (PaymentMethod $method) => $wspay->canBeOffered($method))
             ->filter(fn (PaymentMethod $method) => $this->paymentMethodMatchesShippingMethod($method, $shippingMethod))
             ->filter(fn (PaymentMethod $method) => $this->methodMatchesGeoZones($method->geo_zone_id, $zoneIds))
             ->filter(fn (PaymentMethod $method) => $this->subtotalFits($subtotal, $method->min_subtotal, $method->max_subtotal))
@@ -74,12 +80,17 @@ class CheckoutService
         $lines = $this->cart->lines();
         $destination = $this->islandDestinationClassifier->classify($countryCode, $postalCode, $city);
 
-        return ShippingMethod::query()
+        $methods = ShippingMethod::query()
             ->where('is_active', true)
             ->with('rates')
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->get()
+            ->get();
+        $beforeDiscount = $methods->contains(fn (ShippingMethod $method) => data_get($method->settings, 'subtotal_basis') === 'before_discount')
+            ? $this->cart->summary() : [];
+        $beforeDiscountSubtotal = (float) ($beforeDiscount['raw_subtotal'] ?? $beforeDiscount['subtotal'] ?? $subtotal);
+
+        return $methods
             ->filter(fn (ShippingMethod $method) => $this->shippingMethodIsConfigured($method))
             ->filter(fn (ShippingMethod $method) => $this->methodMatchesGeoZones($method->geo_zone_id, $zoneIds))
             ->filter(fn (ShippingMethod $method) => $this->methodMatchesDestinationScope(
@@ -87,9 +98,9 @@ class CheckoutService
                 $destination->scope,
                 $countryCode,
             ))
-            ->filter(fn (ShippingMethod $method) => $this->subtotalFits($subtotal, $method->min_subtotal, $method->max_subtotal))
-            ->filter(function (ShippingMethod $method) use ($lines, $subtotal): bool {
-                $quote = $this->shippingCalculator->quote($method, $lines, $subtotal);
+            ->filter(fn (ShippingMethod $method) => $this->subtotalFits($this->shippingSubtotal($method, $subtotal, $beforeDiscountSubtotal), $method->min_subtotal, $method->max_subtotal))
+            ->filter(function (ShippingMethod $method) use ($lines, $subtotal, $beforeDiscountSubtotal): bool {
+                $quote = $this->shippingCalculator->quote($method, $lines, $this->shippingSubtotal($method, $subtotal, $beforeDiscountSubtotal));
                 if ($quote === null) {
                     return false;
                 }
@@ -107,7 +118,16 @@ class CheckoutService
      */
     public function placeOrder(array $payload, ?User $user = null): Order
     {
+        $access = app(B2BAccessService::class);
+        $access->ensureCanPurchase($user);
+        if ($access->requiresApprovedAccount() && (int) auth()->id() !== (int) $user?->id) {
+            throw new \Illuminate\Auth\Access\AuthorizationException(__('ui.b2b.pricing.access_required'));
+        }
+
+        $requestedItems = $this->cart->raw();
+        CartService::forgetRequestSnapshot();
         $lines = $this->cart->lines();
+        $this->ensureCartMatchesRequestedItems($requestedItems, $lines);
         $summary = $this->cart->summary();
 
         if ($lines->isEmpty()) {
@@ -116,10 +136,11 @@ class CheckoutService
             ]);
         }
 
-        $subtotal = round((float) ($summary['subtotal'] ?? 0), 2);
-        $discountTotal = round((float) ($summary['discount_total'] ?? 0), 2);
-        $subtotalAfterDiscount = round((float) ($summary['subtotal_after_discount'] ?? $subtotal), 2);
-        $taxTotal = round((float) ($summary['tax_total'] ?? 0), 2);
+        $precision = (int) ($summary['monetary_precision'] ?? 2);
+        $subtotal = round((float) ($summary['raw_subtotal'] ?? $summary['subtotal'] ?? 0), $precision);
+        $discountTotal = round((float) ($summary['raw_discount_total'] ?? $summary['discount_total'] ?? 0), $precision);
+        $subtotalAfterDiscount = round((float) ($summary['raw_subtotal_after_discount'] ?? $summary['subtotal_after_discount'] ?? $subtotal), $precision);
+        $taxTotal = round((float) ($summary['raw_tax_total'] ?? $summary['tax_total'] ?? 0), $precision);
         $defaultTaxRate = round((float) ($summary['tax_rate'] ?? 0), 4);
 
         $shippingCountryCode = (string) ($payload['shipping_country_code'] ?? $payload['billing_country_code'] ?? 'HR');
@@ -187,6 +208,8 @@ class CheckoutService
         }
 
         $shippingTotal = $this->resolveShippingTotal($shippingMethod, $subtotalAfterDiscount);
+        $shippingTaxTotal = $this->resolveShippingTaxTotal($shippingMethod, $shippingTotal, $user);
+        $taxTotal = round($taxTotal + $shippingTaxTotal, $precision);
         $paymentFeeTotal = $this->resolvePaymentFeeTotal($paymentMethod, $subtotalAfterDiscount);
         $grandTotal = round($subtotalAfterDiscount + $shippingTotal + $paymentFeeTotal + $taxTotal, 2);
 
@@ -207,12 +230,14 @@ class CheckoutService
             $user,
             $lines,
             $summary,
+            $precision,
             $subtotal,
             $discountTotal,
             $taxTotal,
             $defaultTaxRate,
             $shippingMethod,
             $shippingTotal,
+            $shippingTaxTotal,
             $paymentMethod,
             $paymentFeeTotal,
             $grandTotal,
@@ -279,7 +304,10 @@ class CheckoutService
                 'payload' => [
                     'placed_from' => 'frontend_checkout',
                     'coupon_code' => (string) ($summary['coupon_code'] ?? ''),
+                    'monetary_precision' => $precision,
                     'shipping' => [
+                        'tax_total' => $shippingTaxTotal,
+                        'tax_rate_percent' => (float) data_get($shippingMethod->settings, 'tax_rate_percent', 0),
                         'destination' => $shippingDestination->toArray(),
                         'calculation' => is_array($shippingMethod->getAttribute('shipping_quote'))
                             ? $shippingMethod->getAttribute('shipping_quote')
@@ -323,12 +351,17 @@ class CheckoutService
                 $unitPrice = (float) $line['unit_price'];
                 $lineDiscountTotal = (float) ($line['line_discount_total'] ?? 0);
                 $lineTotal = (float) $line['line_total'];
-                $lineTaxAmount = round((float) ($line['line_tax_total'] ?? 0), 2);
+                $linePrecision = (int) ($line['monetary_precision'] ?? 2);
+                $lineTaxAmount = round((float) ($line['line_tax_total'] ?? 0), $linePrecision);
                 $lineTaxRate = round((float) ($line['tax_rate'] ?? $defaultTaxRate), 4);
                 $productOptionValueId = isset($line['product_option_value_id']) ? (int) $line['product_option_value_id'] : null;
                 $optionRow = $productOptionValueId
                     ? ProductOptionValue::query()->find($productOptionValueId)
                     : null;
+                if ($productOptionValueId && ! $optionRow) {
+                    throw ValidationException::withMessages(['cart' => 'Odabrana varijanta više nije dostupna.']);
+                }
+                $stockAllocation = app(OrderStockAllocationService::class)->reserve($product, $quantity, $optionRow);
 
                 OrderItem::query()->create([
                     'order_id' => $order->id,
@@ -346,19 +379,21 @@ class CheckoutService
                     'sort_order' => $index++,
                     'payload' => [
                         'product_slug' => (string) ($translation?->slug ?? ''),
+                        'inventory' => $stockAllocation,
+                        'pricing' => [
+                            'source' => $line['b2b_source_type'] ?? $line['price_source'] ?? 'base',
+                            'catalog_id' => $line['price_catalog_id'] ?? null,
+                            'catalog_entry_id' => $line['price_catalog_entry_id'] ?? null,
+                            'customer_group_id' => $user?->b2bAccount?->customer_group_id,
+                            'final' => (bool) ($line['price_is_final'] ?? false),
+                            'monetary_precision' => $linePrecision,
+                            'unit_net' => $unitPrice,
+                            'unit_tax' => $line['unit_tax_amount'] ?? null,
+                            'line_net' => $lineTotal,
+                            'line_tax' => $lineTaxAmount,
+                        ],
                     ],
                 ]);
-
-                if ($optionRow) {
-                    if ((int) $optionRow->stock_qty > 0) {
-                        $optionRow->forceFill([
-                            'stock_qty' => max(0, ((int) $optionRow->stock_qty) - $quantity),
-                        ])->save();
-                    }
-                } elseif ((int) $product->stock_qty > 0) {
-                    $nextStock = max(0, ((int) $product->stock_qty) - $quantity);
-                    $product->forceFill(['stock_qty' => $nextStock])->save();
-                }
             }
 
             OrderTotal::query()->create([
@@ -425,6 +460,39 @@ class CheckoutService
         });
     }
 
+    /**
+     * Display normalization may reduce or omit unavailable items. Ordering must
+     * preserve every requested product, variant and quantity instead.
+     *
+     * @param  array<string, array{product_id:int,product_option_value_id:int|null,quantity:int}>  $requestedItems
+     * @param  Collection<int, array<string, mixed>>  $lines
+     */
+    private function ensureCartMatchesRequestedItems(array $requestedItems, Collection $lines): void
+    {
+        $requestedQuantities = [];
+        foreach ($requestedItems as $item) {
+            $key = (int) $item['product_id'].':'.(int) ($item['product_option_value_id'] ?? 0);
+            $requestedQuantities[$key] = (int) $item['quantity'];
+        }
+
+        $resolvedQuantities = [];
+        foreach ($lines as $line) {
+            $key = (int) $line['product']->getKey().':'.(int) ($line['product_option_value_id'] ?? 0);
+            $resolvedQuantities[$key] = (int) $line['quantity'];
+        }
+
+        ksort($requestedQuantities);
+        ksort($resolvedQuantities);
+
+        if (count($requestedItems) !== $lines->count()
+            || count($resolvedQuantities) !== $lines->count()
+            || $requestedQuantities !== $resolvedQuantities) {
+            throw ValidationException::withMessages([
+                'cart' => __('ui.checkout.validation.cart_changed'),
+            ]);
+        }
+    }
+
     private function subtotalFits(float $subtotal, mixed $min, mixed $max): bool
     {
         $minVal = is_numeric($min) ? (float) $min : null;
@@ -455,6 +523,30 @@ class CheckoutService
         }
 
         return round(max(0, $price), 2);
+    }
+
+    private function shippingSubtotal(ShippingMethod $method, float $afterDiscount, float $beforeDiscount): float
+    {
+        if (data_get($method->settings, 'subtotal_basis') !== 'before_discount') {
+            return $afterDiscount;
+        }
+
+        return $beforeDiscount;
+    }
+
+    private function resolveShippingTaxTotal(ShippingMethod $method, float $amount, ?User $user = null): float
+    {
+        $rate = (float) data_get($method->settings, 'tax_rate_percent', 0);
+        if ($rate <= 0 || $amount <= 0) {
+            return 0.0;
+        }
+
+        // Use the same imported contract tax-class eligibility as product pricing.
+        $taxableShipping = new Product(['payload' => ['opencart' => ['tax_class_id' => (int) data_get($method->settings, 'tax_class_id', 0)]]]);
+        $taxableShipping->setRelation('taxRate', new TaxRate(['rate' => $rate, 'rate_type' => 'percent', 'is_active' => true]));
+        $taxRate = app(TaxPricingService::class)->resolveRateForProduct($taxableShipping, $user);
+
+        return round($amount * max(0, (float) ($taxRate?->rate ?? 0)) / 100, 2);
     }
 
     private function resolvePaymentFeeTotal(PaymentMethod $paymentMethod, float $subtotal): float
@@ -523,6 +615,8 @@ class CheckoutService
         }
 
         $shippingTotal = $shippingMethod ? $this->resolveShippingTotal($shippingMethod, $subtotalAfterDiscount) : 0.0;
+        $shippingTaxTotal = $shippingMethod ? $this->resolveShippingTaxTotal($shippingMethod, $shippingTotal) : 0.0;
+        $taxTotal += $shippingTaxTotal;
         $paymentFeeTotal = $paymentMethod ? $this->resolvePaymentFeeTotal($paymentMethod, $subtotalAfterDiscount) : 0.0;
         $grandTotal = round($subtotalAfterDiscount + $shippingTotal + $paymentFeeTotal + $taxTotal, 2);
 
@@ -532,6 +626,7 @@ class CheckoutService
             'subtotal_after_discount' => round($subtotalAfterDiscount, 2),
             'tax_total' => round($taxTotal, 2),
             'shipping_total' => round($shippingTotal, 2),
+            'shipping_tax_total' => $shippingTaxTotal,
             'payment_fee_total' => round($paymentFeeTotal, 2),
             'grand_total' => $grandTotal,
             'shipping_method_code' => (string) ($shippingMethod?->code ?? ''),

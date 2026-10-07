@@ -12,6 +12,8 @@ class EprelDeclarationWriter
 
     public const ORIGIN_MSAN_SYNC = 'msan_sync';
 
+    public const ORIGIN_CATALOG_BATCH = 'catalog_batch';
+
     /**
      * @param array{
      *   eprel_registration_number:string,
@@ -32,7 +34,7 @@ class EprelDeclarationWriter
         array $expectedProductIdentity = [],
         ?callable $identityGuard = null,
     ): ProductEnergyDeclaration {
-        if (! in_array($origin, [self::ORIGIN_ADMIN_LOOKUP, self::ORIGIN_MSAN_SYNC], true)) {
+        if (! in_array($origin, [self::ORIGIN_ADMIN_LOOKUP, self::ORIGIN_MSAN_SYNC, self::ORIGIN_CATALOG_BATCH], true)) {
             throw new \InvalidArgumentException('EPREL izvor zapisa nije podržan.');
         }
 
@@ -58,6 +60,10 @@ class EprelDeclarationWriter
                 if ($expected !== $actual) {
                     throw new EprelMatchConflictException('Identifikacijski podaci artikla promijenjeni su tijekom EPREL dohvata. Pokrenite pretragu ponovno.');
                 }
+            }
+            if (array_key_exists('product_identity', $expectedProductIdentity)
+                && ! EprelProductIdentity::matches($product, $expectedProductIdentity['product_identity'])) {
+                throw new EprelMatchConflictException('Identifikacijski podaci artikla promijenjeni su tijekom EPREL dohvata. Pokrenite pretragu ponovno.');
             }
             if ($identityGuard && $identityGuard($product) !== true) {
                 throw new EprelMatchConflictException('Identifikacijski podaci artikla promijenjeni su tijekom EPREL dohvata. Pokrenite pretragu ponovno.');
@@ -109,6 +115,9 @@ class EprelDeclarationWriter
                 ->where('source', ProductEnergyDeclaration::SOURCE_EPREL)
                 ->where('context_code', '!=', $context)
                 ->get();
+            if ($origin === self::ORIGIN_CATALOG_BATCH && $staleEprelDeclarations->isNotEmpty()) {
+                throw new EprelMatchConflictException('Artikl već ima različitu službenu deklaraciju; skupni dohvat je neće zamijeniti.');
+            }
             if ($origin === self::ORIGIN_MSAN_SYNC
                 && $staleEprelDeclarations->contains(function (ProductEnergyDeclaration $declaration): bool {
                     $origins = collect(data_get($declaration->payload, 'origins', []))
@@ -155,6 +164,7 @@ class EprelDeclarationWriter
                     'payload' => [
                         'model_identifier' => $data['model_identifier'],
                         'match' => 'exact',
+                        'product_identity' => EprelProductIdentity::fingerprint($product),
                         'origins' => $origins,
                     ],
                     'synced_at' => now(),

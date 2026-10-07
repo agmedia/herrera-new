@@ -20,6 +20,8 @@ class TestMsanConnectionJob implements ShouldQueue
 
     public function handle(MsanClient $client): void
     {
+        \App\Support\Integrations\MsanModule::assertAvailable();
+
         $run = MsanSyncRun::query()->find($this->runId);
         if (! $run) {
             return;
@@ -56,6 +58,10 @@ class TestMsanConnectionJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        if (! \App\Support\Integrations\MsanModule::available()) {
+            return;
+        }
+
         $message = preg_replace(
             '/(password|passphrase|pin)\s*[=:]\s*\S+/iu',
             '$1=[skriveno]',

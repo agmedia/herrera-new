@@ -14,6 +14,12 @@
         let closeTimer = 0;
         let refreshRequest = null;
 
+        const fitToViewport = () => {
+            const top = root.getBoundingClientRect().top + popover.offsetTop;
+            popover.style.setProperty('--header-cart-popover-top', `${top}px`);
+            popover.style.setProperty('--header-cart-available-height', `${Math.max(0, window.innerHeight - top - 16)}px`);
+        };
+
         const cancelClose = () => {
             if (!closeTimer) {
                 return;
@@ -25,6 +31,7 @@
 
         const open = () => {
             cancelClose();
+            fitToViewport();
             root.classList.add('is-open');
             trigger.setAttribute('aria-expanded', 'true');
             popover.setAttribute('aria-hidden', 'false');
@@ -82,7 +89,34 @@
                 const currentContent = popover.querySelector('[data-header-cart-content]');
 
                 if (nextContent && currentContent) {
+                    const itemList = currentContent.querySelector('.header-cart-items');
+                    const scrollTop = itemList?.scrollTop || 0;
+                    const active = document.activeElement;
+                    const restoreFocus = active instanceof Element && currentContent.contains(active);
+                    const oldRows = Array.from(currentContent.querySelectorAll('[data-cart-line-key]'));
+                    const activeRow = restoreFocus ? active.closest('[data-cart-line-key]') : null;
+                    const rowIndex = oldRows.indexOf(activeRow);
+                    const controls = activeRow ? Array.from(activeRow.querySelectorAll('a, button')) : [];
+                    const controlIndex = controls.indexOf(active);
+
                     currentContent.replaceWith(nextContent);
+                    const nextList = nextContent.querySelector('.header-cart-items');
+                    if (nextList) nextList.scrollTop = scrollTop;
+
+                    if (restoreFocus) {
+                        const nextRows = Array.from(nextContent.querySelectorAll('[data-cart-line-key]'));
+                        const sameRow = activeRow && nextRows.find((row) => row.dataset.cartLineKey === activeRow.dataset.cartLineKey);
+                        const nearbyRow = nextRows[Math.min(Math.max(0, rowIndex), nextRows.length - 1)];
+                        const footerAction = active.matches('.header-cart-view-action')
+                            ? nextContent.querySelector('.header-cart-view-action') : null;
+                        const target = sameRow?.querySelectorAll('a, button')[controlIndex]
+                            || footerAction
+                            || (activeRow ? nearbyRow?.querySelector('[data-header-cart-remove] button') : nextList)
+                            || nextContent.querySelector('.header-cart-empty-action')
+                            || trigger;
+                        target.focus({ preventScroll: true });
+                    }
+                    fitToViewport();
                 }
             } catch (error) {
                 if (error.name !== 'AbortError') {
@@ -102,7 +136,7 @@
         });
 
         root.addEventListener('pointerleave', () => {
-            if (hoverQuery.matches) {
+            if (hoverQuery.matches && !root.contains(document.activeElement)) {
                 scheduleClose();
             }
         });
@@ -120,9 +154,16 @@
                 return;
             }
 
-            close();
+            event.preventDefault();
             trigger.focus({ preventScroll: true });
+            close();
         });
+
+        const refitOpenPopover = () => {
+            if (root.classList.contains('is-open')) fitToViewport();
+        };
+        window.addEventListener('resize', refitOpenPopover);
+        window.addEventListener('scroll', refitOpenPopover, { passive: true });
 
         root.addEventListener('submit', async (event) => {
             const form = event.target instanceof HTMLFormElement

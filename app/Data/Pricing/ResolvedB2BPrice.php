@@ -13,6 +13,10 @@ class ResolvedB2BPrice
         public readonly ?int $product_package_id = null,
         public readonly ?int $group_price_id = null,
         public readonly ?int $rule_id = null,
+        public readonly ?int $catalog_id = null,
+        public readonly ?int $catalog_entry_id = null,
+        public readonly bool $is_final = false,
+        public readonly ?float $previous_price = null,
     ) {}
 
     public function getKey(): int

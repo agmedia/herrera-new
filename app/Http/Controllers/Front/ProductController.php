@@ -11,6 +11,7 @@ use App\Models\Content\Page\InfoPage;
 use App\Models\Content\Support\Comment;
 use App\Models\Settings\Local\PaymentMethod;
 use App\Models\Settings\Local\ShippingMethod;
+use App\Models\Settings\Local\TaxRate;
 use App\Models\User\UserProfile;
 use App\Services\Catalog\CatalogFeatureService;
 use App\Services\Content\ContentBlockResolver;
@@ -19,10 +20,13 @@ use App\Services\Front\WishlistService;
 use App\Services\Payments\CorvusPayFormService;
 use App\Services\Pricing\ProductPricePresentationService;
 use App\Services\Pricing\TaxPricingService;
+use App\Services\Settings\SystemSettingsService;
+use App\Support\CountryCatalog;
 use App\Support\ProductMaterialLabel;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -104,7 +108,7 @@ class ProductController extends Controller
 
         $product = Product::query()
             ->withStorefrontEnergyData()
-            ->select(['id', 'code', 'sku', 'base_price', 'stock_qty', 'tax_rate_id', 'manufacturer_id', 'is_active', 'payload'])
+            ->select(['id', 'code', 'sku', 'barcode', 'base_price', 'stock_qty', 'supplier_stock_qty', 'tax_rate_id', 'manufacturer_id', 'is_active', 'payload'])
             ->withApprovedCommentSummary([$locale, $fallbackLocale])
             ->where('is_active', true)
             ->whereHas('translations', function ($q) use ($locale, $fallbackLocale, $slug): void {
@@ -135,6 +139,7 @@ class ProductController extends Controller
                 'technicalSpecificationRows' => fn ($q) => $q->select([
                     'id',
                     'product_id',
+                    'source',
                     'group_name',
                     'item_name',
                     'values',
@@ -189,11 +194,14 @@ class ProductController extends Controller
         }
 
         $categoryIds = $product->categories->pluck('id')->map(fn ($id) => (int) $id)->all();
-        $relatedLimit = max(4, $this->resolveGridCols($request, $this->defaultDesktopGridCols($request)));
+        $isHerreraStorefront = str_contains(strtolower((string) app(SystemSettingsService::class)->get('store_brand_name', config('app.name', 'AG Shop'))), 'herrera');
+        $relatedLimit = $isHerreraStorefront
+            ? 12
+            : max(4, $this->resolveGridCols($request, $this->defaultDesktopGridCols($request)));
 
         $relatedBaseQuery = Product::query()
             ->withStorefrontEnergyData()
-            ->select(['id', 'code', 'sku', 'base_price', 'stock_qty', 'tax_rate_id', 'manufacturer_id', 'is_active'])
+            ->select(['id', 'code', 'sku', 'barcode', 'base_price', 'stock_qty', 'supplier_stock_qty', 'tax_rate_id', 'manufacturer_id', 'is_active', 'payload'])
             ->withApprovedCommentSummary([$locale, $fallbackLocale])
             ->visibleOnStorefront($this->hideOutOfStockProducts())
             ->where('id', '!=', $product->id)
@@ -243,6 +251,17 @@ class ProductController extends Controller
         $related = collect();
         $excludeIds = [(int) $product->id];
 
+        $explicitRelatedIds = collect($product->payload['related_product_ids'] ?? [])
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn ($id): bool => $id > 0 && $id !== (int) $product->id)
+            ->unique()->values()->all();
+        if ($explicitRelatedIds !== []) {
+            $related = (clone $relatedBaseQuery)->whereIn('id', $explicitRelatedIds)->get()
+                ->sortBy(fn (Product $row): int => array_search((int) $row->id, $explicitRelatedIds, true))
+                ->take($relatedLimit)->values();
+            $excludeIds = array_merge($excludeIds, $related->pluck('id')->all());
+        }
+
         if ($categoryIds !== []) {
             $productCategories = Category::query()
                 ->select(['id', 'parent_id', '_lft', '_rgt'])
@@ -261,7 +280,8 @@ class ProductController extends Controller
             if ($deepestCategoryIds !== []) {
                 $sameSubcategory = (clone $relatedBaseQuery)
                     ->whereHas('categories', fn ($categoryQuery) => $categoryQuery->whereIn('categories.id', $deepestCategoryIds))
-                    ->limit($relatedLimit)
+                    ->whereNotIn('id', $excludeIds)
+                    ->limit(max(0, $relatedLimit - $related->count()))
                     ->get();
 
                 $related = $related->concat($sameSubcategory);
@@ -338,8 +358,8 @@ class ProductController extends Controller
 
         $recentlyViewed = collect();
         if ($recentlyViewedIds->isNotEmpty()) {
-            $recentlyViewedLookupIds = $recentlyViewedIds
-                ->take(12)
+            $recentlyViewedLookupIds = ($isHerreraStorefront ? $recentlyViewedIds->unique() : $recentlyViewedIds)
+                ->take($isHerreraStorefront ? self::RECENTLY_VIEWED_MAX : 12)
                 ->values()
                 ->all();
 
@@ -351,6 +371,7 @@ class ProductController extends Controller
 
                     return $position === false ? PHP_INT_MAX : (int) $position;
                 })
+                ->take(12)
                 ->values();
         }
 
@@ -393,11 +414,13 @@ class ProductController extends Controller
         $fitFinderSelection = $this->resolveFitFinderSelection($request, $product);
         $colorVariants = app(ProductColorVariantService::class)->variantsFor($product, $locale, $fallbackLocale);
         $shippingMethods = ShippingMethod::query()
-            ->select(['id', 'code', 'name', 'description', 'pricing_type', 'price', 'free_over', 'sort_order'])
+            ->select(['id', 'code', 'name', 'description', 'pricing_type', 'price', 'free_over', 'min_subtotal', 'max_subtotal', 'geo_zone_id', 'settings', 'sort_order'])
             ->where('is_active', true)
+            ->with(['geoZone:id,name', 'geoZone.countries:id,geo_zone_id,country_code'])
             ->orderBy('sort_order')
             ->orderBy('id')
             ->get();
+        $shippingMethods = $this->groupShippingMethodsForProduct($shippingMethods, $locale);
         $paymentMethods = PaymentMethod::query()
             ->select(['id', 'code', 'name', 'provider', 'description', 'fee_type', 'fee_value', 'settings', 'sort_order'])
             ->where('is_active', true)
@@ -439,6 +462,51 @@ class ProductController extends Controller
         ]);
 
         return $this->withDesktopCacheHeaders($request, $response, (int) $product->id, $slug);
+    }
+
+    private function groupShippingMethodsForProduct(Collection $methods, string $locale): Collection
+    {
+        $countryNames = collect(CountryCatalog::all())->keyBy('code');
+        $countryNameKey = str_starts_with($locale, 'hr') ? 'name_hr' : 'name_en';
+        $displayNet = (bool) config('commerce.b2b_only') && (bool) config('commerce.b2b_display_net', true);
+        $taxPricing = app(TaxPricingService::class);
+
+        return $methods->groupBy(function (ShippingMethod $method): string {
+            $sourceId = data_get($method->settings, 'source_method_id');
+
+            return data_get($method->settings, 'configured_from') === 'herrera-opencart' && $sourceId !== null
+                ? 'legacy-'.$sourceId
+                : 'method-'.$method->id;
+        })->map(function (Collection $ranges) use ($countryNames, $countryNameKey, $displayNet, $taxPricing): ShippingMethod {
+            $method = $ranges->first();
+            if (data_get($method->settings, 'configured_from') !== 'herrera-opencart' || data_get($method->settings, 'source_method_id') === null) {
+                return $method;
+            }
+
+            $method->setAttribute('storefront_destinations', $method->geoZone?->countries
+                ->pluck('country_code')->unique()
+                ->map(fn (string $code): string => (string) data_get($countryNames->get($code), $countryNameKey, $code))
+                ->implode(', ') ?? '');
+            $method->setAttribute('storefront_display_net', $displayNet);
+            $method->setAttribute('storefront_ranges', $ranges->sortBy('min_subtotal')->map(function (ShippingMethod $range) use ($displayNet, $taxPricing): array {
+                $rate = max(0, (float) data_get($range->settings, 'tax_rate_percent', 0));
+                if ($rate > 0) {
+                    $taxableShipping = new Product(['payload' => ['opencart' => ['tax_class_id' => (int) data_get($range->settings, 'tax_class_id', 0)]]]);
+                    $taxableShipping->setRelation('taxRate', new TaxRate(['rate' => $rate, 'rate_type' => 'percent', 'is_active' => true]));
+                    $rate = max(0, (float) $taxPricing->resolveRateForProduct($taxableShipping)?->rate);
+                }
+
+                return [
+                    'min_subtotal' => (float) ($range->min_subtotal ?? 0),
+                    'max_subtotal' => $range->max_subtotal !== null ? (float) $range->max_subtotal : null,
+                    'price' => (float) $range->price,
+                    'display_price' => round((float) $range->price * ($displayNet ? 1 : 1 + $rate / 100), 2),
+                    'tax_rate' => $rate,
+                ];
+            })->values());
+
+            return $method;
+        })->values();
     }
 
     public function storeFitFinderPreferences(Request $request): JsonResponse

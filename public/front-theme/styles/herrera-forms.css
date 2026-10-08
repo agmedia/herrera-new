@@ -21,6 +21,7 @@ body.herrera-storefront :is(.auth-form-card, .auth-side-card, .contact-form-card
 body.herrera-storefront .commerce-main fieldset,
 body.herrera-storefront.account-profile-commerce-body .commerce-main form.border-slate-200.bg-white,
 body.herrera-storefront.account-commerce-body .commerce-account-nav > div,
+body.herrera-storefront.account-commerce-body :is([data-account-status="approved"], .quick-order-search-panel, .quick-order-selection-heading, .quick-order-footer),
 body.herrera-storefront.mobile-commerce-body .card.card-style:has(> .content > form),
 body.herrera-storefront .commerce-main table thead,
 body.herrera-storefront .product-detail-lower .product-detail-comment-form {

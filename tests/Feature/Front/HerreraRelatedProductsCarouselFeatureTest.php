@@ -72,7 +72,9 @@ class HerreraRelatedProductsCarouselFeatureTest extends TestCase
         $this->assertNotNull($carousel);
         $options = json_decode($carousel->getAttribute('data-splide'), true, flags: JSON_THROW_ON_ERROR);
         $this->assertSame('slide', $options['type']);
-        $this->assertSame(1, $options['perPage']);
+        $this->assertSame(6, $options['perPage']);
+        $this->assertTrue($options['destroy']);
+        $this->assertTrue($options['breakpoints'][767]['destroy']);
         $this->assertFalse($options['arrows']);
         $this->assertFalse($options['drag']);
         $this->assertSame('1', $carousel->getAttribute('data-product-count'));
@@ -151,20 +153,30 @@ class HerreraRelatedProductsCarouselFeatureTest extends TestCase
         $this->assertSame(0, $xpath->query('.//button[contains(@class, "splide__arrow")]', $carousel)->count());
     }
 
-    public function test_small_recent_collection_loops_without_repeating_cards_in_the_first_page(): void
+    public function test_three_recent_products_keep_the_six_four_two_grid_and_loop_only_when_they_overflow(): void
     {
         $this->product('main');
-        $viewed = collect([$this->product('first-viewed'), $this->product('second-viewed')]);
+        $viewed = collect([$this->product('first-viewed'), $this->product('second-viewed'), $this->product('third-viewed')]);
         $response = $this->withSession(['front_recently_viewed_products' => $viewed->pluck('id')->all()])
             ->get(route('products.show', ['slug' => 'related-carousel-main']))->assertOk();
         $carousel = $this->xpath($response->getContent())->query('//*[@data-herrera-recently-viewed-products-splide]')->item(0);
         $this->assertNotNull($carousel);
         $options = json_decode($carousel->getAttribute('data-splide'), true, flags: JSON_THROW_ON_ERROR);
         $this->assertSame('loop', $options['type']);
-        $this->assertSame(2, $options['perPage']);
-        $this->assertSame(2, $options['breakpoints'][1280]['perPage']);
-        $this->assertSame(2, $options['breakpoints'][767]['perPage']);
-        $this->assertTrue($options['arrows']);
+        $this->assertSame(6, $options['perPage']);
+        $this->assertTrue($options['destroy']);
+        $this->assertFalse($options['arrows']);
+        $this->assertSame(6, $options['breakpoints'][1280]['perPage']);
+        foreach ([1279, 1024, 860] as $breakpoint) {
+            $this->assertSame(4, $options['breakpoints'][$breakpoint]['perPage']);
+            $this->assertTrue($options['breakpoints'][$breakpoint]['destroy']);
+            $this->assertFalse($options['breakpoints'][$breakpoint]['arrows']);
+        }
+        foreach ([767, 640] as $breakpoint) {
+            $this->assertSame(2, $options['breakpoints'][$breakpoint]['perPage']);
+            $this->assertFalse($options['breakpoints'][$breakpoint]['destroy']);
+            $this->assertTrue($options['breakpoints'][$breakpoint]['arrows']);
+        }
         $this->assertTrue($options['drag']);
     }
 

@@ -1,30 +1,31 @@
 @php
     $productCount = $products->count();
-    $desktopPerPage = $kind === 'recently-viewed' && $productCount === 1 ? 6 : min(6, $productCount);
     $headingId = $carouselId.'-heading';
     $previousLabel = trim(str_replace(['&laquo;', '&raquo;'], '', __('pagination.previous')));
     $nextLabel = trim(str_replace(['&laquo;', '&raquo;'], '', __('pagination.next')));
     $carouselOptions = [
         'type' => $productCount > 1 ? 'loop' : 'slide',
         'rewind' => false,
-        'perPage' => $desktopPerPage,
+        'perPage' => 6,
+        // Keep the card grid when all items fit; remount the loop at narrower breakpoints.
+        'destroy' => $productCount <= 6,
         'perMove' => 1,
         'gap' => '0rem',
         'drag' => $productCount > 1,
         'snap' => true,
         'pagination' => false,
-        'arrows' => $productCount > 1,
+        'arrows' => $productCount > 6,
         'updateOnMove' => true,
         'speed' => 420,
         'i18n' => ['prev' => $previousLabel, 'next' => $nextLabel, 'first' => $nextLabel, 'last' => $previousLabel],
         // Data options override every intermediate breakpoint in the shared initializer.
         'breakpoints' => [
-            1280 => ['perPage' => $desktopPerPage, 'arrows' => $productCount > 1],
-            1279 => ['perPage' => min(4, $productCount)],
-            1024 => ['perPage' => min(4, $productCount), 'arrows' => $productCount > 1],
-            860 => ['perPage' => min(4, $productCount), 'arrows' => $productCount > 1],
-            767 => ['perPage' => min(2, $productCount)],
-            640 => ['perPage' => min(2, $productCount), 'arrows' => $productCount > 1, 'pagination' => false],
+            1280 => ['perPage' => 6, 'destroy' => $productCount <= 6, 'arrows' => $productCount > 6],
+            1279 => ['perPage' => 4, 'destroy' => $productCount <= 4, 'arrows' => $productCount > 4],
+            1024 => ['perPage' => 4, 'destroy' => $productCount <= 4, 'arrows' => $productCount > 4],
+            860 => ['perPage' => 4, 'destroy' => $productCount <= 4, 'arrows' => $productCount > 4],
+            767 => ['perPage' => 2, 'destroy' => $productCount <= 2, 'arrows' => $productCount > 2],
+            640 => ['perPage' => 2, 'destroy' => $productCount <= 2, 'arrows' => $productCount > 2, 'pagination' => false],
         ],
     ];
 @endphp
@@ -51,7 +52,7 @@
     >
         <div class="herrera-product-carousel-heading">
             <h2 id="{{ $headingId }}">{{ $title }}</h2>
-            @if ($productCount > 1)
+            @if ($productCount > 2)
                 <div class="splide__arrows">
                     <button class="splide__arrow splide__arrow--prev" type="button" aria-label="{{ $previousLabel }}" disabled><x-fa-icon name="chevron-right" style="solid" /></button>
                     <button class="splide__arrow splide__arrow--next" type="button" aria-label="{{ $nextLabel }}" disabled><x-fa-icon name="chevron-right" style="solid" /></button>

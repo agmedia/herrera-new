@@ -111,19 +111,20 @@
         $herreraProductCarouselOptions = [
             'type' => $herreraProductCount > 1 ? 'loop' : 'slide',
             'rewind' => false,
-            'perPage' => min(6, max(1, $herreraProductCount)),
+            'perPage' => 6,
+            'destroy' => $herreraProductCount <= 6,
             'perMove' => 1,
             'gap' => '0rem',
             'drag' => $herreraProductCount > 1,
             'snap' => true,
             'pagination' => false,
-            'arrows' => $herreraProductCount > 1,
+            'arrows' => $herreraProductCount > 6,
             'updateOnMove' => true,
             'speed' => 420,
             'i18n' => ['prev' => $herreraProductPreviousLabel, 'next' => $herreraProductNextLabel, 'first' => $herreraProductNextLabel, 'last' => $herreraProductPreviousLabel],
             'breakpoints' => [
-                1279 => ['perPage' => min(4, max(1, $herreraProductCount))],
-                767 => ['perPage' => min(2, max(1, $herreraProductCount))],
+                1279 => ['perPage' => 4, 'destroy' => $herreraProductCount <= 4, 'arrows' => $herreraProductCount > 4],
+                767 => ['perPage' => 2, 'destroy' => $herreraProductCount <= 2, 'arrows' => $herreraProductCount > 2],
             ],
         ];
     @endphp
@@ -139,7 +140,7 @@
                     </div>
                     <div class="herrera-home-product-actions">
                         <a class="herrera-home-products-link" href="{{ route('categories.index') }}">{{ __('herrera.all_products') }} <x-fa-icon name="arrow-right" /></a>
-                        @if ($herreraProductCount > 1)
+                        @if ($herreraProductCount > 2)
                             <div class="splide__arrows">
                                 <button class="splide__arrow splide__arrow--prev" type="button" aria-label="{{ $herreraProductPreviousLabel }}" disabled><x-fa-icon name="chevron-right" style="solid" /></button>
                                 <button class="splide__arrow splide__arrow--next" type="button" aria-label="{{ $herreraProductNextLabel }}" disabled><x-fa-icon name="chevron-right" style="solid" /></button>

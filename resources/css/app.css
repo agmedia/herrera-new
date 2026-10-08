@@ -1992,7 +1992,7 @@
     flex: 0 0 2.75rem;
     place-items: center;
     overflow: hidden;
-    padding: .2rem;
+    padding: 0;
     border: 1px solid #e2eaec;
     border-radius: .5rem;
     background: #fff;
@@ -2179,7 +2179,7 @@
     flex: 0 0 2.5rem;
     place-items: center;
     overflow: hidden;
-    padding: .18rem;
+    padding: 0;
     border: 1px solid #e2eaec;
     border-radius: .5rem;
     background: #fff;

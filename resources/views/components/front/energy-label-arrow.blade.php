@@ -15,6 +15,8 @@
             'class' => $declaration['energy_class'],
             'range' => $declaration['scale_label'],
         ]);
+        $classFontSize = strlen($declaration['energy_class']) > 1 ? 23 : 32;
+        $rangeFontSize = max(strlen($declaration['scale_min']), strlen($declaration['scale_max'])) > 1 ? 9 : 13;
     @endphp
 
     @if ($hasFullEnergyLabel)
@@ -42,29 +44,30 @@
             data-energy-label-arrow
         >
     @endif
-        @if (! empty($declaration['energy_class_image_url']))
-            <img
-                src="{{ $declaration['energy_class_image_url'] }}"
-                alt=""
-                class="{{ $compact ? 'h-6 w-[43.68px]' : 'h-8 w-[58.24px]' }} shrink-0 object-contain"
-                width="273"
-                height="150"
-                loading="lazy"
-                decoding="async"
-                aria-hidden="true"
-            >
-        @else
-            <span
-                class="relative inline-flex {{ $compact ? 'h-6 min-w-10 px-2 text-xs' : 'h-8 min-w-12 px-2.5 text-sm' }} items-center justify-center font-black leading-none shadow-sm"
-                style="background-color: {{ $declaration['color'] }}; color: {{ $declaration['text_color'] }}; clip-path: polygon(0 0, calc(100% - 0.55rem) 0, 100% 50%, calc(100% - 0.55rem) 100%, 0 100%); padding-right: 0.85rem;"
-                aria-hidden="true"
-            >
-                {{ $declaration['energy_class'] }}
-            </span>
-            <span class="inline-flex {{ $compact ? 'h-6 px-1.5 text-[9px]' : 'h-8 px-2 text-[10px]' }} items-center border-y border-r border-slate-300 bg-white font-bold leading-none text-slate-700" aria-hidden="true">
-                {{ $declaration['scale_label'] }}
-            </span>
-        @endif
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 100 52"
+            width="{{ $compact ? 50 : 65.38 }}"
+            height="{{ $compact ? 26 : 34 }}"
+            class="block shrink-0"
+            aria-hidden="true"
+            focusable="false"
+            data-energy-label-graphic
+        >
+            <title>{{ $declaration['energy_class'] }} · {{ $declaration['scale_label'] }}</title>
+            <path d="M24 1H99V51H24L1 26Z" fill="#fff" />
+            <path d="M24 1H77V51H24L1 26Z" fill="{{ $declaration['color'] }}" />
+            <path d="M24 1H99V51H24L1 26Z" fill="none" stroke="#64748b" stroke-width="1" stroke-linejoin="round" />
+            <path d="M77 1V51" stroke="#64748b" stroke-width="1" />
+            <g font-family="Arial, Helvetica, sans-serif" font-weight="700" text-anchor="middle">
+                <text x="48" y="27" dominant-baseline="central" font-size="{{ $classFontSize }}" fill="{{ $declaration['text_color'] }}">{{ $declaration['energy_class'] }}</text>
+                <g font-size="{{ $rangeFontSize }}" fill="#24353b">
+                    <text x="88" y="14">{{ $declaration['scale_min'] }}</text>
+                    <text x="88" y="47">{{ $declaration['scale_max'] }}</text>
+                </g>
+            </g>
+            <path d="M88 32V20M84 24L88 20L92 24" fill="none" stroke="#24353b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
     @if ($hasFullEnergyLabel)
         </a>
     @else

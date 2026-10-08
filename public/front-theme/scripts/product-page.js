@@ -304,10 +304,12 @@
                 1,
                 Number.parseInt(element.dataset.mobileCols || '2', 10) || 2
             );
+            const cardControls = Array.from(element.querySelectorAll('a, button, textarea, input, select, iframe'))
+                .map(function (node) { return [node, node.getAttribute('tabindex')]; });
 
             new window.Splide(element, {
                 type: count > 1 ? 'loop' : 'slide',
-                perPage: count > 1 ? Math.min(desktopPerPage, count) : desktopPerPage,
+                perPage: desktopPerPage,
                 perMove: 1,
                 gap: '0rem',
                 drag: count > 1,
@@ -318,24 +320,39 @@
                 speed: 520,
                 breakpoints: {
                     1280: {
-                        perPage: count > 1 ? Math.min(4, count) : 4,
+                        perPage: 4,
                         arrows: count > 1,
                     },
                     1024: {
-                        perPage: count > 1 ? Math.min(3, count) : 3,
+                        perPage: 3,
                         arrows: count > 1,
                     },
                     860: {
-                        perPage: Math.min(2, count),
+                        perPage: 2,
                         arrows: count > 1,
                     },
                     640: {
-                        perPage: Math.min(mobilePerPage, count),
+                        perPage: mobilePerPage,
                         arrows: false,
                         pagination: count > mobilePerPage,
                     },
                 },
-            }).mount();
+            }).mount({
+                RestoreCardGridFocus: function () {
+                    return {
+                        // A responsive static grid must restore controls hidden by the loop.
+                        destroy: function () {
+                            cardControls.forEach(function ([node, tabindex]) {
+                                if (tabindex === null) {
+                                    node.removeAttribute('tabindex');
+                                } else {
+                                    node.setAttribute('tabindex', tabindex);
+                                }
+                            });
+                        },
+                    };
+                },
+            });
         });
 
         return true;

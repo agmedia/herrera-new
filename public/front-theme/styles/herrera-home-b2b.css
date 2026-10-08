@@ -234,6 +234,10 @@
     gap: 8px;
 }
 
+.herrera-storefront .herrera-home-product-carousel:not(.is-active) .splide__arrows {
+    display: none;
+}
+
 .herrera-storefront .herrera-home-product-carousel .splide__arrow {
     position: static;
     display: inline-flex;
@@ -279,7 +283,8 @@
     scroll-snap-type: x mandatory;
 }
 
-.herrera-storefront .herrera-home-product-carousel .splide__list {
+.herrera-storefront .herrera-home-product-carousel .splide__list,
+.herrera-storefront .herrera-home-product-carousel:not(.is-active) .splide__list {
     display: flex;
     margin: 0 !important;
     padding: 0 !important;
@@ -287,11 +292,17 @@
 }
 
 .herrera-storefront .herrera-home-product-carousel .splide__slide {
+    display: flex;
     flex: 0 0 auto;
     width: calc(100% / var(--herrera-product-columns, 6));
     min-width: 0;
     height: auto;
     scroll-snap-align: start;
+}
+
+.herrera-storefront .herrera-home-product-carousel .splide__slide > [data-product-card] {
+    width: 100%;
+    height: auto;
 }
 
 .herrera-storefront .herrera-b2b-hero a:focus-visible,

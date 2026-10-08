@@ -22,8 +22,11 @@ for (const initiallyLoaded of [false, true]) {
     });
 }
 
-test('small related collections loop at every viewport without duplicating the initial page', () => {
-    const element = { dataset: { desktopCols: '6', mobileCols: '2' }, querySelectorAll: () => [{}, {}] };
+test('small related collections retain configured card columns at every viewport', () => {
+    const element = {
+        dataset: { desktopCols: '6', mobileCols: '2' },
+        querySelectorAll: (selector) => selector === '.splide__slide' ? [{}, {}] : [],
+    };
     let options;
     const document = {
         readyState: 'complete',
@@ -36,12 +39,45 @@ test('small related collections loop at every viewport without duplicating the i
     } };
     vm.runInNewContext(read('public/front-theme/scripts/product-page.js'), { document, window });
     assert.equal(options.type, 'loop');
-    assert.equal(options.perPage, 2);
+    assert.equal(options.perPage, 6);
     assert.equal(options.arrows, true);
-    for (const breakpoint of Object.values(options.breakpoints)) {
-        assert.equal(breakpoint.perPage, 2);
-    }
+    assert.equal(options.breakpoints[1280].perPage, 4);
+    assert.equal(options.breakpoints[1024].perPage, 3);
+    assert.equal(options.breakpoints[860].perPage, 2);
+    assert.equal(options.breakpoints[640].perPage, 2);
 });
+
+for (const path of [
+    'public/front-theme/scripts/product-page.js',
+    'resources/views/front/partials/herrera-home-carousel-script.blade.php',
+]) {
+    test(path + ': returning to a static grid restores original keyboard controls after every loop mount', () => {
+        const controls = [null, '0', '-1'].map((tabindex) => ({
+            tabindex,
+            getAttribute() { return this.tabindex; },
+            setAttribute(name, value) { this.tabindex = value; },
+            removeAttribute() { this.tabindex = null; },
+        }));
+        const element = {
+            dataset: { desktopCols: '6', mobileCols: '2' },
+            querySelectorAll: (selector) => selector === '.splide__slide' ? [{}, {}, {}] : controls,
+        };
+        let extensions;
+        const document = {
+            readyState: 'complete',
+            querySelector: () => null,
+            querySelectorAll: (selector) => ['[data-related-products-splide]', '[data-herrera-home-carousel]'].includes(selector) ? [element] : [],
+        };
+        const window = { Splide: class { mount(value) { extensions = value; } } };
+        const source = path.endsWith('.php') ? read(path).match(/<script>([\s\S]*?)<\/script>/)[1] : read(path);
+        vm.runInNewContext(source, { document, window });
+        for (let mount = 0; mount < 2; mount += 1) {
+            controls.forEach((node) => node.setAttribute('tabindex', '-1'));
+            extensions.RestoreCardGridFocus().destroy();
+            assert.deepEqual(controls.map((node) => node.tabindex), [null, '0', '-1']);
+        }
+    });
+}
 
 function galleryPage(count) {
     const listeners = new Map();

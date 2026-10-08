@@ -10,7 +10,23 @@
                         if (el.dataset.splideReady === '1') {
                             return;
                         }
-                        new window.Splide(el).mount();
+                        const cardControls = Array.from(el.querySelectorAll('a, button, textarea, input, select, iframe'))
+                            .map(function (node) { return [node, node.getAttribute('tabindex')]; });
+                        new window.Splide(el).mount({
+                            RestoreCardGridFocus: function () {
+                                return {
+                                    destroy: function () {
+                                        cardControls.forEach(function ([node, tabindex]) {
+                                            if (tabindex === null) {
+                                                node.removeAttribute('tabindex');
+                                            } else {
+                                                node.setAttribute('tabindex', tabindex);
+                                            }
+                                        });
+                                    },
+                                };
+                            },
+                        });
                         el.dataset.splideReady = '1';
                     });
                     return true;

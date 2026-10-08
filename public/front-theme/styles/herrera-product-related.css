@@ -5,27 +5,6 @@
 .herrera-storefront .herrera-product-carousel {
     position: relative;
     visibility: visible;
-    --herrera-related-product-count: 6;
-}
-
-.herrera-storefront .herrera-product-carousel[data-product-count="1"] {
-    --herrera-related-product-count: 1;
-}
-
-.herrera-storefront .herrera-product-carousel[data-product-count="2"] {
-    --herrera-related-product-count: 2;
-}
-
-.herrera-storefront .herrera-product-carousel[data-product-count="3"] {
-    --herrera-related-product-count: 3;
-}
-
-.herrera-storefront .herrera-product-carousel[data-product-count="4"] {
-    --herrera-related-product-count: 4;
-}
-
-.herrera-storefront .herrera-product-carousel[data-product-count="5"] {
-    --herrera-related-product-count: 5;
 }
 
 .herrera-storefront .herrera-product-carousel-heading {
@@ -49,6 +28,10 @@
     display: flex;
     flex-shrink: 0;
     gap: 8px;
+}
+
+.herrera-storefront .herrera-product-carousel:not(.is-active) .splide__arrows {
+    display: none;
 }
 
 .herrera-storefront .herrera-product-carousel .splide__arrow {
@@ -99,25 +82,28 @@
     overflow: hidden;
 }
 
-.herrera-storefront .herrera-product-carousel:not(.is-initialized) .splide__list {
+.herrera-storefront .herrera-product-carousel .splide__list,
+.herrera-storefront .herrera-product-carousel:not(.is-active) .splide__list {
     display: flex;
     margin: 0;
     padding: 0;
     list-style: none;
 }
 
-.herrera-storefront .herrera-product-carousel:not(.is-initialized) .splide__slide {
+.herrera-storefront .herrera-product-carousel .splide__slide {
+    display: flex;
     width: calc(100% / 6);
     flex-shrink: 0;
 }
 
-.herrera-storefront [data-herrera-related-products-splide]:not(.is-initialized) .splide__slide {
-    width: calc(100% / min(6, var(--herrera-related-product-count)));
+.herrera-storefront .herrera-product-carousel .splide__slide > [data-product-card] {
+    width: 100%;
+    height: auto;
 }
 
 @media (max-width: 1279px) {
-    .herrera-storefront .herrera-product-carousel:not(.is-initialized) .splide__slide {
-        width: calc(100% / min(4, var(--herrera-related-product-count)));
+    .herrera-storefront .herrera-product-carousel .splide__slide {
+        width: calc(100% / 4);
     }
 }
 
@@ -127,7 +113,7 @@
         margin-bottom: 18px;
     }
 
-    .herrera-storefront .herrera-product-carousel:not(.is-initialized) .splide__slide {
-        width: calc(100% / min(2, var(--herrera-related-product-count)));
+    .herrera-storefront .herrera-product-carousel .splide__slide {
+        width: calc(100% / 2);
     }
 }

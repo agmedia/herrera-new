@@ -191,6 +191,13 @@ class HerreraPopularProductsFeatureTest extends TestCase
         $this->assertSame(1, $xpath->query('//main//*[@data-herrera-popular-products]')->count());
         $this->assertSame(1, $xpath->query('//main/section[@aria-labelledby="herrera-brand-strip-title"]/following-sibling::*[1][@data-herrera-popular-products]')->count());
         $this->assertSame(1, $xpath->query('//*[@data-herrera-popular-products]//*[@data-product-card]')->count());
+        $carousel = $xpath->query('//*[@data-herrera-popular-products-splide]')->item(0);
+        $options = json_decode($carousel->getAttribute('data-splide'), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame(6, $options['perPage']);
+        $this->assertSame(4, $options['breakpoints'][1279]['perPage']);
+        $this->assertSame(2, $options['breakpoints'][767]['perPage']);
+        $this->assertTrue($options['destroy']);
+        $this->assertTrue($options['breakpoints'][767]['destroy']);
         $this->assertSame(0, $xpath->query('//*[@data-herrera-popular-products]//*[@data-product-card-form]')->count());
         $this->assertSame(1, $xpath->query('//*[@data-herrera-popular-products]//a[@href="'.route('categories.index').'"]')->count());
         $this->assertSame(2, $xpath->query('//main//*[@data-herrera-home-carousel and (@data-herrera-home-products-splide or @data-herrera-popular-products-splide)]')->count());

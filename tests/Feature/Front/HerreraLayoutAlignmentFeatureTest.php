@@ -82,9 +82,12 @@ class HerreraLayoutAlignmentFeatureTest extends TestCase
         $this->assertNotNull($carousel);
         $options = json_decode($carousel->getAttribute('data-splide'), true, flags: JSON_THROW_ON_ERROR);
         $this->assertSame('slide', $options['type']);
-        $this->assertSame(1, $options['perPage']);
-        $this->assertSame(1, $options['breakpoints'][1279]['perPage']);
-        $this->assertSame(1, $options['breakpoints'][767]['perPage']);
+        $this->assertSame(6, $options['perPage']);
+        $this->assertSame(4, $options['breakpoints'][1279]['perPage']);
+        $this->assertSame(2, $options['breakpoints'][767]['perPage']);
+        $this->assertTrue($options['destroy']);
+        $this->assertTrue($options['breakpoints'][1279]['destroy']);
+        $this->assertTrue($options['breakpoints'][767]['destroy']);
         $this->assertFalse($options['arrows']);
         $this->assertFalse($options['drag']);
         $this->assertSame(1, $xpath->query('.//*[@data-product-card]', $carousel)->count());

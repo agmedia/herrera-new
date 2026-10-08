@@ -7,13 +7,13 @@
     $popularPrevious = trim(str_replace(['&laquo;', '&raquo;'], '', __('pagination.previous')));
     $popularNext = trim(str_replace(['&laquo;', '&raquo;'], '', __('pagination.next')));
     $popularOptions = [
-        'type' => $popularCount > 1 ? 'loop' : 'slide', 'rewind' => false, 'perPage' => min(6, max(1, $popularCount)),
+        'type' => $popularCount > 1 ? 'loop' : 'slide', 'rewind' => false, 'perPage' => 6, 'destroy' => $popularCount <= 6,
         'perMove' => 1, 'gap' => '0rem', 'drag' => $popularCount > 1, 'snap' => true,
-        'pagination' => false, 'arrows' => $popularCount > 1, 'updateOnMove' => true, 'speed' => 420,
+        'pagination' => false, 'arrows' => $popularCount > 6, 'updateOnMove' => true, 'speed' => 420,
         'i18n' => ['prev' => $popularPrevious, 'next' => $popularNext, 'first' => $popularNext, 'last' => $popularPrevious],
         'breakpoints' => [
-            1279 => ['perPage' => min(4, max(1, $popularCount))],
-            767 => ['perPage' => min(2, max(1, $popularCount))],
+            1279 => ['perPage' => 4, 'destroy' => $popularCount <= 4, 'arrows' => $popularCount > 4],
+            767 => ['perPage' => 2, 'destroy' => $popularCount <= 2, 'arrows' => $popularCount > 2],
         ],
     ];
 @endphp
@@ -34,7 +34,7 @@
                 </div>
                 <div class="herrera-home-product-actions">
                     <a class="herrera-home-products-link" href="{{ route('categories.index') }}">{{ __('herrera.all_products') }} <x-fa-icon name="arrow-right" /></a>
-                    @if ($popularCount > 1)
+                    @if ($popularCount > 2)
                         <div class="splide__arrows">
                             <button class="splide__arrow splide__arrow--prev" type="button" aria-label="{{ $popularPrevious }}" disabled><x-fa-icon name="chevron-right" style="solid" /></button>
                             <button class="splide__arrow splide__arrow--next" type="button" aria-label="{{ $popularNext }}" disabled><x-fa-icon name="chevron-right" style="solid" /></button>

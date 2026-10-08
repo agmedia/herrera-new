@@ -106,6 +106,7 @@ class AppServiceProvider extends ServiceProvider
             return $url.$separator.'v='.rawurlencode(app(AssetVersion::class)->current());
         });
 
+        Livewire::component('admin.user.b2b-account-manager', \App\Livewire\Admin\User\B2BAccountManager::class);
         Livewire::component('admin.user.b2b-user-profile-editor', \App\Livewire\Admin\User\B2BUserProfileEditor::class);
         Livewire::component('admin.integrations.eprel.settings-form', \App\Livewire\Admin\Integrations\Eprel\SettingsForm::class);
         Livewire::component('admin.integrations.eprel.catalog-sync-manager', \App\Livewire\Admin\Integrations\Eprel\CatalogSyncManager::class);

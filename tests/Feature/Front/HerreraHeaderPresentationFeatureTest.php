@@ -78,6 +78,30 @@ class HerreraHeaderPresentationFeatureTest extends TestCase
         $this->assertStringNotContainsString('grid-template-rows: 64px', $mobileCss);
     }
 
+    public function test_shared_header_preloads_its_font_on_every_public_page_type(): void
+    {
+        $this->configure();
+        $this->category('rasvjeta');
+        app(SystemSettingsService::class)->putMany([
+            'catalog_use_manufacturers' => true,
+            'catalog_use_blog' => true,
+        ]);
+
+        foreach (['/', '/shop', '/categories', '/category/rasvjeta', '/brendovi', '/blog', '/faq',
+            '/page/o-nama', '/contact', '/cart', '/wishlist', '/auth/login', '/auth/register',
+            '/auth/b2b-register', '/auth/forgot-password'] as $path) {
+            $response = $this->get($path);
+            $this->assertSame(200, $response->status(), $path);
+            $xpath = $this->xpath($response->getContent());
+            $preloads = $xpath->query('//head/link[@rel="preload" and @as="font"]');
+            $this->assertSame(1, $preloads->count(), $path);
+            $this->assertStringContainsString('assets/fonts/sora/Sora-Variable.woff2', $preloads->item(0)->getAttribute('href'), $path);
+            $this->assertTrue($preloads->item(0)->hasAttribute('crossorigin'), $path);
+            $this->assertSame(1, $xpath->query('//*[@data-site-main-header-spacer]')->count(), $path);
+            $this->assertSame(1, $xpath->query('//*[@data-herrera-header]')->count(), $path);
+        }
+    }
+
     public function test_homepage_displays_every_active_catalog_root_and_no_nested_or_scheduled_root(): void
     {
         $this->configure();

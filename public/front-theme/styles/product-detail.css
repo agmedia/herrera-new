@@ -320,6 +320,7 @@
 }
 
 .product-gallery-main {
+    visibility: visible;
     overflow: hidden;
     border: 1px solid #e2e8f0;
     background: #fff;

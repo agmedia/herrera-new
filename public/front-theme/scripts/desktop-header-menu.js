@@ -1,7 +1,7 @@
 (() => {
     const initStickyHeader = () => {
         const header = document.querySelector('.site-main-header');
-        if (!(header instanceof HTMLElement)) {
+        if (!(header instanceof HTMLElement) || header.dataset.stickyHeaderInit === '1') {
             return;
         }
 
@@ -10,17 +10,25 @@
         let expandedHeaderHeight = 24;
         let sticky = header.classList.contains('is-sticky');
 
-        const syncExpandedHeaderHeight = () => {
-            if (!preservesHeaderFlow || sticky) {
+        const syncExpandedHeaderHeight = (remeasureSticky = false) => {
+            if (!preservesHeaderFlow || (sticky && !remeasureSticky)) {
                 return;
             }
 
+            // Measure the expanded layout even after resizing a compact header.
+            // Both class changes happen before the next paint.
+            if (sticky) {
+                header.classList.remove('is-sticky');
+            }
             expandedHeaderHeight = Math.ceil(header.getBoundingClientRect().height);
+            if (sticky) {
+                header.classList.add('is-sticky');
+            }
             spacer.style.setProperty('--site-main-header-expanded-height', `${expandedHeaderHeight}px`);
         };
 
-        const updateHeaderState = () => {
-            syncExpandedHeaderHeight();
+        const updateHeaderState = (remeasureSticky = false) => {
+            syncExpandedHeaderHeight(remeasureSticky);
             const stickAt = preservesHeaderFlow ? expandedHeaderHeight : 24;
             const releaseAt = preservesHeaderFlow ? Math.max(24, expandedHeaderHeight - 16) : 24;
             const shouldStick = sticky
@@ -35,29 +43,31 @@
             header.classList.toggle('is-sticky', sticky);
         };
 
-        syncExpandedHeaderHeight();
-        updateHeaderState();
-
-        if (header.dataset.stickyHeaderInit === '1') {
-            return;
-        }
-
         header.dataset.stickyHeaderInit = '1';
+        updateHeaderState(true);
         let frameRequested = false;
+        let remeasureRequested = false;
 
-        window.addEventListener('scroll', () => {
+        const scheduleUpdate = (remeasureSticky = false) => {
+            remeasureRequested = remeasureRequested || remeasureSticky;
             if (frameRequested) {
                 return;
             }
 
             frameRequested = true;
             window.requestAnimationFrame(() => {
-                updateHeaderState();
+                const remeasure = remeasureRequested;
                 frameRequested = false;
+                remeasureRequested = false;
+                updateHeaderState(remeasure);
             });
-        }, { passive: true });
+        };
 
-        window.addEventListener('resize', syncExpandedHeaderHeight, { passive: true });
+        window.addEventListener('scroll', () => scheduleUpdate(), { passive: true });
+        window.addEventListener('resize', () => scheduleUpdate(true), { passive: true });
+        window.addEventListener('pageshow', () => scheduleUpdate(true));
+        window.addEventListener('load', () => scheduleUpdate(true), { once: true });
+        document.fonts?.ready.then(() => scheduleUpdate(true));
     };
 
     const initCatalogMegaMenus = () => {

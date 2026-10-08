@@ -76,6 +76,11 @@
     $carouselDesktopCols = $categoryProductsMode ? 5 : $preferredGridCols;
     $carouselGap = $categoryProductsMode ? '0rem' : '1.25rem';
     $carouselMobileGap = $categoryProductsMode ? '0rem' : '0.8rem';
+    $carouselCount = max(1, $products->count());
+    $carouselContinuousCards = str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera');
+    $carouselFallbackGap = $carouselContinuousCards ? '0rem' : $carouselGap;
+    $carouselFallbackMobileGap = $carouselContinuousCards ? '0rem' : $carouselMobileGap;
+    $carouselFallbackTabletGap = $carouselContinuousCards || $categoryProductsMode ? '0rem' : '1rem';
 @endphp
 
 <section class="{{ $categoryProductsMode ? 'w-full' : 'relative left-1/2 w-screen -translate-x-1/2' }} bg-white max-[540px]:py-5 py-8" data-herrera-aligned-section>
@@ -153,17 +158,22 @@
                     margin: 0 !important;
                     padding: 0 !important;
                     list-style: none;
-                    gap: {{ $carouselGap }};
+                    gap: 0;
                 }
 
                 #products-carousel-{{ $block->id }} .splide__slide {
-                    flex: 0 0 {{ $categoryProductsMode
-                        ? 'calc(100% / '.max(1, $carouselDesktopCols).')'
-                        : 'calc((100% - ('.max(1, $carouselDesktopCols).' - 1) * 1.25rem) / '.max(1, $carouselDesktopCols).')' }};
                     min-width: 0;
                     @if ($categoryProductsMode)
                         border-right: 1px solid #e2e8f0;
                     @endif
+                }
+
+                #products-carousel-{{ $block->id }}:not(.is-initialized) .splide__list {
+                    gap: {{ $carouselFallbackGap }};
+                }
+
+                #products-carousel-{{ $block->id }}:not(.is-initialized) .splide__slide {
+                    flex: 0 0 calc((100% - ({{ min(max(1, $carouselDesktopCols), $carouselCount) }} - 1) * {{ $carouselFallbackGap }}) / {{ min(max(1, $carouselDesktopCols), $carouselCount) }});
                 }
 
                 #products-carousel-{{ $block->id }} .splide__pagination {
@@ -181,27 +191,53 @@
                     }
                 }
 
-                @media (max-width: 1024px) {
-                    #products-carousel-{{ $block->id }} .splide__slide {
-                        flex-basis: {{ $categoryProductsMode ? '50%' : 'calc((100% - 1.25rem) / 2)' }};
+                @media (max-width: 1536px) {
+                    #products-carousel-{{ $block->id }}:not(.is-initialized) .splide__slide {
+                        flex-basis: calc((100% - ({{ min(max(1, $carouselDesktopCols), 5, $carouselCount) }} - 1) * {{ $carouselFallbackGap }}) / {{ min(max(1, $carouselDesktopCols), 5, $carouselCount) }});
                     }
-
                 }
 
+                @media (max-width: 1280px) {
+                    #products-carousel-{{ $block->id }}:not(.is-initialized) .splide__slide {
+                        flex-basis: calc((100% - ({{ min(max(1, $carouselDesktopCols), 4, $carouselCount) }} - 1) * {{ $carouselFallbackGap }}) / {{ min(max(1, $carouselDesktopCols), 4, $carouselCount) }});
+                    }
+                }
+
+                @media (max-width: 1024px) {
+                    #products-carousel-{{ $block->id }}:not(.is-initialized) .splide__slide {
+                        flex-basis: calc((100% - ({{ min(max(1, $carouselDesktopCols), 3, $carouselCount) }} - 1) * {{ $carouselFallbackGap }}) / {{ min(max(1, $carouselDesktopCols), 3, $carouselCount) }});
+                    }
+                }
+
+                @media (max-width: 860px) {
+                    #products-carousel-{{ $block->id }}:not(.is-initialized) .splide__list {
+                        gap: {{ $carouselFallbackTabletGap }};
+                    }
+
+                    #products-carousel-{{ $block->id }}:not(.is-initialized) .splide__slide {
+                        flex-basis: calc((100% - ({{ min($mobileDefaultCols, $carouselCount) }} - 1) * {{ $carouselFallbackTabletGap }}) / {{ min($mobileDefaultCols, $carouselCount) }});
+                    }
+                }
                 @media (max-width: 640px) {
                     #products-carousel-{{ $block->id }} .splide__arrow {
                         display: none;
                     }
 
-                    #products-carousel-{{ $block->id }} .splide__list {
-                        gap: {{ $carouselMobileGap }};
+                    #products-carousel-{{ $block->id }}:not(.is-initialized) .splide__list {
+                        gap: {{ $carouselFallbackMobileGap }};
                     }
 
-                    #products-carousel-{{ $block->id }} .splide__slide {
-                        flex-basis: {{ $mobileDefaultCols === 2
-                            ? ($categoryProductsMode ? '50%' : 'calc((100% - 0.8rem) / 2)')
-                            : '100%' }};
+                    #products-carousel-{{ $block->id }}:not(.is-initialized) .splide__slide {
+                        flex-basis: calc((100% - ({{ min($mobileDefaultCols, $carouselCount) }} - 1) * {{ $carouselFallbackMobileGap }}) / {{ min($mobileDefaultCols, $carouselCount) }});
                     }
+
+                    @if ($products->count() > $mobileDefaultCols)
+                        #products-carousel-{{ $block->id }}:not(.is-initialized)::after {
+                            display: block;
+                            height: 1.6rem;
+                            content: '';
+                        }
+                    @endif
 
                     #products-carousel-{{ $block->id }} .splide__pagination {
                         position: static;
@@ -210,6 +246,11 @@
                         transform: none;
                         gap: 0.5rem;
                         padding: 1rem 0 0.1rem;
+                    }
+
+                    #products-carousel-{{ $block->id }} .splide__pagination li {
+                        display: flex;
+                        line-height: 0;
                     }
 
                     #products-carousel-{{ $block->id }} .splide__pagination__page {
@@ -255,7 +296,7 @@
             <div
                 class="mt-4 {{ $categoryProductsMode ? 'storefront-widget-wide' : '' }}"
             >
-                <div id="products-carousel-{{ $block->id }}" class="splide" data-products-carousel-splide data-continuous-card-carousel>
+                <div id="products-carousel-{{ $block->id }}" class="splide" data-products-carousel-splide data-continuous-card-carousel data-desktop-cols="{{ $carouselDesktopCols }}" data-mobile-cols="{{ $mobileDefaultCols }}" data-category-products-mode="{{ $categoryProductsMode ? '1' : '0' }}">
                     <div class="splide__track">
                         <div class="splide__list">
                             @foreach ($products as $product)
@@ -291,14 +332,15 @@
                                     el.dataset.splideReady = '1';
 
                                     const count = el.querySelectorAll('.splide__slide').length;
-                                    const mobilePerPage = {{ $mobileDefaultCols }};
-                                    const preferredDesktopPerPage = {{ $carouselDesktopCols }};
+                                    const mobilePerPage = Number.parseInt(el.dataset.mobileCols || '2', 10) || 2;
+                                    const preferredDesktopPerPage = Number.parseInt(el.dataset.desktopCols || '4', 10) || 4;
                                     const continuousCards = document.body.classList.contains('herrera-storefront');
+                                    const categoryProducts = el.dataset.categoryProductsMode === '1';
                                     new window.Splide(el, {
                                         type: count > 1 ? 'loop' : 'slide',
                                         perPage: Math.min(Math.max(1, preferredDesktopPerPage), Math.max(1, count)),
                                         perMove: 1,
-                                        gap: continuousCards ? '0rem' : '{{ $carouselGap }}',
+                                        gap: continuousCards || categoryProducts ? '0rem' : '1.25rem',
                                         drag: count > 1,
                                         snap: true,
                                         pagination: false,
@@ -309,10 +351,10 @@
                                             1536: { perPage: Math.min(Math.min(Math.max(1, preferredDesktopPerPage), 5), Math.max(1, count)) },
                                             1280: { perPage: Math.min(Math.min(Math.max(1, preferredDesktopPerPage), 4), Math.max(1, count)) },
                                             1024: { perPage: Math.min(Math.min(Math.max(1, preferredDesktopPerPage), 3), Math.max(1, count)) },
-                                            860: { perPage: Math.min(mobilePerPage, Math.max(1, count)), gap: continuousCards ? '0rem' : '{{ $categoryProductsMode ? '0rem' : '1rem' }}' },
+                                            860: { perPage: Math.min(mobilePerPage, Math.max(1, count)), gap: continuousCards || categoryProducts ? '0rem' : '1rem' },
                                             640: {
                                                 perPage: Math.min(mobilePerPage, Math.max(1, count)),
-                                                gap: continuousCards ? '0rem' : '{{ $carouselMobileGap }}',
+                                                gap: continuousCards || categoryProducts ? '0rem' : '0.8rem',
                                                 arrows: false,
                                                 pagination: count > mobilePerPage,
                                             },

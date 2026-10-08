@@ -272,6 +272,19 @@
     height: auto;
 }
 
+.commerce-product-thumb {
+    aspect-ratio: 1 / 1;
+    overflow: hidden;
+}
+
+.commerce-product-thumb img,
+.checkout-summary-image.commerce-product-thumb img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
 .cart-product-copy {
     overflow: hidden;
 }

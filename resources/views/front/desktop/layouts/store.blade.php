@@ -28,6 +28,9 @@
         $storefrontCssBundleIncludesLegacyAssets = true;
         $storefrontAssetVersion = app(\App\Support\AssetVersion::class)->current();
     @endphp
+    @if (str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera'))
+        <link rel="preload" href="{{ asset('assets/fonts/sora/Sora-Variable.woff2') }}" as="font" type="font/woff2" crossorigin>
+    @endif
     <script defer src="{{ asset('front-theme/scripts/desktop-header-menu.js') }}?v={{ filemtime(public_path('front-theme/scripts/desktop-header-menu.js')) }}"></script>
     <script defer src="{{ asset('front-theme/scripts/header-search-panel.js') }}?v={{ filemtime(public_path('front-theme/scripts/header-search-panel.js')) }}"></script>
     @include('front.partials.cookie-consent-head')

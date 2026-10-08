@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Front;
 
+use App\Models\Catalog\Product\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class CommercePagePresentationTest extends TestCase
@@ -47,6 +49,30 @@ class CommercePagePresentationTest extends TestCase
             ->assertSee('for="account-email"', false)
             ->assertSee('autocomplete="email"', false)
             ->assertSee('commerce-primary-action', false);
+    }
+
+    public function test_cart_and_checkout_reserve_square_space_for_portrait_product_thumbnails(): void
+    {
+        $product = Product::query()->create(['code' => 'STABLE-THUMB', 'is_active' => true, 'base_price' => 10, 'stock_qty' => 5]);
+        $product->translations()->create(['locale' => 'hr', 'name' => 'Portrait thumbnail', 'slug' => 'portrait-thumbnail']);
+        $product->addMedia(UploadedFile::fake()->image('portrait-thumb.jpg', 200, 300))->toMediaCollection('product_main');
+        $this->withSession(['front.cart.items' => [$product->id.':0' => ['product_id' => $product->id, 'product_option_value_id' => null, 'quantity' => 1]]]);
+
+        foreach (['/cart' => 2, '/checkout' => 1] as $url => $expectedImages) {
+            $response = $this->get($url)->assertOk();
+            $dom = new \DOMDocument;
+            $previous = libxml_use_internal_errors(true);
+            $dom->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
+            libxml_clear_errors();
+            libxml_use_internal_errors($previous);
+            $images = (new \DOMXPath($dom))->query('//*[contains(concat(" ", normalize-space(@class), " "), " commerce-product-thumb ")]//img');
+            $this->assertSame($expectedImages, $images->count());
+            foreach ($images as $thumbnail) {
+                $this->assertSame('100', $thumbnail->getAttribute('width'));
+                $this->assertSame('100', $thumbnail->getAttribute('height'));
+                $this->assertStringContainsString('portrait-thumb', $thumbnail->getAttribute('src'));
+            }
+        }
     }
 
     public function test_return_request_form_uses_the_shared_commerce_form_treatment(): void

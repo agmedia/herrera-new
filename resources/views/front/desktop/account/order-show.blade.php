@@ -224,17 +224,17 @@
                                 <td class="px-4 py-4">
                                     <div class="flex items-start gap-3">
                                         @if ($productUrl)
-                                            <a href="{{ $productUrl }}" class="block w-16 shrink-0 border border-slate-200 bg-slate-50 p-1">
+                                            <a href="{{ $productUrl }}" class="commerce-product-thumb block w-16 shrink-0 border border-slate-200 bg-slate-50 p-1">
                                                 @if ($productImageUrl)
-                                                    <img src="{{ $productImageUrl }}" alt="{{ $item->name }}" class="h-auto w-full" loading="lazy" decoding="async">
+                                                    <img src="{{ $productImageUrl }}" alt="{{ $item->name }}" class="h-auto w-full" width="100" height="100" loading="lazy" decoding="async">
                                                 @else
                                                     <span class="flex h-full w-full items-center justify-center text-[10px] font-semibold uppercase text-slate-500">{{ __('ui.product.no_image') }}</span>
                                                 @endif
                                             </a>
                                         @else
-                                            <div class="block w-16 shrink-0 border border-slate-200 bg-slate-50 p-1">
+                                            <div class="commerce-product-thumb block w-16 shrink-0 border border-slate-200 bg-slate-50 p-1">
                                                 @if ($productImageUrl)
-                                                    <img src="{{ $productImageUrl }}" alt="{{ $item->name }}" class="h-auto w-full" loading="lazy" decoding="async">
+                                                    <img src="{{ $productImageUrl }}" alt="{{ $item->name }}" class="h-auto w-full" width="100" height="100" loading="lazy" decoding="async">
                                                 @else
                                                     <span class="flex h-full w-full items-center justify-center text-[10px] font-semibold uppercase text-slate-500">{{ __('ui.product.no_image') }}</span>
                                                 @endif

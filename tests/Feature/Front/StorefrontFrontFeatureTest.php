@@ -117,7 +117,7 @@ class StorefrontFrontFeatureTest extends TestCase
 
         [$post, $postSlug] = $this->seedBlogPost();
         $cover = $post
-            ->addMedia(UploadedFile::fake()->image('original-blog-cover.jpg', 1200, 800))
+            ->addMedia(UploadedFile::fake()->image('original-blog-cover.jpg', 1200, 900))
             ->toMediaCollection('blog_cover');
 
         app(SystemSettingsService::class)->put('catalog_use_blog', true);
@@ -132,6 +132,9 @@ class StorefrontFrontFeatureTest extends TestCase
             ->assertOk()
             ->assertSee('src="'.$cover->getUrl().'"', false)
             ->assertSee('class="mx-auto block h-auto max-w-full"', false)
+            ->assertSee('width="1200"', false)
+            ->assertSee('height="900"', false)
+            ->assertDontSee('blog-cover--fallback', false)
             ->assertDontSee('cover_1600x2133', false);
     }
 
@@ -1252,14 +1255,14 @@ class StorefrontFrontFeatureTest extends TestCase
             ->assertOk()
             ->assertSee('New arrivals')
             ->assertSee('data-products-carousel-splide', false)
-            ->assertSee('const preferredDesktopPerPage = 5;', false)
+            ->assertSee('data-desktop-cols="5"', false)
             ->assertDontSee('Fallback subtitle');
 
         app(SystemSettingsService::class)->put('store_product_desktop_default_cols', 4);
 
         $this->get('/?cols=5')
             ->assertOk()
-            ->assertSee('const preferredDesktopPerPage = 5;', false);
+            ->assertSee('data-desktop-cols="5"', false);
     }
 
     public function test_home_renders_footer_newsletter_validation_hooks(): void

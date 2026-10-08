@@ -1,4 +1,6 @@
+@import '../../public/vendor/splide/splide.min.css';
 @import './full-width-image-slider.css';
+@import './carousel-layout.css';
 @import '../../public/front-theme/styles/cookie-consent-theme.css';
 @import '../../public/front-theme/styles/font-awesome-svg.css';
 @import '../../public/front-theme/styles/scroll-to-top.css';

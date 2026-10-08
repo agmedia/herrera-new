@@ -13,6 +13,10 @@
     $preferWebp = (bool) ($storeSettings['images']['use_webp'] ?? false);
     $coverImage = $mediaItems->firstWhere('collection_name', 'blog_cover') ?? $post->getFirstMedia('blog_cover');
     $coverImageUrl = $coverImage?->getUrl() ?: \App\Support\Media\LegacyCatalogImage::first($post);
+    $coverImagePath = $coverImage?->getPath();
+    $coverImageDimensions = $coverImagePath && is_file($coverImagePath) ? @getimagesize($coverImagePath) : false;
+    $coverImageWidth = is_array($coverImageDimensions) ? (int) $coverImageDimensions[0] : 1200;
+    $coverImageHeight = is_array($coverImageDimensions) ? (int) $coverImageDimensions[1] : 800;
     $galleryItems = $mediaItems->where('collection_name', 'blog_gallery')->values();
     if ($galleryItems->isEmpty()) {
         $galleryItems = $post->getMedia('blog_gallery')
@@ -160,11 +164,13 @@
             @endif
 
             @if ($coverImageUrl)
-                <figure class="mb-8">
+                <figure class="mb-8 {{ $coverImageDimensions ? '' : 'blog-cover--fallback' }}">
                     <img
                         src="{{ $coverImageUrl }}"
                         alt="{{ $translation?->title ?? $post->code }}"
                         class="mx-auto block h-auto max-w-full"
+                        width="{{ $coverImageWidth }}"
+                        height="{{ $coverImageHeight }}"
                         loading="eager"
                         decoding="async"
                     >
@@ -283,6 +289,35 @@
 
                     #blog-related-products-carousel-{{ $post->id }} .splide__list {
                         gap: 0 !important;
+                    }
+
+                    #blog-related-products-carousel-{{ $post->id }}:not(.is-initialized) .splide__list {
+                        display: flex;
+                        margin: 0;
+                        padding: 0;
+                        list-style: none;
+                    }
+
+                    #blog-related-products-carousel-{{ $post->id }}:not(.is-initialized) .splide__slide {
+                        flex: 0 0 calc(100% / {{ min(max(1, $preferredGridCols), $relatedProducts->count()) }});
+                    }
+
+                    @media (max-width: 1280px) {
+                        #blog-related-products-carousel-{{ $post->id }}:not(.is-initialized) .splide__slide {
+                            flex-basis: calc(100% / {{ min(4, $relatedProducts->count()) }});
+                        }
+                    }
+
+                    @media (max-width: 1024px) {
+                        #blog-related-products-carousel-{{ $post->id }}:not(.is-initialized) .splide__slide {
+                            flex-basis: calc(100% / {{ min(3, $relatedProducts->count()) }});
+                        }
+                    }
+
+                    @media (max-width: 860px) {
+                        #blog-related-products-carousel-{{ $post->id }}:not(.is-initialized) .splide__slide {
+                            flex-basis: calc(100% / {{ min($mobileDefaultCols, $relatedProducts->count()) }});
+                        }
                     }
 
                     #blog-related-products-carousel-{{ $post->id }} .splide__slide {

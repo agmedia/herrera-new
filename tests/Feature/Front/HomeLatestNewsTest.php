@@ -52,6 +52,7 @@ class HomeLatestNewsTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('data-latest-news', false)
+            ->assertSee('data-post-count="3"', false)
             ->assertSee('class="home-news-heading storefront-widget-heading--split"', false)
             ->assertSee('class="storefront-widget-heading-title"', false)
             ->assertSee('Sve novosti')

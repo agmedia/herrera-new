@@ -420,12 +420,14 @@
                         $productImageUrl = \App\Support\Media\LegacyCatalogImage::first($product, ['thumb_100x100']);
                     @endphp
                     <div class="checkout-summary-line flex items-start gap-3">
-                        <div class="checkout-summary-image w-16 shrink-0 border border-slate-200 bg-slate-50 p-1">
+                        <div class="checkout-summary-image commerce-product-thumb w-16 shrink-0 border border-slate-200 bg-slate-50 p-1">
                             @if ($productImageUrl)
                                 <img
                                     src="{{ $productImageUrl }}"
                                     alt="{{ $translation?->name ?? $line['product']->code }}"
                                     class="h-auto w-full"
+                                    width="100"
+                                    height="100"
                                     loading="lazy"
                                     decoding="async"
                                 >

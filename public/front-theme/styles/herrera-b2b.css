@@ -93,6 +93,10 @@ body.herrera-storefront { --herrera-action: #007b8b; --herrera-footer: #24353b; 
 }
 
 @media (min-width: 1024px) {
+ /* Preserve the expanded header's space when the compact header becomes fixed. */
+ .herrera-storefront .site-main-header { position: relative; top: auto; }
+ .herrera-storefront .site-main-header.is-sticky { position: fixed; top: 0; right: 0; left: 0; }
+ .herrera-storefront .site-main-header.is-sticky + .site-main-header-spacer { display: block; height: var(--site-main-header-expanded-height); }
  .herrera-storefront .herrera-header-layout,
  .herrera-storefront .site-main-header.is-sticky .herrera-header-layout {
   display: grid; grid-template-areas: "brand search actions" "catalog navigation quick";

@@ -46,9 +46,9 @@
             <img
                 src="{{ $declaration['energy_class_image_url'] }}"
                 alt=""
-                class="{{ $compact ? 'h-6 w-auto' : 'h-8 w-auto' }} max-w-[8rem] object-contain"
-                width="{{ $compact ? 96 : 128 }}"
-                height="{{ $compact ? 24 : 32 }}"
+                class="{{ $compact ? 'h-6 w-[43.68px]' : 'h-8 w-[58.24px]' }} shrink-0 object-contain"
+                width="273"
+                height="150"
                 loading="lazy"
                 decoding="async"
                 aria-hidden="true"

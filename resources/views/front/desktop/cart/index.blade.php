@@ -48,12 +48,14 @@
                         @endphp
                         <div class="p-4">
                             <div class="flex items-start gap-3">
-                                <a href="{{ route('products.show', ['slug' => $translation?->slug ?? $product->id]) }}" class="block w-16 shrink-0 border border-slate-200 bg-slate-50 p-1">
+                                <a href="{{ route('products.show', ['slug' => $translation?->slug ?? $product->id]) }}" class="commerce-product-thumb block w-16 shrink-0 border border-slate-200 bg-slate-50 p-1">
                                     @if ($productImageUrl)
                                         <img
                                             src="{{ $productImageUrl }}"
                                             alt="{{ $translation?->name ?? $product->code }}"
                                             class="h-auto w-full"
+                                            width="100"
+                                            height="100"
                                             loading="lazy"
                                             decoding="async"
                                         >
@@ -178,12 +180,14 @@
                         <tr class="border-t border-slate-200">
                             <td class="cart-product-cell px-4 py-3.5">
                                 <div class="flex items-start gap-3">
-                                    <a href="{{ route('products.show', ['slug' => $translation?->slug ?? $product->id]) }}" class="cart-product-thumb block border border-slate-200 bg-slate-50 p-1">
+                                    <a href="{{ route('products.show', ['slug' => $translation?->slug ?? $product->id]) }}" class="cart-product-thumb commerce-product-thumb block border border-slate-200 bg-slate-50 p-1">
                                         @if ($productImageUrl)
                                             <img
                                                 src="{{ $productImageUrl }}"
                                                 alt="{{ $translation?->name ?? $product->code }}"
                                                 class="h-auto w-full"
+                                                width="100"
+                                                height="100"
                                                 loading="lazy"
                                                 decoding="async"
                                             >

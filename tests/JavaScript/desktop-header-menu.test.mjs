@@ -6,7 +6,8 @@ import vm from 'node:vm';
 const script = readFileSync(new URL('../../public/front-theme/scripts/desktop-header-menu.js', import.meta.url), 'utf8');
 
 function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections), hrefs = [],
-    currentPath = '/shop', parents = {}, linkSections = [], categoriesButton = false } = {}) {
+    currentPath = '/shop', parents = {}, linkSections = [], categoriesButton = false,
+    headerSpacer = false, headerHeight = 176, compactHeaderHeight = 130, scrollY = 0 } = {}) {
     const queuedToggles = new Set();
     class Element {
         constructor() {
@@ -19,7 +20,11 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
                 contains: (value) => classes.has(value),
                 toggle(value, enabled) { if (enabled) classes.add(value); else classes.delete(value); },
             };
-            this.style = { setProperty() {} };
+            this.style = {
+                values: new Map(),
+                setProperty(name, value) { this.values.set(name, value); },
+                getPropertyValue(name) { return this.values.get(name) || ''; },
+            };
         }
         addEventListener(type, callback) {
             this.listeners.set(type, [...(this.listeners.get(type) || []), callback]);
@@ -48,6 +53,12 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     }
     const root = new Element();
     const header = new Element();
+    header.expandedHeight = headerHeight;
+    header.compactHeight = compactHeaderHeight;
+    header.getBoundingClientRect = () => ({
+        height: header.classList.contains('is-sticky') ? header.compactHeight : header.expandedHeight,
+    });
+    const spacer = headerSpacer ? new Element() : null;
     const openButton = new Element();
     const panel = new Element();
     const overlay = new Element();
@@ -84,11 +95,12 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     document.body = new Element(); document.readyState = 'complete';
     document.querySelector = (selector) => ({
         '.site-main-header': header, '[data-mobile-menu-root]': root,
+        '[data-site-main-header-spacer]': spacer,
     })[selector] || null;
     document.querySelectorAll = (selector) => selector === '[data-mobile-menu-open]' ? [openButton] : [];
     const window = new Element();
     window.location = { origin: 'https://shop.example', href: new URL(currentPath, 'https://shop.example').href };
-    window.scrollY = 0;
+    window.scrollY = scrollY;
     window.requestAnimationFrame = (callback) => callback();
     const storage = { reads: 0, writes: 0, value: JSON.stringify(savedSections) };
     const sessionStorage = {
@@ -99,7 +111,7 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
         document, window, sessionStorage, URL, HTMLElement: Element, HTMLDetailsElement: Details,
     });
     return {
-        root, header, window, document, openButton, overlay, sections, storage, links, sectionToggles,
+        root, header, spacer, window, document, openButton, overlay, sections, storage, links, sectionToggles,
         open() { openButton.emit('click', { preventDefault() {}, currentTarget: openButton }); },
         flushToggles() {
             while (queuedToggles.size > 0) {
@@ -109,6 +121,47 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
         },
     };
 }
+
+test('restored scrolling reserves the expanded header height before compacting', () => {
+    const page = harness({ headerSpacer: true, scrollY: 300 });
+    assert.equal(page.header.classList.contains('is-sticky'), true);
+    assert.equal(page.spacer.style.getPropertyValue('--site-main-header-expanded-height'), '176px');
+});
+
+test('sticky threshold retains hysteresis and the measured height after BFCache restoration', () => {
+    const page = harness({ headerSpacer: true });
+    page.window.scrollY = 177; page.window.emit('scroll');
+    assert.equal(page.header.classList.contains('is-sticky'), true);
+    page.window.scrollY = 170; page.window.emit('scroll');
+    assert.equal(page.header.classList.contains('is-sticky'), true);
+    page.window.scrollY = 150; page.window.emit('pageshow', { persisted: true });
+    assert.equal(page.header.classList.contains('is-sticky'), false);
+    assert.equal(page.spacer.style.getPropertyValue('--site-main-header-expanded-height'), '176px');
+    assert.equal(page.window.listeners.get('scroll').length, 1);
+    assert.equal(page.window.listeners.get('resize').length, 1);
+});
+
+test('resizing a compact header updates the spacer from its expanded layout', () => {
+    const page = harness({ headerSpacer: true, scrollY: 300 });
+    page.header.expandedHeight = 220;
+    page.header.compactHeight = 150;
+    page.window.emit('resize');
+    assert.equal(page.spacer.style.getPropertyValue('--site-main-header-expanded-height'), '220px');
+    assert.equal(page.header.classList.contains('is-sticky'), true);
+    page.window.scrollY = 190;
+    page.window.emit('resize');
+    assert.equal(page.header.classList.contains('is-sticky'), false);
+});
+
+test('pageshow and image loading refresh header geometry without another scroll', () => {
+    const page = harness({ headerSpacer: true });
+    page.window.scrollY = 300;
+    page.window.emit('pageshow', { persisted: false });
+    assert.equal(page.header.classList.contains('is-sticky'), true);
+    page.header.expandedHeight = 194;
+    page.window.emit('load');
+    assert.equal(page.spacer.style.getPropertyValue('--site-main-header-expanded-height'), '194px');
+});
 
 test('initial pageshow leaves an already opened mobile menu visible', () => {
     const page = harness();

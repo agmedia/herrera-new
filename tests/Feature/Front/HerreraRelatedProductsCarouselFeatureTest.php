@@ -72,6 +72,7 @@ class HerreraRelatedProductsCarouselFeatureTest extends TestCase
         $this->assertSame(1, $options['perPage']);
         $this->assertFalse($options['arrows']);
         $this->assertFalse($options['drag']);
+        $this->assertSame('1', $carousel->getAttribute('data-product-count'));
         $this->assertSame(1, $xpath->query('.//*[@data-product-card]', $carousel)->count());
         $this->assertSame(0, $xpath->query('.//button[contains(@class, "splide__arrow")]', $carousel)->count());
     }

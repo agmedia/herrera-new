@@ -100,7 +100,7 @@
         @include('front.partials.splide-assets')
 
         <div>
-            <div id="blogs-carousel-{{ $block->id }}" class="splide home-news-carousel" data-blogs-carousel-splide>
+            <div id="blogs-carousel-{{ $block->id }}" class="splide home-news-carousel" data-blogs-carousel-splide data-post-count="{{ $posts->count() }}">
                     <div class="splide__track">
                         <div class="splide__list">
                             @foreach ($posts as $post)

@@ -58,7 +58,8 @@ class HerreraLayoutAlignmentFeatureTest extends TestCase
         $this->assertSame(4, $options['breakpoints'][1279]['perPage']);
         $this->assertSame(2, $options['breakpoints'][767]['perPage']);
         $this->assertSame(2, $xpath->query('.//button[contains(@class, "splide__arrow") and @aria-label]', $carousel)->count());
-        $response->assertSee('@splidejs/splide@4.1.4/dist/js/splide.min.js', false);
+        $response->assertSee('vendor/splide/splide.min.js', false);
+        $response->assertDontSee('cdn.jsdelivr.net/npm/@splidejs', false);
     }
 
     public function test_single_home_product_does_not_offer_empty_carousel_navigation(): void

@@ -9,7 +9,7 @@
         target="_blank"
         rel="noopener noreferrer"
         {{ $attributes->class([
-            'inline-flex font-semibold text-blue-700 underline decoration-blue-400 underline-offset-2 hover:text-blue-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-2',
+            'product-information-sheet-link inline-flex items-center font-semibold text-blue-700 underline decoration-blue-400 underline-offset-2 hover:text-blue-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-2',
             $compact ? 'text-xs leading-tight' : 'text-sm',
         ]) }}
         aria-label="{{ __('ui.product.open_product_information_sheet') }}"

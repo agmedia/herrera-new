@@ -189,7 +189,7 @@
             const activateItem = (depth, index) => {
                 const nodes = nodesByDepth[depth] || [];
                 const selectedNode = nodes[index];
-                if (!selectedNode) {
+                if (!selectedNode || activeIndexByDepth[depth] === index) {
                     return;
                 }
 
@@ -230,13 +230,13 @@
                 if (event.key === 'ArrowRight' && hasChildren(node) && depth + 1 < maxColumns) {
                     event.preventDefault();
                     activateItem(depth, index);
-                    focusItem(depth + 1, activeIndexByDepth[depth + 1] || 0);
+                    focusItem(depth + 1, Math.max(0, activeIndexByDepth[depth + 1] ?? 0));
                     return;
                 }
 
                 if (event.key === 'ArrowLeft' && depth > 0) {
                     event.preventDefault();
-                    focusItem(depth - 1, activeIndexByDepth[depth - 1] || 0);
+                    focusItem(depth - 1, Math.max(0, activeIndexByDepth[depth - 1] ?? 0));
                     return;
                 }
 
@@ -400,11 +400,13 @@
         const menuLinks = Array.from(root.querySelectorAll('a[href]'));
         const resetSectionStates = new WeakMap();
         let lastSyncedPath;
+        let menuOpener = null;
 
         const forceClosedState = () => {
             root.classList.add('pointer-events-none');
             root.dataset.menuOpen = '0';
             root.inert = true;
+            openButtons.forEach((button) => button.setAttribute('aria-expanded', 'false'));
             overlay?.classList.remove('opacity-100');
             overlay?.classList.add('opacity-0');
             panel?.classList.add('-translate-x-full');
@@ -532,17 +534,24 @@
             highlightCurrentLink(currentLink);
         };
 
-        const closeMenu = () => {
+        const closeMenu = (restoreFocus = true) => {
             forceClosedState();
+            if (restoreFocus && menuOpener instanceof HTMLElement) {
+                menuOpener.focus({ preventScroll: true });
+            }
         };
 
         const openMenu = (event) => {
             if (event) {
                 event.preventDefault();
             }
+            menuOpener = event?.currentTarget instanceof HTMLElement
+                ? event.currentTarget
+                : document.activeElement;
             root.classList.remove('pointer-events-none');
             root.dataset.menuOpen = '1';
             root.inert = false;
+            openButtons.forEach((button) => button.setAttribute('aria-expanded', 'true'));
             resetAccordionSections();
             syncMenuState();
             if (event?.currentTarget?.hasAttribute('data-mobile-menu-open-categories')) {
@@ -557,13 +566,46 @@
             panel?.classList.add('translate-x-0');
             document.body.classList.add('overflow-hidden');
             document.body.classList.add('desktop-mobile-menu-open');
+            panel?.querySelector('[data-mobile-menu-close]')?.focus({ preventScroll: true });
         };
 
+        document.addEventListener('keydown', (event) => {
+            if (root.dataset.menuOpen !== '1') {
+                return;
+            }
+
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeMenu();
+                return;
+            }
+
+            if (event.key !== 'Tab') {
+                return;
+            }
+
+            const focusable = Array.from(panel?.querySelectorAll('a[href], button, summary, [tabindex="0"]') || [])
+                .filter((element) => !element.hasAttribute('disabled') && element.getClientRects().length > 0);
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (!panel?.contains(document.activeElement)) {
+                event.preventDefault();
+                (event.shiftKey ? last : first)?.focus();
+            } else if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last?.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first?.focus();
+            }
+        });
+
         openButtons.forEach((button) => {
+            button.setAttribute('aria-controls', panel?.id || 'mobile-navigation');
             button.addEventListener('click', openMenu);
             button.addEventListener('touchend', openMenu, { passive: false });
         });
-        closeButtons.forEach((button) => button.addEventListener('click', closeMenu));
+        closeButtons.forEach((button) => button.addEventListener('click', () => closeMenu()));
         accordionSections.forEach((section) => {
             section.addEventListener('toggle', () => {
                 if (resetSectionStates.has(section)) {
@@ -595,7 +637,14 @@
 
                 const section = button.closest('[data-mobile-menu-accordion]');
                 if (section instanceof HTMLDetailsElement) {
+                    const hadFocus = document.activeElement === button;
                     section.open = !section.open;
+                    if (hadFocus) {
+                        const visibleToggle = section.querySelector(section.open
+                            ? ':scope > summary > [data-mobile-menu-toggle-close]'
+                            : ':scope > summary > [data-mobile-menu-toggle-open]');
+                        visibleToggle?.focus({ preventScroll: true });
+                    }
                 }
             };
 
@@ -675,7 +724,7 @@
             link.addEventListener('click', (event) => {
                 // Keep the outgoing page still while a new document is loading.
                 if (!leavesCurrentDocument(event, link)) {
-                    closeMenu();
+                    closeMenu(false);
                 }
             });
         });

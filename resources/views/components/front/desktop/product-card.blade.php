@@ -187,13 +187,15 @@
             <div class="product-card-lined-price mt-auto pt-4">
                 @if (! $canViewPrices)
                     @include('front.partials.b2b-price-access', ['compact' => true])
-                    <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
-                    <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                    <div class="product-card-energy-documents">
+                        <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
+                        <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                    </div>
                 @else
                 <p class="text-[11px] leading-none {{ $isB2BPrice ? 'font-semibold text-cyan-800' : 'text-slate-700' }}">
                     {{ $isB2BPrice ? __('ui.product.b2b_contract_price') : __('ui.shop.filters.price') }}
                 </p>
-                <div class="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <div class="product-card-price-row mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                     @if (! empty($oldPrice))
                         <p class="text-[11px] leading-none text-slate-500 line-through sm:text-[12px]">{{ $oldPrice }}</p>
                     @endif
@@ -323,13 +325,15 @@
             <div class="mt-1.5 flex flex-col gap-1">
                 @if (! $canViewPrices)
                     @include('front.partials.b2b-price-access', ['compact' => true])
-                    <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
-                    <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                    <div class="product-card-energy-documents">
+                        <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
+                        <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                    </div>
                 @else
                 @if ($isB2BPrice)
                     <p class="text-[10px] font-semibold leading-tight text-cyan-800 sm:text-[11px]">{{ __('ui.product.b2b_contract_price') }}</p>
                 @endif
-                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <div class="product-card-price-row flex flex-wrap items-center gap-x-2 gap-y-1">
                     @if (! empty($oldPrice))
                         <p class="text-[11px] leading-none text-slate-500 line-through sm:text-[13px]">{{ $oldPrice }}</p>
                     @endif
@@ -371,13 +375,15 @@
             <div class="flex flex-col gap-1">
                 @if (! $canViewPrices)
                     @include('front.partials.b2b-price-access', ['compact' => true])
-                    <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
-                    <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                    <div class="product-card-energy-documents">
+                        <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
+                        <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                    </div>
                 @else
                 @if ($isB2BPrice)
                     <p class="text-[10px] font-semibold leading-tight text-cyan-800 sm:text-[11px]">{{ __('ui.product.b2b_contract_price') }}</p>
                 @endif
-                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <div class="product-card-price-row flex flex-wrap items-center gap-x-2 gap-y-1">
                     @if (! empty($oldPrice))
                         <p class="text-[11px] leading-none text-slate-500 line-through sm:text-[13px]">{{ $oldPrice }}</p>
                     @endif

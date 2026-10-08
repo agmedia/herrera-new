@@ -2,7 +2,7 @@
     $children = collect($child['children'] ?? []);
     $depthClass = 'desktop-mobile-depth-'.min(4, max(0, (int) $level));
     $labelWeightClass = $level === 0 ? 'font-semibold' : 'font-medium';
-    $leafWeightClass = $level === 0 ? 'font-medium' : 'font-light';
+    $leafWeightClass = 'font-medium';
     $target = !empty($child['open_in_new_tab']) ? '_blank' : null;
     $rel = !empty($child['open_in_new_tab']) ? 'noopener noreferrer' : null;
     $imageUrl = trim((string) ($child['image_url'] ?? ''));
@@ -17,7 +17,7 @@
             <summary class="{{ $depthClass }} {{ $categoryRowClass }} desktop-mobile-menu-row relative flex min-h-[52px] cursor-pointer list-none items-center py-3 pr-3 text-slate-700 hover:bg-slate-50 hover:text-slate-900">
                 <a
                     href="{{ $child['url'] ?? '#' }}"
-                    class="min-w-0 flex-1 truncate pr-11 {{ $labelWeightClass }}"
+                    class="desktop-mobile-menu-category-link min-w-0 flex-1 pr-11 {{ $labelWeightClass }}"
                     data-mobile-nav-link
                     @if($target) target="{{ $target }}" rel="{{ $rel }}" @endif
                 >
@@ -32,23 +32,23 @@
                 </a>
                 <button
                     type="button"
-                    class="absolute right-3 top-1/2 z-10 inline-flex h-10 w-10 -translate-y-1/2 touch-manipulation items-center justify-center border border-slate-300 bg-white p-0 text-slate-500"
+                    class="desktop-mobile-menu-toggle"
                     aria-label="{{ __('ui.front.desktop.open_navigation') }}: {{ $child['label'] ?? '' }}"
                     aria-expanded="false"
                     data-mobile-menu-toggle
                     data-mobile-menu-toggle-open
                 >
-                    <x-fa-icon name="plus" class="h-[18px] w-[18px]" />
+                    <x-fa-icon name="chevron-down" class="h-[18px] w-[18px]" />
                 </button>
                 <button
                     type="button"
-                    class="absolute right-3 top-1/2 z-10 hidden h-10 w-10 -translate-y-1/2 touch-manipulation items-center justify-center border border-slate-300 bg-white p-0 text-slate-500"
+                    class="desktop-mobile-menu-toggle"
                     aria-label="{{ __('ui.front.desktop.close_navigation') }}: {{ $child['label'] ?? '' }}"
                     aria-expanded="true"
                     data-mobile-menu-toggle
                     data-mobile-menu-toggle-close
                 >
-                    <x-fa-icon name="minus" class="h-[18px] w-[18px]" />
+                    <x-fa-icon name="chevron-up" class="h-[18px] w-[18px]" />
                 </button>
             </summary>
             <ul class="desktop-mobile-menu-children">
@@ -58,7 +58,7 @@
             </ul>
         </details>
     @else
-        <a href="{{ $child['url'] ?? '#' }}" class="{{ $depthClass }} {{ $categoryRowClass }} desktop-mobile-menu-row flex min-h-[52px] items-center py-3 {{ $leafWeightClass }} text-slate-700 hover:bg-slate-100 hover:text-slate-900">
+        <a href="{{ $child['url'] ?? '#' }}" @if($target) target="{{ $target }}" rel="{{ $rel }}" @endif class="{{ $depthClass }} {{ $categoryRowClass }} desktop-mobile-menu-row flex min-h-[52px] items-center py-3 {{ $leafWeightClass }} text-slate-700 hover:bg-slate-100 hover:text-slate-900">
             <span class="desktop-mobile-menu-item-main">
                 @if ($imageUrl !== '')
                     <span class="desktop-mobile-menu-thumb" aria-hidden="true">

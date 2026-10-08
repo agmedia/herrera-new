@@ -26,9 +26,9 @@
             <div class="herrera-hero-actions">
                 <a class="herrera-hero-primary-action" href="{{ route('shop.index') }}">{{ __('herrera.catalog') }} <x-fa-icon name="arrow-right" /></a>
                 @auth
-                    <a class="herrera-hero-secondary-action" href="{{ route('account.dashboard') }}">{{ __('herrera.account') }}</a>
+                    <a class="herrera-hero-secondary-action" href="{{ route('account.dashboard') }}"><x-fa-icon name="user" /> {{ __('herrera.account') }}</a>
                 @else
-                    <a class="herrera-hero-secondary-action" href="{{ route('front.auth.b2b-register') }}">{{ __('herrera.register') }}</a>
+                    <a class="herrera-hero-secondary-action" href="{{ route('front.auth.b2b-register') }}"><x-fa-icon name="user-plus" /> {{ __('herrera.register') }}</a>
                 @endauth
             </div>
         </div>

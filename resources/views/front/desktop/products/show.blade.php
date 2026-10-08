@@ -371,11 +371,9 @@
                                         <div class="mt-1 flex flex-wrap items-center gap-2">
                                             <x-front.energy-label-arrow :declaration="$energyDeclaration" />
                                             @if (! empty($energyDeclaration['energy_label_url']) && empty($energyDeclaration['is_complete']))
-                                                <a href="{{ $energyDeclaration['energy_label_url'] }}" target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-blue-700 underline underline-offset-2">{{ __('ui.product.energy_label') }}</a>
+                                                <a href="{{ $energyDeclaration['energy_label_url'] }}" target="_blank" rel="noopener noreferrer" class="product-energy-document-link text-xs font-semibold text-blue-700 underline underline-offset-2">{{ __('ui.product.energy_label') }}</a>
                                             @endif
-                                            @if (! empty($energyDeclaration['product_information_sheet_url']))
-                                                <a href="{{ $energyDeclaration['product_information_sheet_url'] }}" target="_blank" rel="noopener noreferrer" class="text-xs font-semibold text-blue-700 underline underline-offset-2">{{ __('ui.product.product_information_sheet') }}</a>
-                                            @endif
+                                            <x-front.energy-information-sheet-link :declaration="$energyDeclaration" :compact="false" />
                                         </div>
                                         @if (! empty($energyDeclaration['eprel_registration_number']))
                                             <p class="mt-1 text-[11px] text-slate-500">{{ __('ui.product.eprel_registration_number') }}: {{ $energyDeclaration['eprel_registration_number'] }}</p>

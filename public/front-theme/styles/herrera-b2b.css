@@ -218,17 +218,18 @@ html[data-storefront-page-ready] .herrera-page-loader { opacity: 0; pointer-even
 .herrera-storefront .site-footer-benefits { background: var(--herrera-footer); box-shadow: 0 0 0 100vmax var(--herrera-footer); color: #c3d3d9; border-bottom: 1px solid #ffffff22; }
 .herrera-storefront .site-footer-benefit { background: transparent; box-shadow: none; color: #c3d3d9; }
 @media (max-width: 1023px) {
- .herrera-storefront .site-footer-mobile-links { --reading-slate-500: #b9cbd1; --reading-slate-600: #c3d3d9; --reading-slate-700: #75d4df; --reading-slate-900: #edf4f6; margin: 0; padding-top: 14px; padding-bottom: 14px; background: var(--herrera-footer); box-shadow: 0 0 0 100vmax var(--herrera-footer); }
+ .herrera-storefront .site-footer-mobile-links { --reading-slate-500: #b9cbd1; --reading-slate-600: #c3d3d9; --reading-slate-700: #75d4df; --reading-slate-900: #edf4f6; gap: 0; margin: 0; padding-top: 8px; padding-bottom: 0; background: var(--herrera-footer); box-shadow: 0 0 0 100vmax var(--herrera-footer); }
  .herrera-storefront .site-footer-mobile-section { background: transparent; border-bottom: 1px solid #ffffff22; }
- .herrera-storefront .site-footer-mobile-links > details > summary { min-height: 52px; color: #edf4f6; font-size: 17px; }
+ .herrera-storefront .site-footer-mobile-links > details > summary { min-height: 64px; gap: 12px; padding-top: 18px; padding-bottom: 18px; color: #edf4f6; font-size: 16px; line-height: 1.5; }
  .herrera-storefront .site-footer-mobile-links > details > summary span { color: #b9cbd1; }
  .herrera-storefront .site-footer-mobile-links > details > div,
  .herrera-storefront .site-footer-mobile-links > details > ul { color: #c3d3d9; padding-left: 0; padding-right: 0; font-size: 15px; line-height: 1.65; }
  .herrera-storefront .site-footer-mobile-links a,
  .herrera-storefront .site-footer-mobile-links p { color: #c3d3d9; font-size: 15px; line-height: 1.65; }
  .herrera-storefront .site-footer-mobile-links a[href^=tel] { --reading-slate-900: #75d4df; color: #75d4df; font-size: 18px; }
- .herrera-storefront .site-footer .store-footer-bottom { justify-items: start; }
+ .herrera-storefront .site-footer .store-footer-bottom { justify-items: start; gap: 12px; padding-top: 20px; padding-bottom: 24px; border-top: 0; }
  .herrera-storefront .site-footer .store-footer-bottom-links { justify-content: flex-start; }
+ .herrera-storefront .site-footer .store-footer-bottom-links:not(:has(a)) { display: none; }
 }
 
 /* Full-width bands must not paint over the catalog above the footer. */

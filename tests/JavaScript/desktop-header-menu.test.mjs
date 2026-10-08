@@ -9,13 +9,14 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     currentPath = '/shop', parents = {}, linkSections = [], categoriesButton = false,
     headerSpacer = false, headerHeight = 176, compactHeaderHeight = 130, scrollY = 0,
     herreraStorefront = false, mobileViewport = false,
-    deferredCatalogMenu = false, catalogTriggerPresent = true } = {}) {
+    deferredCatalogMenu = false, catalogTriggerPresent = true, catalogTree = null } = {}) {
     const queuedToggles = new Set();
     class Element {
         constructor() {
             this.dataset = {};
             this.listeners = new Map();
             this.attributes = new Map();
+            this.children = [];
             const classes = new Set();
             this.classMutations = [];
             const classMutations = this.classMutations;
@@ -48,6 +49,10 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
         removeAttribute(name) { this.attributes.delete(name); }
         closest() { return null; }
         getBoundingClientRect() { return { height: 72 }; }
+        getClientRects() { return this.visible === false ? [] : [{}]; }
+        focus() { document.activeElement = this; }
+        append(...children) { this.children.push(...children); }
+        replaceChildren(fragment) { this.children = fragment?.children || []; }
     }
     class Details extends Element {
         constructor(key) {
@@ -80,7 +85,9 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     const spacer = headerSpacer ? new Element() : null;
     const openButton = new Element();
     const panel = new Element();
+    panel.id = 'mobile-navigation';
     const overlay = new Element();
+    const drawerClose = new Element();
     const catalogNavGroup = new Element();
     catalogNavGroup.children = [];
     catalogNavGroup.append = (fragment) => {
@@ -92,6 +99,33 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     catalogTrigger.setAttribute('aria-controls', 'site-main-nav-mega-0');
     catalogTrigger.closest = (selector) => selector === '.group\\/nav' ? catalogNavGroup : null;
     const catalogTemplate = deferredCatalogMenu ? new Template('site-main-nav-mega-0', catalogMenu) : null;
+    const catalogLists = [];
+    const catalogColumns = catalogTree ? [0, 1].map(() => {
+        const column = new Element();
+        const title = new Element();
+        const viewAll = new Element();
+        const list = new Element();
+        catalogLists.push(list);
+        column.querySelector = (selector) => {
+            const itemMatch = selector.match(/^\[data-catalog-mega-item-index="(\d+)"\]$/);
+            return itemMatch ? list.children[Number(itemMatch[1])]?.children[0] : ({
+                '[data-catalog-mega-column-title]': title,
+                '[data-catalog-mega-column-link]': viewAll,
+                '[data-catalog-mega-list]': list,
+            })[selector] || null;
+        };
+        column.querySelectorAll = (selector) => selector === '[data-catalog-mega-item]'
+            ? list.children.map((item) => item.children[0]) : [];
+        return column;
+    }) : [];
+    if (catalogTree) {
+        catalogMenu.dataset = { catalogMegaMaxColumns: '2', catalogMegaUrl: '/shop' };
+        catalogMenu.closest = (selector) => selector === '.group\\/nav' ? catalogNavGroup : null;
+        catalogMenu.querySelector = (selector) => selector === '[data-catalog-mega-tree]'
+            ? { textContent: JSON.stringify(catalogTree) } : null;
+        catalogMenu.querySelectorAll = (selector) => selector === '[data-catalog-mega-column]' ? catalogColumns : [];
+        catalogNavGroup.querySelector = (selector) => selector === ':scope > [data-catalog-mega-trigger]' ? catalogTrigger : null;
+    }
     const sections = sectionKeys.map((key) => new Details(key));
     const sectionsByKey = new Map(sections.map((section) => [section.dataset.menuSectionKey, section]));
     sections.forEach((section) => {
@@ -108,21 +142,37 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     links.forEach((link, index) => {
         link.closest = (selector) => selector === 'details' ? sectionsByKey.get(linkSections[index]) || null : null;
     });
+    panel.querySelector = (selector) => selector === '[data-mobile-menu-close]' ? drawerClose : null;
+    panel.querySelectorAll = (selector) => selector === 'a[href], button, summary, [tabindex="0"]'
+        ? [drawerClose, ...links] : [];
     const sectionToggles = sections.map((section) => {
-        const toggle = new Element(); toggle.closest = () => section; return toggle;
+        const toggle = new Element();
+        const alternate = new Element();
+        toggle.closest = alternate.closest = () => section;
+        toggle.alternate = alternate;
+        section.querySelector = (selector) => ({
+            ':scope > summary > [data-mobile-menu-toggle-open]': toggle,
+            ':scope > summary > [data-mobile-menu-toggle-close]': alternate,
+        })[selector] || null;
+        return toggle;
     });
+    panel.contains = (element) => [panel, drawerClose, ...links,
+        ...sectionToggles.flatMap((toggle) => [toggle, toggle.alternate])].includes(element);
     if (categoriesButton) openButton.setAttribute('data-mobile-menu-open-categories', '');
     root.querySelector = (selector) => ({
         '[data-mobile-menu-panel]': panel, '[data-mobile-menu-close]': overlay,
         '[data-mobile-menu-catalog]': sectionsByKey.get('catalog'),
     })[selector] || null;
     root.querySelectorAll = (selector) => ({
-        '[data-mobile-menu-accordion]': sections, '[data-mobile-menu-close]': [overlay],
-        '[data-mobile-menu-toggle]': sectionToggles,
+        '[data-mobile-menu-accordion]': sections, '[data-mobile-menu-close]': [overlay, drawerClose],
+        '[data-mobile-menu-toggle]': sectionToggles.flatMap((toggle) => [toggle, toggle.alternate]),
         'a[href]': links,
     })[selector] || [];
     const document = new Element();
     document.body = new Element(); document.readyState = 'complete';
+    document.activeElement = openButton;
+    document.createElement = document.createElementNS = () => new Element();
+    document.createDocumentFragment = () => new Element();
     if (herreraStorefront) document.body.classList.add('herrera-storefront');
     const fontReadyCallbacks = [];
     document.fonts = { ready: { then(callback) { fontReadyCallbacks.push(callback); } } };
@@ -134,6 +184,7 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
         '[data-mobile-menu-open]': [openButton],
         'template[data-catalog-mega-template]': catalogTemplate && !catalogTemplate.removed ? [catalogTemplate] : [],
         '[data-catalog-mega-trigger]': catalogTriggerPresent ? [catalogTrigger] : [],
+        '[data-catalog-mega]': catalogTree ? [catalogMenu] : [],
     })[selector] || [];
     const window = new Element();
     window.location = { origin: 'https://shop.example', href: new URL(currentPath, 'https://shop.example').href };
@@ -152,11 +203,12 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     };
     vm.runInNewContext(script, {
         document, window, sessionStorage, URL, HTMLElement: Element, HTMLDetailsElement: Details,
-        HTMLTemplateElement: Template,
+        HTMLTemplateElement: Template, HTMLAnchorElement: Element,
     });
     return {
-        root, header, spacer, window, document, openButton, overlay, sections, storage, links, sectionToggles,
-        catalogTemplate, catalogNavGroup, catalogMenu,
+        root, header, spacer, window, document, openButton, overlay, drawerClose, sections, storage, links, sectionToggles,
+        catalogTemplate, catalogNavGroup, catalogMenu, catalogColumns,
+        catalogLink(depth, index) { return catalogLists[depth]?.children[index]?.children[0]; },
         finishFonts() { fontReadyCallbacks.forEach((callback) => callback()); },
         setMobileViewport(matches) {
             nativeStickyViewport.matches = matches;
@@ -354,4 +406,82 @@ test('manual closing and same-document, auxiliary, download or canceled links st
     }
     const page = harness(); page.open(); page.overlay.emit('click');
     assert.equal(page.root.dataset.menuOpen, '0');
+});
+
+
+test('mobile drawer announces its state, focuses close, and restores its opener on Escape', () => {
+    const page = harness();
+    assert.equal(page.openButton.getAttribute('aria-controls'), 'mobile-navigation');
+    assert.equal(page.openButton.getAttribute('aria-expanded'), 'false');
+    page.open();
+    assert.equal(page.openButton.getAttribute('aria-expanded'), 'true');
+    assert.equal(page.document.activeElement, page.drawerClose);
+    let prevented = false;
+    page.document.emit('keydown', { key: 'Escape', preventDefault() { prevented = true; } });
+    assert.equal(prevented, true);
+    assert.equal(page.root.dataset.menuOpen, '0');
+    assert.equal(page.openButton.getAttribute('aria-expanded'), 'false');
+    assert.equal(page.document.activeElement, page.openButton);
+});
+
+test('Tab stays within visible drawer controls and skips collapsed category links', () => {
+    const page = harness({ hrefs: ['/shop', '/categories/collapsed'] });
+    page.links[1].visible = false;
+    page.open();
+    let prevented = false;
+    page.document.emit('keydown', { key: 'Tab', shiftKey: true, preventDefault() { prevented = true; } });
+    assert.equal(prevented, true);
+    assert.equal(page.document.activeElement, page.links[0]);
+    prevented = false;
+    page.document.emit('keydown', { key: 'Tab', preventDefault() { prevented = true; } });
+    assert.equal(prevented, true);
+    assert.equal(page.document.activeElement, page.drawerClose);
+    page.drawerClose.emit('click');
+    assert.equal(page.document.activeElement, page.openButton);
+});
+
+
+test('accordion toggling keeps focus visible and Escape still closes after focus leaves the panel', () => {
+    const page = harness({ sectionKeys: ['catalog'], categoriesButton: false });
+    page.open();
+    page.sectionToggles[0].focus();
+    page.sectionToggles[0].emit('click', { preventDefault() {}, stopPropagation() {} });
+    assert.equal(page.sections[0].open, true);
+    assert.equal(page.document.activeElement, page.sectionToggles[0].alternate);
+    // Browsers can move focus to body when a previously focused details control hides.
+    page.document.activeElement = page.document.body;
+    page.document.emit('keydown', { key: 'Escape', preventDefault() {} });
+    assert.equal(page.root.dataset.menuOpen, '0');
+    assert.equal(page.document.activeElement, page.openButton);
+});
+
+test('Tab recovers focus that has moved outside an open drawer', () => {
+    const page = harness({ hrefs: ['/shop'] });
+    page.open();
+    page.document.activeElement = page.document.body;
+    let prevented = false;
+    page.document.emit('keydown', { key: 'Tab', preventDefault() { prevented = true; } });
+    assert.equal(prevented, true);
+    assert.equal(page.document.activeElement, page.drawerClose);
+    page.document.activeElement = page.document.body;
+    page.document.emit('keydown', { key: 'Tab', shiftKey: true, preventDefault() {} });
+    assert.equal(page.document.activeElement, page.links[0]);
+});
+
+
+test('desktop ArrowRight enters the first child and reselecting a parent retains its child column', () => {
+    const page = harness({ catalogTree: [{ label: 'Rasvjeta', url: '/rasvjeta',
+        children: [{ label: 'Unutarnja rasvjeta', url: '/rasvjeta/unutarnja' }] }] });
+    const parent = page.catalogLink(0, 0);
+    let prevented = false;
+    parent.emit('keydown', { key: 'ArrowRight', preventDefault() { prevented = true; } });
+    const child = page.catalogLink(1, 0);
+    assert.equal(prevented, true);
+    assert.equal(page.document.activeElement, child);
+    assert.equal(page.catalogColumns[1].hidden, false);
+    parent.emit('pointerenter');
+    assert.equal(page.catalogLink(1, 0), child);
+    assert.equal(parent.getAttribute('aria-expanded'), 'true');
+    child.emit('keydown', { key: 'ArrowLeft', preventDefault() {} });
+    assert.equal(page.document.activeElement, parent);
 });

@@ -1,4 +1,45 @@
 /* Shared Herrera purchase controls for home, catalog and product carousels. */
+.herrera-storefront :is(.product-information-sheet-link, .product-energy-document-link) {
+    color: var(--herrera-action, #007b8b);
+    text-decoration-color: currentColor;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    border-radius: 3px;
+    line-height: 1.5;
+}
+
+.herrera-storefront :is(.product-information-sheet-link, .product-energy-document-link):is(:hover, :focus-visible) {
+    color: #005f6c;
+    text-decoration-thickness: 2px;
+}
+
+.herrera-storefront [data-product-card] :is(.product-card-price-row, .product-card-energy-documents) {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+}
+
+.herrera-storefront [data-product-card] .product-card-price-row {
+    margin-top: 6px;
+}
+
+.herrera-storefront [data-product-card] .product-card-price-row > p,
+.herrera-storefront [data-product-card] [data-energy-label-arrow] {
+    flex-shrink: 0;
+}
+
+.herrera-storefront [data-product-card] .product-information-sheet-link {
+    min-height: 24px;
+    max-width: 100%;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.herrera-storefront [data-product-card] .product-card-energy-documents:not(:has(> *)) {
+    display: none;
+}
+
 .herrera-storefront .product-card-lined .product-card-lined-controls {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 44px;

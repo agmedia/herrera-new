@@ -131,6 +131,15 @@
     font-size: 13px;
     font-weight: 500;
 }
+.herrera-storefront .product-detail-pricing > .product-information-sheet-link {
+    min-height: 32px;
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 500;
+}
+.herrera-storefront [data-product-energy-declarations] .product-information-sheet-link {
+    font-size: 12px;
+}
 .herrera-storefront .product-detail-pricing :is([data-price-excludes-tax], .product-detail-tax-note, .product-detail-net-price) {
     margin-top: 4px;
     font-size: 12px;

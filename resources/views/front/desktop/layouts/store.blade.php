@@ -809,14 +809,14 @@
 
 <div class="pointer-events-none fixed inset-0 lg:hidden" data-mobile-menu-root>
     <button type="button" class="absolute inset-0 bg-black/45 opacity-0 transition-opacity duration-300" aria-label="{{ __('ui.front.desktop.close_navigation') }}" data-mobile-menu-close></button>
-    <aside class="absolute inset-y-0 left-0 flex w-full max-w-none -translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out" data-mobile-menu-panel>
-        <div class="flex items-center justify-between border-b border-slate-200 px-4 py-4">
+    <aside id="mobile-navigation" class="absolute inset-y-0 left-0 flex w-full max-w-none -translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out" role="dialog" aria-modal="true" aria-label="{{ __('Izbornik') }}" tabindex="-1" data-mobile-menu-panel>
+        <div class="desktop-mobile-menu-header flex items-center justify-between border-b border-slate-200 px-4 py-4">
             @if ($storeBrandLogoUrl !== '')
                 <img src="{{ $storeBrandLogoUrl }}" alt="{{ $storeBrandName }}" class="block h-10 w-auto max-w-[12rem] object-contain" width="{{ $storeBrandLogoWidth }}" height="{{ $storeBrandLogoHeight }}" data-store-brand-logo>
             @else
                 <span class="text-xl font-black tracking-tight text-slate-900">{{ $storeBrandName }}</span>
             @endif
-            <button type="button" class="inline-flex h-10 w-10 items-center justify-center border border-slate-200 text-slate-700 transition hover:bg-slate-50 hover:text-black" aria-label="{{ __('ui.front.desktop.close_navigation') }}" data-mobile-menu-close>
+            <button type="button" class="desktop-mobile-menu-dismiss inline-flex h-11 w-11 items-center justify-center text-slate-700 transition hover:bg-slate-50 hover:text-black" aria-label="{{ __('ui.front.desktop.close_navigation') }}" data-mobile-menu-close>
                 <x-fa-icon name="xmark" class="h-5 w-5" />
             </button>
         </div>

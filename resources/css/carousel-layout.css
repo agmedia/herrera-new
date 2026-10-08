@@ -2,6 +2,22 @@
     visibility: visible;
 }
 
+@media (max-width: 1023px) {
+    /* Rapid taps, including near a control, must not trigger browser double-tap zoom. */
+    body.storefront {
+        touch-action: manipulation;
+    }
+
+    .storefront .splide {
+        touch-action: pan-y pinch-zoom;
+    }
+
+    .storefront .splide .splide__arrow {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
 .home-news-carousel {
     visibility: visible;
     --news-columns: 3;

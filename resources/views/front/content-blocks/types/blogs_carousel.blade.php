@@ -198,14 +198,13 @@
                                     const desktopPerPage = Math.min(3, Math.max(1, count));
                                     const tabletPerPage = Math.min(2, Math.max(1, count));
                                     const mobilePerPage = 1;
-                                    const canSlideDesktop = count > desktopPerPage;
-                                    const canSlideTablet = count > tabletPerPage;
-                                    const canSlideMobile = count > mobilePerPage;
+                                    const canSlideDesktop = count > 1;
+                                    const canSlideTablet = count > 1;
+                                    const canSlideMobile = count > 1;
                                     const mobilePaddingRight = count > 1 ? '18%' : '0';
 
                                     new window.Splide(el, {
-                                        type: 'slide',
-                                        rewind: canSlideDesktop,
+                                        type: count > 1 ? 'loop' : 'slide',
                                         perPage: desktopPerPage,
                                         perMove: 1,
                                         gap: '1.25rem',
@@ -217,7 +216,6 @@
                                         speed: 520,
                                         breakpoints: {
                                             1024: {
-                                                rewind: canSlideTablet,
                                                 perPage: tabletPerPage,
                                                 gap: '1rem',
                                                 drag: canSlideTablet,
@@ -225,7 +223,6 @@
                                                 arrows: canSlideTablet,
                                             },
                                             640: {
-                                                rewind: canSlideMobile,
                                                 perPage: mobilePerPage,
                                                 gap: '0.8rem',
                                                 drag: canSlideMobile,

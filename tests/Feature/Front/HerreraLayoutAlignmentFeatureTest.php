@@ -55,7 +55,9 @@ class HerreraLayoutAlignmentFeatureTest extends TestCase
         $cards = $xpath->query('.//*[contains(concat(" ", normalize-space(@class), " "), " splide__slide ")]/*[@data-product-card]', $carousel);
         $this->assertSame(8, $cards->count());
         $options = json_decode($carousel->getAttribute('data-splide'), true, flags: JSON_THROW_ON_ERROR);
-        $this->assertSame('slide', $options['type']);
+        $this->assertSame('loop', $options['type']);
+        $this->assertSame('Prethodna', $options['i18n']['last']);
+        $this->assertSame('Sljedeća', $options['i18n']['first']);
         $this->assertFalse($options['rewind']);
         $this->assertSame(6, $options['perPage']);
         $this->assertSame(1, $options['perMove']);
@@ -79,6 +81,7 @@ class HerreraLayoutAlignmentFeatureTest extends TestCase
         $carousel = $xpath->query('//*[@data-herrera-home-products-splide]')->item(0);
         $this->assertNotNull($carousel);
         $options = json_decode($carousel->getAttribute('data-splide'), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame('slide', $options['type']);
         $this->assertSame(1, $options['perPage']);
         $this->assertSame(1, $options['breakpoints'][1279]['perPage']);
         $this->assertSame(1, $options['breakpoints'][767]['perPage']);

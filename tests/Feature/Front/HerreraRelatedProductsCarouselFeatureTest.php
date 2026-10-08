@@ -41,7 +41,9 @@ class HerreraRelatedProductsCarouselFeatureTest extends TestCase
         $this->assertSame($related->take(12)->pluck('id')->map(fn ($id) => (string) $id)->all(),
             array_map(fn ($node) => $node->getAttribute('data-product-id'), iterator_to_array($cards)));
         $options = json_decode($carousel->getAttribute('data-splide'), true, flags: JSON_THROW_ON_ERROR);
-        $this->assertSame('slide', $options['type']);
+        $this->assertSame('loop', $options['type']);
+        $this->assertSame('Prethodna', $options['i18n']['last']);
+        $this->assertSame('Sljedeća', $options['i18n']['first']);
         $this->assertFalse($options['rewind']);
         $this->assertSame(6, $options['perPage']);
         $this->assertSame(6, $options['breakpoints'][1280]['perPage']);
@@ -69,6 +71,7 @@ class HerreraRelatedProductsCarouselFeatureTest extends TestCase
         $carousel = $xpath->query('//*[@data-herrera-related-products-splide]')->item(0);
         $this->assertNotNull($carousel);
         $options = json_decode($carousel->getAttribute('data-splide'), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame('slide', $options['type']);
         $this->assertSame(1, $options['perPage']);
         $this->assertFalse($options['arrows']);
         $this->assertFalse($options['drag']);
@@ -139,12 +142,30 @@ class HerreraRelatedProductsCarouselFeatureTest extends TestCase
         $carousel = $xpath->query('//*[@data-herrera-recently-viewed-products-splide]')->item(0);
         $this->assertNotNull($carousel);
         $options = json_decode($carousel->getAttribute('data-splide'), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame('slide', $options['type']);
         $this->assertSame(6, $options['perPage']);
         $this->assertSame(6, $options['breakpoints'][1280]['perPage']);
         $this->assertFalse($options['arrows']);
         $this->assertFalse($options['drag']);
         $this->assertSame(1, $xpath->query('.//*[@data-product-card]', $carousel)->count());
         $this->assertSame(0, $xpath->query('.//button[contains(@class, "splide__arrow")]', $carousel)->count());
+    }
+
+    public function test_small_recent_collection_loops_without_repeating_cards_in_the_first_page(): void
+    {
+        $this->product('main');
+        $viewed = collect([$this->product('first-viewed'), $this->product('second-viewed')]);
+        $response = $this->withSession(['front_recently_viewed_products' => $viewed->pluck('id')->all()])
+            ->get(route('products.show', ['slug' => 'related-carousel-main']))->assertOk();
+        $carousel = $this->xpath($response->getContent())->query('//*[@data-herrera-recently-viewed-products-splide]')->item(0);
+        $this->assertNotNull($carousel);
+        $options = json_decode($carousel->getAttribute('data-splide'), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame('loop', $options['type']);
+        $this->assertSame(2, $options['perPage']);
+        $this->assertSame(2, $options['breakpoints'][1280]['perPage']);
+        $this->assertSame(2, $options['breakpoints'][767]['perPage']);
+        $this->assertTrue($options['arrows']);
+        $this->assertTrue($options['drag']);
     }
 
     public function test_other_storefront_recent_history_keeps_its_existing_carousel_and_lookup_limit(): void

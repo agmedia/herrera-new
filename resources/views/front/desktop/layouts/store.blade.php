@@ -6,24 +6,7 @@
     @include('front.partials.seo-meta')
     @include('front.partials.schema-markup')
     @include('front.partials.analytics')
-    @if (!empty($storeSettings['branding']['favicons']['ico_url'] ?? null))
-        <link rel="icon" href="{{ $storeSettings['branding']['favicons']['ico_url'] }}" sizes="any">
-    @endif
-    @if (!empty($storeSettings['branding']['favicons']['32_url'] ?? null))
-        <link rel="icon" type="image/png" sizes="32x32" href="{{ $storeSettings['branding']['favicons']['32_url'] }}">
-    @endif
-    @if (!empty($storeSettings['branding']['favicons']['16_url'] ?? null))
-        <link rel="icon" type="image/png" sizes="16x16" href="{{ $storeSettings['branding']['favicons']['16_url'] }}">
-    @endif
-    @if (!empty($storeSettings['branding']['favicons']['192_url'] ?? null))
-        <link rel="icon" type="image/png" sizes="192x192" href="{{ $storeSettings['branding']['favicons']['192_url'] }}">
-    @endif
-    @if (!empty($storeSettings['branding']['favicons']['512_url'] ?? null))
-        <link rel="icon" type="image/png" sizes="512x512" href="{{ $storeSettings['branding']['favicons']['512_url'] }}">
-    @endif
-    @if (empty($storeSettings['branding']['favicons']['ico_url'] ?? null) && !empty($storeSettings['branding']['favicon_url'] ?? null))
-        <link rel="icon" href="{{ $storeSettings['branding']['favicon_url'] }}">
-    @endif
+    <x-front.site-icons :branding="$storeSettings['branding'] ?? []" />
     @php
         $storefrontCssBundleIncludesLegacyAssets = true;
         $storefrontAssetVersion = app(\App\Support\AssetVersion::class)->current();
@@ -66,6 +49,7 @@
     @if (str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera'))
         <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-b2b.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-b2b.css')) }}-{{ $storefrontAssetVersion }}">
         <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-forms.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-forms.css')) }}-{{ $storefrontAssetVersion }}">
+        <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-account.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-account.css')) }}-{{ $storefrontAssetVersion }}">
         <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-search.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-search.css')) }}-{{ $storefrontAssetVersion }}">
         <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-product-cards.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-product-cards.css')) }}-{{ $storefrontAssetVersion }}">
     @endif

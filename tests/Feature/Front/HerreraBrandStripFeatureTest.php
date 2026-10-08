@@ -43,6 +43,9 @@ class HerreraBrandStripFeatureTest extends TestCase
         $carousel = $xpath->query('//*[@data-herrera-brand-carousel and @data-herrera-home-carousel]')->item(0);
         $this->assertNotNull($carousel);
         $options = json_decode($carousel->getAttribute('data-splide'), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame('loop', $options['type']);
+        $this->assertSame('Prethodna', $options['i18n']['last']);
+        $this->assertSame('Sljedeća', $options['i18n']['first']);
         $this->assertSame(7, $options['perPage']);
         $this->assertSame(6, $options['breakpoints'][1439]['perPage']);
         $this->assertSame(2, $options['breakpoints'][767]['perPage']);

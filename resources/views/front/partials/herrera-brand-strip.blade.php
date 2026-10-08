@@ -54,10 +54,10 @@
     $brandStripPrevious = trim(str_replace(['&laquo;', '&raquo;'], '', __('pagination.previous')));
     $brandStripNext = trim(str_replace(['&laquo;', '&raquo;'], '', __('pagination.next')));
     $brandStripOptions = [
-        'type' => 'slide', 'rewind' => false, 'perPage' => min(7, max(1, $brandStripCount)),
+        'type' => $brandStripCount > 1 ? 'loop' : 'slide', 'rewind' => false, 'perPage' => min(7, max(1, $brandStripCount)),
         'perMove' => 1, 'gap' => '12px', 'drag' => $brandStripCount > 1, 'snap' => true,
         'pagination' => false, 'arrows' => $brandStripCount > 1, 'updateOnMove' => true, 'speed' => 420,
-        'i18n' => ['prev' => $brandStripPrevious, 'next' => $brandStripNext],
+        'i18n' => ['prev' => $brandStripPrevious, 'next' => $brandStripNext, 'first' => $brandStripNext, 'last' => $brandStripPrevious],
         'breakpoints' => [
             1439 => ['perPage' => min(6, max(1, $brandStripCount))],
             1023 => ['perPage' => min(4, max(1, $brandStripCount))],

@@ -25,10 +25,17 @@
 }
 
 .herrera-storefront [data-product-card] .product-card-price-row {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 4px;
     min-width: 0;
     margin-top: 6px;
+}
+
+.herrera-storefront [data-product-card] .product-card-energy-documents {
+    flex-wrap: nowrap;
+    min-width: 0;
+    max-width: 100%;
+    gap: 4px;
 }
 
 .herrera-storefront [data-product-card] .product-card-price-row > p,
@@ -65,20 +72,30 @@
 }
 
 .herrera-storefront [data-continuous-card-carousel] .splide__slide:has([data-product-card]) {
-    min-width: 210px;
-}
-
-.herrera-storefront [data-continuous-card-carousel] .splide__slide:has([data-product-card] > .product-card-purchase-footer) {
-    min-width: 240px;
+    min-width: 0;
 }
 
 @container herrera-product-card (max-width: 215px) {
     .herrera-storefront [data-product-card] .product-card-price-row {
-        gap: 2px;
+        gap: 4px;
+    }
+
+    .herrera-storefront [data-product-card] .product-card-price-row > .product-card-current-price,
+    .herrera-storefront [data-product-card] .product-card-price-row > .product-card-energy-documents {
+        flex-basis: 100%;
     }
 
     .herrera-storefront [data-product-card] .product-card-current-price {
         font-size: 13px;
+    }
+
+    .herrera-storefront [data-product-card] .product-information-sheet-link {
+        overflow: visible;
+        font-size: 10px;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+        text-overflow: clip;
+        white-space: normal;
     }
 }
 
@@ -165,7 +182,7 @@
     color: #fff;
 }
 
-@media (max-width: 479px) {
+@container herrera-product-card (max-width: 215px) {
     .herrera-storefront .product-card-lined .product-card-lined-controls {
         grid-template-columns: minmax(0, 1fr);
     }
@@ -179,9 +196,15 @@
     }
 }
 
-/* Keep prices and energy documents readable on narrow phones. */
-@media (max-width: 439px) {
-    .herrera-storefront :is([data-catalog-grid], [data-continuous-card-grid]:has(> [data-product-card])) {
+@media (max-width: 1023px) {
+    .herrera-storefront [data-catalog-grid][data-catalog-mobile-cols="1"] {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    .herrera-storefront [data-catalog-grid][data-catalog-mobile-cols="2"] {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .herrera-storefront [data-product-card] [data-qty-input] {
+        font-size: 16px;
     }
 }

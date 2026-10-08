@@ -1,11 +1,11 @@
 @php
     $productCount = $products->count();
-    $desktopPerPage = $kind === 'recently-viewed' ? 6 : min(6, $productCount);
+    $desktopPerPage = $kind === 'recently-viewed' && $productCount === 1 ? 6 : min(6, $productCount);
     $headingId = $carouselId.'-heading';
     $previousLabel = trim(str_replace(['&laquo;', '&raquo;'], '', __('pagination.previous')));
     $nextLabel = trim(str_replace(['&laquo;', '&raquo;'], '', __('pagination.next')));
     $carouselOptions = [
-        'type' => 'slide',
+        'type' => $productCount > 1 ? 'loop' : 'slide',
         'rewind' => false,
         'perPage' => $desktopPerPage,
         'perMove' => 1,
@@ -16,7 +16,7 @@
         'arrows' => $productCount > 1,
         'updateOnMove' => true,
         'speed' => 420,
-        'i18n' => ['prev' => $previousLabel, 'next' => $nextLabel],
+        'i18n' => ['prev' => $previousLabel, 'next' => $nextLabel, 'first' => $nextLabel, 'last' => $previousLabel],
         // Data options override every intermediate breakpoint in the shared initializer.
         'breakpoints' => [
             1280 => ['perPage' => $desktopPerPage, 'arrows' => $productCount > 1],

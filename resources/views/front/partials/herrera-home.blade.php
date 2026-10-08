@@ -109,7 +109,7 @@
         $herreraProductPreviousLabel = trim(str_replace(['&laquo;', '&raquo;'], '', __('pagination.previous')));
         $herreraProductNextLabel = trim(str_replace(['&laquo;', '&raquo;'], '', __('pagination.next')));
         $herreraProductCarouselOptions = [
-            'type' => 'slide',
+            'type' => $herreraProductCount > 1 ? 'loop' : 'slide',
             'rewind' => false,
             'perPage' => min(6, max(1, $herreraProductCount)),
             'perMove' => 1,
@@ -120,7 +120,7 @@
             'arrows' => $herreraProductCount > 1,
             'updateOnMove' => true,
             'speed' => 420,
-            'i18n' => ['prev' => $herreraProductPreviousLabel, 'next' => $herreraProductNextLabel],
+            'i18n' => ['prev' => $herreraProductPreviousLabel, 'next' => $herreraProductNextLabel, 'first' => $herreraProductNextLabel, 'last' => $herreraProductPreviousLabel],
             'breakpoints' => [
                 1279 => ['perPage' => min(4, max(1, $herreraProductCount))],
                 767 => ['perPage' => min(2, max(1, $herreraProductCount))],

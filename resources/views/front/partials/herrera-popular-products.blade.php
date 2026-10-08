@@ -7,10 +7,10 @@
     $popularPrevious = trim(str_replace(['&laquo;', '&raquo;'], '', __('pagination.previous')));
     $popularNext = trim(str_replace(['&laquo;', '&raquo;'], '', __('pagination.next')));
     $popularOptions = [
-        'type' => 'slide', 'rewind' => false, 'perPage' => min(6, max(1, $popularCount)),
+        'type' => $popularCount > 1 ? 'loop' : 'slide', 'rewind' => false, 'perPage' => min(6, max(1, $popularCount)),
         'perMove' => 1, 'gap' => '0rem', 'drag' => $popularCount > 1, 'snap' => true,
         'pagination' => false, 'arrows' => $popularCount > 1, 'updateOnMove' => true, 'speed' => 420,
-        'i18n' => ['prev' => $popularPrevious, 'next' => $popularNext],
+        'i18n' => ['prev' => $popularPrevious, 'next' => $popularNext, 'first' => $popularNext, 'last' => $popularPrevious],
         'breakpoints' => [
             1279 => ['perPage' => min(4, max(1, $popularCount))],
             767 => ['perPage' => min(2, max(1, $popularCount))],

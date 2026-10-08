@@ -1,0 +1,24 @@
+{
+  "id": "/",
+  "name": "Herrera",
+  "short_name": "Herrera",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#007b8b",
+  "icons": [
+    {
+      "src": "android-chrome-192x192.png?v=3e8bfd6b0ace",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "android-chrome-512x512.png?v=a4826123fea4",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

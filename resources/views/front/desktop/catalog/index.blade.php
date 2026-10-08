@@ -95,10 +95,10 @@
     $priceFilterPanel = $resolveFilterPanel('price');
     $priceFilterPanel['visible'] = $priceFilterPanel['visible'] && $canViewPrices;
     $currentCols = (int) ($filters['cols'] ?? $desktopDefaultCols);
+    $mobileCols = in_array($currentCols, [1, 2], true) ? $currentCols : $mobileDefaultCols;
     if (request()->query('cols') === null && in_array($currentCols, [1, 2], true)) {
         $currentCols = $desktopDefaultCols;
     }
-    $mobileCols = in_array($currentCols, [1, 2], true) ? $currentCols : $mobileDefaultCols;
     $paginationMode = (string) ($storeSettings['product']['catalog_pagination_mode'] ?? 'pagination');
     $useAsyncPagination = in_array($paginationMode, ['load_more', 'infinite'], true);
     $isInfinitePagination = $paginationMode === 'infinite';
@@ -284,6 +284,8 @@
                     <a
                         href="{{ $catalogUrl(['cols' => $cols]) }}"
                         class="catalog-mobile-grid-toggle {{ $mobileCols === $cols ? 'is-active' : '' }}"
+                        data-catalog-grid-cols="{{ $cols }}"
+                        @if ($mobileCols === $cols) aria-current="true" @endif
                         aria-label="{{ __('ui.shop.filters.grid') }} {{ $cols }}"
                     >
                         <x-fa-icon name="{{ $mobileGridIcons[$cols] }}" class="h-4 w-4" />
@@ -775,7 +777,7 @@
                     @if ($products->isEmpty())
                         <div class="border border-dashed border-slate-300 bg-white p-10 text-center text-slate-500">{{ __('ui.category.empty') }}</div>
                     @else
-                        <div class="catalog-lined-grid {{ $gridClass }}" data-catalog-grid data-continuous-card-grid>
+                        <div class="catalog-lined-grid {{ $gridClass }}" data-catalog-grid data-catalog-mobile-cols="{{ $mobileCols }}" data-continuous-card-grid>
                             @foreach ($products as $product)
                                 @include('front.desktop.partials.product-card', [
                                     'product' => $product,

@@ -517,28 +517,28 @@
                     const mobilePerPage = {{ $mobileDefaultCols }};
                     const preferredDesktopPerPage = {{ $preferredGridCols }};
                     new window.Splide(el, {
-                        type: count > preferredDesktopPerPage ? 'loop' : 'slide',
+                        type: count > 1 ? 'loop' : 'slide',
                         perPage: Math.min(Math.max(1, preferredDesktopPerPage), count),
                         perMove: 1,
                         gap: '0rem',
                         drag: count > 1,
                         snap: true,
                         pagination: false,
-                        arrows: count > preferredDesktopPerPage,
+                        arrows: count > 1,
                         updateOnMove: true,
                         speed: 520,
                         breakpoints: {
                             1280: {
                                 perPage: Math.min(4, count),
-                                arrows: count > 4,
+                                arrows: count > 1,
                             },
                             1024: {
                                 perPage: Math.min(3, count),
-                                arrows: count > 3,
+                                arrows: count > 1,
                             },
                             860: {
                                 perPage: Math.min(mobilePerPage, count),
-                                arrows: count > mobilePerPage,
+                                arrows: count > 1,
                             },
                             640: {
                                 perPage: Math.min(mobilePerPage, count),

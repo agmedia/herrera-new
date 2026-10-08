@@ -25,7 +25,7 @@
                     $b2bStatus = \App\Models\User\B2BAccount::statusOptions()[$b2bAccount->status] ?? $b2bAccount->status;
                     $b2bApproved = $canViewPrices && $b2bAccount->contractIsActive();
                 @endphp
-                <section class="border {{ $b2bApproved ? 'border-cyan-200 bg-cyan-50' : 'border-amber-200 bg-amber-50' }} p-5">
+                <section class="border {{ $b2bApproved ? 'border-cyan-200 bg-cyan-50' : 'border-amber-200 bg-amber-50' }} p-5" data-account-status="{{ $b2bApproved ? 'approved' : 'pending' }}">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <p class="text-xs font-bold uppercase tracking-[0.16em] {{ $b2bApproved ? 'text-cyan-800' : 'text-amber-800' }}">{{ __('B2B račun') }} · {{ __($b2bStatus) }}</p>

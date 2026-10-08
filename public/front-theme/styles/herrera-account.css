@@ -1,0 +1,182 @@
+/* The account uses the same surfaces and actions as the Herrera storefront. */
+body.herrera-storefront.account-commerce-body {
+    --commerce-accent: #007b8b;
+    --commerce-accent-hover: #005f6c;
+    --commerce-accent-soft: #edf7f9;
+    --commerce-orange: #00b5cc;
+    --commerce-border: #d6e6ea;
+    --commerce-border-strong: #b7d2d9;
+    --commerce-muted: #52666d;
+    --commerce-ink: #24353b;
+    --commerce-surface: #edf7f9;
+    --commerce-form-surface: #edf7f9;
+}
+
+.herrera-storefront.account-commerce-body .commerce-main {
+    padding-top: 0;
+}
+
+.herrera-storefront.account-commerce-body .commerce-main > .front-soft-hero {
+    position: relative;
+    isolation: isolate;
+    max-width: none;
+    padding: 28px 0;
+    background: #edf7f9;
+    box-shadow: 0 0 0 100vmax #edf7f9;
+    clip-path: inset(0 -100vmax);
+}
+
+.herrera-storefront.account-commerce-body .commerce-main > .front-soft-hero::before {
+    position: absolute;
+    z-index: -1;
+    inset: 0 auto 0 calc(50% - 50vw);
+    display: block;
+    width: 100vw;
+    height: auto;
+    margin: 0;
+    background: var(--herrera-surface-pattern) center top / 100vw max(900px, 100vh) no-repeat fixed;
+    content: "";
+}
+
+.herrera-storefront.account-commerce-body .commerce-main > .front-soft-hero::after {
+    left: calc(50% - 50vw);
+    right: auto;
+    width: 100vw;
+    background: var(--commerce-border);
+}
+
+.herrera-storefront.account-commerce-body .front-soft-hero :is(p, .front-eyebrow) {
+    color: var(--commerce-muted);
+}
+
+.herrera-storefront.account-commerce-body .front-soft-hero h1 {
+    font-weight: 700;
+    letter-spacing: -.035em;
+}
+
+.herrera-storefront.account-commerce-body :is(.commerce-account-nav, .commerce-main .border-slate-200.bg-white) {
+    border-color: var(--commerce-border);
+    border-radius: 8px;
+}
+
+.herrera-storefront.account-commerce-body .commerce-account-nav > div {
+    border-color: var(--commerce-border);
+    background: var(--commerce-surface);
+    border-radius: 8px 8px 0 0;
+}
+
+.herrera-storefront.account-commerce-body .commerce-account-nav-link {
+    border-color: var(--commerce-border);
+    border-radius: 6px;
+    color: var(--commerce-ink);
+}
+
+.herrera-storefront.account-commerce-body .commerce-account-nav-link[aria-current="page"] {
+    border-color: var(--commerce-accent);
+    background: var(--commerce-accent);
+    color: #fff;
+}
+
+.herrera-storefront.account-commerce-body .commerce-account-nav-link:not([aria-current="page"]):hover {
+    background: var(--commerce-surface);
+    color: var(--commerce-accent);
+}
+
+.herrera-storefront.account-commerce-body :is(.commerce-primary-action, .commerce-secondary-action) {
+    min-height: 46px;
+    border-color: var(--commerce-accent);
+    border-radius: 6px;
+}
+
+.herrera-storefront.account-commerce-body .commerce-primary-action {
+    background: var(--commerce-accent);
+    color: #fff;
+}
+
+.herrera-storefront.account-commerce-body .commerce-primary-action:hover {
+    border-color: var(--commerce-accent-hover);
+    background: var(--commerce-accent-hover);
+}
+
+.herrera-storefront.account-commerce-body .commerce-secondary-action {
+    color: var(--commerce-accent);
+}
+
+.herrera-storefront.account-commerce-body [data-account-status="approved"] {
+    border-color: var(--commerce-border);
+    border-radius: 8px;
+    background: var(--commerce-surface);
+}
+
+.herrera-storefront.account-commerce-body [data-account-status="approved"] > div > div > p:first-child {
+    color: var(--commerce-accent);
+}
+
+.herrera-storefront.account-commerce-body table thead {
+    background: var(--commerce-surface);
+    color: var(--commerce-muted);
+}
+
+.herrera-storefront.account-commerce-body .quick-order-builder {
+    --qo-border: var(--commerce-border);
+    --qo-muted: var(--commerce-muted);
+    --qo-ink: var(--commerce-ink);
+    --qo-accent: var(--commerce-accent);
+    --qo-accent-dark: var(--commerce-accent-hover);
+}
+
+.herrera-storefront.account-commerce-body .quick-order-search-panel {
+    border-color: var(--commerce-border);
+    border-top-width: 1px;
+    border-radius: 8px 8px 0 0;
+    background: var(--commerce-surface);
+}
+
+.herrera-storefront.account-commerce-body .quick-order-search-label {
+    color: var(--commerce-ink);
+    font-weight: 700;
+}
+
+.herrera-storefront.account-commerce-body .quick-order-search-help {
+    color: var(--commerce-muted);
+}
+
+.herrera-storefront.account-commerce-body .quick-order-builder #quick-order-search {
+    border: 1px solid var(--commerce-border-strong);
+    border-radius: 6px;
+}
+
+.herrera-storefront.account-commerce-body :is(.quick-order-selection-heading, .quick-order-footer, .quick-order-count, .quick-order-b2b-badge) {
+    background: var(--commerce-surface);
+    color: var(--commerce-ink);
+}
+
+.herrera-storefront.account-commerce-body :is(.quick-order-primary, .quick-order-secondary, .quick-order-suggestion) {
+    border-radius: 6px;
+}
+
+.herrera-storefront.account-commerce-body :is(.quick-order-result:hover, .quick-order-result.is-active, .quick-order-suggestion:hover, .quick-order-import-feedback) {
+    background: var(--commerce-surface);
+}
+
+.herrera-storefront.account-commerce-body .commerce-main :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    border-radius: 6px;
+}
+
+.herrera-storefront.account-commerce-body .quick-order-quantity-control input {
+    border-radius: 0;
+}
+
+@media (max-width: 1023px) {
+    .herrera-storefront.account-commerce-body .commerce-main > .front-soft-hero::before {
+        background-size: 100vw max(600px, 100vh);
+    }
+
+    .herrera-storefront.account-commerce-body .commerce-main :is(input, select, textarea) {
+        font-size: 16px;
+    }
+
+    .herrera-storefront.account-commerce-body .b2b-quick-order-hero-description {
+        white-space: normal;
+    }
+}

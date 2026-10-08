@@ -558,26 +558,31 @@
                             }
                             el.dataset.splideReady = '1';
 
-                            const count = el.querySelectorAll('.splide__slide').length;
+                            const originalSlides = Array.from(el.querySelectorAll('.splide__slide'));
+                            const count = originalSlides.length;
+                            originalSlides.forEach(function (slide, index) {
+                                slide.dataset.heroSlideIndex = String(index);
+                            });
                             const loadSlideImage = function (index) {
-                                const slide = el.querySelectorAll('.splide__slide')[index];
-                                if (!slide) {
+                                if (count === 0) {
                                     return;
                                 }
+                                const normalizedIndex = ((index % count) + count) % count;
+                                el.querySelectorAll('[data-hero-slide-index="' + normalizedIndex + '"]').forEach(function (slide) {
 
-                                slide.querySelectorAll('[data-hero-lazy-srcset]').forEach(function (image) {
-                                    image.setAttribute('srcset', image.dataset.heroLazySrcset);
-                                    image.removeAttribute('data-hero-lazy-srcset');
-                                });
+                                    slide.querySelectorAll('[data-hero-lazy-srcset]').forEach(function (image) {
+                                        image.setAttribute('srcset', image.dataset.heroLazySrcset);
+                                        image.removeAttribute('data-hero-lazy-srcset');
+                                    });
 
-                                slide.querySelectorAll('img[data-hero-lazy-src]').forEach(function (image) {
-                                    image.setAttribute('src', image.dataset.heroLazySrc);
-                                    image.removeAttribute('data-hero-lazy-src');
+                                    slide.querySelectorAll('img[data-hero-lazy-src]').forEach(function (image) {
+                                        image.setAttribute('src', image.dataset.heroLazySrc);
+                                        image.removeAttribute('data-hero-lazy-src');
+                                    });
                                 });
                             };
                             const slider = new window.Splide(el, {
-                                type: 'slide',
-                                rewind: count > 1,
+                                type: count > 1 ? 'loop' : 'slide',
                                 perPage: 1,
                                 perMove: 1,
                                 arrows: count > 1,
@@ -590,6 +595,7 @@
                                 speed: 700,
                                 easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
                             });
+                            slider.on('mounted', function () { loadSlideImage(0); });
                             slider.on('move', loadSlideImage);
                             slider.mount();
                         });

@@ -200,8 +200,10 @@
                 @endif
                 <div class="product-card-price-row mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
                     <p class="product-card-current-price text-[14px] font-extrabold leading-none text-slate-900 sm:text-[15px]">{{ $price }}</p>
-                    <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
-                    <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                    <span class="product-card-energy-documents">
+                        <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
+                        <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                    </span>
                 </div>
                 @include('front.partials.b2b-tax-note', ['includesTax' => $displayIncludesTax ?? true])
                 @if (! empty($lowest30DaysPrice))
@@ -338,8 +340,10 @@
                 @endif
                 <div class="product-card-price-row flex flex-wrap items-center gap-x-2 gap-y-1">
                     <p class="product-card-current-price text-[13px] font-bold leading-none text-slate-900 sm:text-[15px]">{{ $price }}</p>
-                    <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
-                    <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                    <span class="product-card-energy-documents">
+                        <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
+                        <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                    </span>
                 </div>
                 @include('front.partials.b2b-tax-note', ['includesTax' => $displayIncludesTax ?? true])
                 @if (! empty($lowest30DaysPrice))
@@ -388,8 +392,10 @@
                 @endif
                 <div class="product-card-price-row flex flex-wrap items-center gap-x-2 gap-y-1">
                     <p class="product-card-current-price text-[13px] font-bold leading-none text-slate-900 sm:text-[15px]">{{ $price }}</p>
-                    <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
-                    <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                    <span class="product-card-energy-documents">
+                        <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
+                        <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
+                    </span>
                 </div>
                 @include('front.partials.b2b-tax-note', ['includesTax' => $displayIncludesTax ?? true])
                 @if (! empty($lowest30DaysPrice))

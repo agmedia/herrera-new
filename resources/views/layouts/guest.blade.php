@@ -10,8 +10,6 @@
     $authLogoUrl = trim((string) ($authBranding['logo_url'] ?? ''));
     $authLogoWidth = max(1, (int) ($authBranding['logo_width'] ?? 320));
     $authLogoHeight = max(1, (int) ($authBranding['logo_height'] ?? 145));
-    $authFavicons = is_array($authBranding['favicons'] ?? null) ? $authBranding['favicons'] : [];
-    $authFaviconUrl = trim((string) ($authBranding['favicon_url'] ?? ''));
 
     $isLoginPage = request()->routeIs('login');
     $isForgotPasswordPage = request()->routeIs('password.request');
@@ -49,17 +47,7 @@
 
     <title>{{ $authPageTitle }} · {{ $authStoreName }}</title>
 
-    @if (!empty($authFavicons['ico_url']))
-        <link rel="icon" href="{{ $authFavicons['ico_url'] }}" sizes="any">
-    @elseif ($authFaviconUrl !== '')
-        <link rel="icon" href="{{ $authFaviconUrl }}">
-    @endif
-    @if (!empty($authFavicons['32_url']))
-        <link rel="icon" type="image/png" sizes="32x32" href="{{ $authFavicons['32_url'] }}">
-    @endif
-    @if (!empty($authFavicons['16_url']))
-        <link rel="icon" type="image/png" sizes="16x16" href="{{ $authFavicons['16_url'] }}">
-    @endif
+    <x-front.site-icons :branding="$authBranding" />
 
     @unless ($isHerreraAuth)
     <link rel="preconnect" href="https://fonts.googleapis.com">

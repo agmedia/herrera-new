@@ -306,31 +306,31 @@
             );
 
             new window.Splide(element, {
-                type: count > desktopPerPage ? 'loop' : 'slide',
-                perPage: desktopPerPage,
+                type: count > 1 ? 'loop' : 'slide',
+                perPage: count > 1 ? Math.min(desktopPerPage, count) : desktopPerPage,
                 perMove: 1,
                 gap: '0rem',
                 drag: count > 1,
                 snap: true,
                 pagination: false,
-                arrows: count > desktopPerPage,
+                arrows: count > 1,
                 updateOnMove: true,
                 speed: 520,
                 breakpoints: {
                     1280: {
-                        perPage: 4,
-                        arrows: count > 4,
+                        perPage: count > 1 ? Math.min(4, count) : 4,
+                        arrows: count > 1,
                     },
                     1024: {
-                        perPage: 3,
-                        arrows: count > 3,
+                        perPage: count > 1 ? Math.min(3, count) : 3,
+                        arrows: count > 1,
                     },
                     860: {
-                        perPage: 2,
-                        arrows: count > 2,
+                        perPage: Math.min(2, count),
+                        arrows: count > 1,
                     },
                     640: {
-                        perPage: mobilePerPage,
+                        perPage: Math.min(mobilePerPage, count),
                         arrows: false,
                         pagination: count > mobilePerPage,
                     },

@@ -15,14 +15,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const galleryNavigation = Array.from(document.querySelectorAll('[data-gallery-nav]'));
         const gallerySlideCount = productSplide.querySelectorAll('.splide__slide').length;
         const slider = new window.Splide(productSplide, {
-            type: 'slide',
+            type: gallerySlideCount > 1 ? 'loop' : 'slide',
             perPage: 1,
             perMove: 1,
             arrows: gallerySlideCount > 1,
             pagination: gallerySlideCount > 1,
             drag: gallerySlideCount > 1,
             speed: 450,
-            rewind: gallerySlideCount > 1,
             lazyLoad: 'nearby',
             preloadPages: 0,
         });
@@ -397,27 +396,27 @@ document.addEventListener('DOMContentLoaded', function () {
         window.location.href = target.full;
     };
 
-    galleryOpenButtons.forEach(function (button) {
-        button.addEventListener('click', function () {
-            if (!galleryItems.length) {
-                return;
-            }
+    // Delegation also covers the gallery buttons created by loop mode.
+    document.addEventListener('click', function (event) {
+        const button = event.target.closest('[data-gallery-open]');
+        if (!button || !galleryItems.length) {
+            return;
+        }
 
-            const index = Number.parseInt(String(button.dataset.galleryOpen || '0'), 10);
-            const normalized = Number.isNaN(index) ? 0 : index;
+        const index = Number.parseInt(String(button.dataset.galleryOpen || '0'), 10);
+        const normalized = Number.isNaN(index) ? 0 : index;
 
-            if (!galleryBox) {
-                openFallbackImage(normalized);
-                return;
-            }
+        if (!galleryBox) {
+            openFallbackImage(normalized);
+            return;
+        }
 
-            try {
-                galleryBox.openGallery(normalized);
-                scheduleLightGalleryEnhancements();
-            } catch (error) {
-                openFallbackImage(normalized);
-            }
-        });
+        try {
+            galleryBox.openGallery(normalized);
+            scheduleLightGalleryEnhancements();
+        } catch (error) {
+            openFallbackImage(normalized);
+        }
     });
 
     const mobileTrack = document.querySelector('[data-mobile-gallery-track]');

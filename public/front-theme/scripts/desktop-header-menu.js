@@ -7,6 +7,10 @@
 
         const spacer = document.querySelector('[data-site-main-header-spacer]');
         const preservesHeaderFlow = spacer instanceof HTMLElement;
+        const nativeStickyViewport = document.body.classList.contains('herrera-storefront')
+            ? window.matchMedia('(max-width: 1023px)')
+            : null;
+        const usesNativeStickyHeader = () => nativeStickyViewport?.matches === true;
         let expandedHeaderHeight = 24;
         let sticky = header.classList.contains('is-sticky');
 
@@ -28,6 +32,16 @@
         };
 
         const updateHeaderState = (remeasureSticky = false) => {
+            // Herrera's mobile header keeps its full height with CSS sticky.
+            // Avoid relayout when iOS scrolls or resizes its browser controls.
+            if (usesNativeStickyHeader()) {
+                if (sticky) {
+                    sticky = false;
+                    header.classList.remove('is-sticky');
+                }
+                return;
+            }
+
             syncExpandedHeaderHeight(remeasureSticky);
             const stickAt = preservesHeaderFlow ? expandedHeaderHeight : 24;
             const releaseAt = preservesHeaderFlow ? Math.max(24, expandedHeaderHeight - 16) : 24;
@@ -49,6 +63,10 @@
         let remeasureRequested = false;
 
         const scheduleUpdate = (remeasureSticky = false) => {
+            if (usesNativeStickyHeader() && !sticky) {
+                return;
+            }
+
             remeasureRequested = remeasureRequested || remeasureSticky;
             if (frameRequested) {
                 return;
@@ -68,6 +86,11 @@
         window.addEventListener('pageshow', () => scheduleUpdate(true));
         window.addEventListener('load', () => scheduleUpdate(true), { once: true });
         document.fonts?.ready.then(() => scheduleUpdate(true));
+        if (typeof nativeStickyViewport?.addEventListener === 'function') {
+            nativeStickyViewport.addEventListener('change', () => scheduleUpdate(true));
+        } else {
+            nativeStickyViewport?.addListener(() => scheduleUpdate(true));
+        }
     };
 
     const initCatalogMegaMenus = () => {

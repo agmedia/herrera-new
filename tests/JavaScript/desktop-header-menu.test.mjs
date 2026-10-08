@@ -7,7 +7,8 @@ const script = readFileSync(new URL('../../public/front-theme/scripts/desktop-he
 
 function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections), hrefs = [],
     currentPath = '/shop', parents = {}, linkSections = [], categoriesButton = false,
-    headerSpacer = false, headerHeight = 176, compactHeaderHeight = 130, scrollY = 0 } = {}) {
+    headerSpacer = false, headerHeight = 176, compactHeaderHeight = 130, scrollY = 0,
+    herreraStorefront = false, mobileViewport = false } = {}) {
     const queuedToggles = new Set();
     class Element {
         constructor() {
@@ -15,10 +16,16 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
             this.listeners = new Map();
             this.attributes = new Map();
             const classes = new Set();
+            this.classMutations = [];
+            const classMutations = this.classMutations;
             this.classList = {
-                add: (value) => classes.add(value), remove: (value) => classes.delete(value),
+                add(value) { classMutations.push(value); classes.add(value); },
+                remove(value) { classMutations.push(value); classes.delete(value); },
                 contains: (value) => classes.has(value),
-                toggle(value, enabled) { if (enabled) classes.add(value); else classes.delete(value); },
+                toggle(value, enabled) {
+                    classMutations.push(value);
+                    if (enabled) classes.add(value); else classes.delete(value);
+                },
             };
             this.style = {
                 values: new Map(),
@@ -55,9 +62,11 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     const header = new Element();
     header.expandedHeight = headerHeight;
     header.compactHeight = compactHeaderHeight;
-    header.getBoundingClientRect = () => ({
-        height: header.classList.contains('is-sticky') ? header.compactHeight : header.expandedHeight,
-    });
+    header.measurements = 0;
+    header.getBoundingClientRect = () => {
+        header.measurements++;
+        return { height: header.classList.contains('is-sticky') ? header.compactHeight : header.expandedHeight };
+    };
     const spacer = headerSpacer ? new Element() : null;
     const openButton = new Element();
     const panel = new Element();
@@ -93,6 +102,9 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     })[selector] || [];
     const document = new Element();
     document.body = new Element(); document.readyState = 'complete';
+    if (herreraStorefront) document.body.classList.add('herrera-storefront');
+    const fontReadyCallbacks = [];
+    document.fonts = { ready: { then(callback) { fontReadyCallbacks.push(callback); } } };
     document.querySelector = (selector) => ({
         '.site-main-header': header, '[data-mobile-menu-root]': root,
         '[data-site-main-header-spacer]': spacer,
@@ -102,6 +114,12 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     window.location = { origin: 'https://shop.example', href: new URL(currentPath, 'https://shop.example').href };
     window.scrollY = scrollY;
     window.requestAnimationFrame = (callback) => callback();
+    const nativeStickyViewport = new Element();
+    nativeStickyViewport.matches = mobileViewport;
+    window.matchMedia = (query) => {
+        assert.equal(query, '(max-width: 1023px)');
+        return nativeStickyViewport;
+    };
     const storage = { reads: 0, writes: 0, value: JSON.stringify(savedSections) };
     const sessionStorage = {
         getItem() { storage.reads++; return storage.value; },
@@ -112,6 +130,11 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     });
     return {
         root, header, spacer, window, document, openButton, overlay, sections, storage, links, sectionToggles,
+        finishFonts() { fontReadyCallbacks.forEach((callback) => callback()); },
+        setMobileViewport(matches) {
+            nativeStickyViewport.matches = matches;
+            nativeStickyViewport.emit('change', { matches });
+        },
         open() { openButton.emit('click', { preventDefault() {}, currentTarget: openButton }); },
         flushToggles() {
             while (queuedToggles.size > 0) {
@@ -121,6 +144,44 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
         },
     };
 }
+
+test('Herrera mobile uses native sticky without header measurements or class changes', () => {
+    const page = harness({ herreraStorefront: true, mobileViewport: true, headerSpacer: true, scrollY: 300 });
+    for (const type of ['scroll', 'resize', 'load', 'pageshow']) page.window.emit(type);
+    page.finishFonts();
+    page.window.scrollY = 0; page.window.emit('scroll');
+    page.window.scrollY = 500; page.window.emit('pageshow', { persisted: true });
+    assert.equal(page.header.classList.contains('is-sticky'), false);
+    assert.equal(page.header.measurements, 0);
+    assert.deepEqual(page.header.classMutations, []);
+    assert.equal(page.spacer.style.getPropertyValue('--site-main-header-expanded-height'), '');
+});
+
+test('Herrera breakpoint changes switch between native sticky and the measured desktop header', () => {
+    const page = harness({ herreraStorefront: true, mobileViewport: true, headerSpacer: true, scrollY: 300 });
+    page.setMobileViewport(false);
+    assert.equal(page.header.classList.contains('is-sticky'), true);
+    assert.equal(page.spacer.style.getPropertyValue('--site-main-header-expanded-height'), '176px');
+    page.setMobileViewport(true);
+    assert.equal(page.header.classList.contains('is-sticky'), false);
+    const mobileMeasurements = page.header.measurements;
+    const mobileMutations = page.header.classMutations.length;
+    page.window.emit('resize'); page.window.emit('scroll'); page.finishFonts();
+    assert.equal(page.header.measurements, mobileMeasurements);
+    assert.equal(page.header.classMutations.length, mobileMutations);
+    page.header.expandedHeight = 220;
+    page.setMobileViewport(false);
+    assert.equal(page.header.classList.contains('is-sticky'), true);
+    assert.equal(page.spacer.style.getPropertyValue('--site-main-header-expanded-height'), '220px');
+});
+
+test('other storefront mobile headers retain their existing measured sticky behavior', () => {
+    const page = harness({ mobileViewport: true, headerSpacer: true, scrollY: 300 });
+    assert.equal(page.header.classList.contains('is-sticky'), true);
+    assert.equal(page.spacer.style.getPropertyValue('--site-main-header-expanded-height'), '176px');
+    page.header.expandedHeight = 200; page.window.emit('resize');
+    assert.equal(page.spacer.style.getPropertyValue('--site-main-header-expanded-height'), '200px');
+});
 
 test('restored scrolling reserves the expanded header height before compacting', () => {
     const page = harness({ headerSpacer: true, scrollY: 300 });

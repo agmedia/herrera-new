@@ -5,6 +5,20 @@ body.herrera-storefront { --herrera-action: #007b8b; --herrera-footer: #24353b; 
 @supports selector(:has(*)) {
  .herrera-storefront .site-main-header:not(:has(> [data-header-rendered])) { visibility: hidden; }
 }
+/* The first layout settles behind a small veil; lazy images keep loading normally. */
+.herrera-page-loader { display: none; position: fixed; inset: 0; z-index: 2147483647; place-items: center; background: #fff; opacity: 1; transition: opacity 180ms ease-out; }
+html[data-storefront-page-loading] .herrera-page-loader,
+html[data-storefront-page-ready] .herrera-page-loader { display: grid; }
+html[data-storefront-page-ready] .herrera-page-loader { opacity: 0; pointer-events: none; }
+.herrera-page-loader-dots { display: flex; gap: 7px; }
+.herrera-page-loader-dots > span { width: 7px; height: 7px; border-radius: 50%; background: var(--herrera-action); animation: herrera-page-loader-pulse 800ms ease-in-out 200ms infinite alternate; }
+.herrera-page-loader-dots > span:nth-child(2) { animation-delay: 300ms; }
+.herrera-page-loader-dots > span:nth-child(3) { animation-delay: 400ms; }
+@keyframes herrera-page-loader-pulse { from { opacity: .3; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+ .herrera-page-loader { transition: none; }
+ .herrera-page-loader-dots > span { animation: none; }
+}
 .herrera-storefront .site-top-bar,
 .herrera-storefront .site-top-bar-shell { background: #f4f7f7; color: #58686e; }
 .herrera-storefront .site-top-bar-shell,

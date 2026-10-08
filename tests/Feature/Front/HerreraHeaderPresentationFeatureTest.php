@@ -163,10 +163,27 @@ class HerreraHeaderPresentationFeatureTest extends TestCase
             ->assertDontSee('data-herrera-header', false)
             ->assertDontSee('data-header-rendered', false)
             ->assertDontSee('data-catalog-mega-template', false)
+            ->assertDontSee('data-storefront-page-loader', false)
+            ->assertDontSee('storefront-page-reveal.js', false)
             ->assertDontSee('data-herrera-primary-navigation', false)
             ->assertDontSee('data-herrera-catalog-navigation', false)
             ->assertSee('site-main-nav-shell', false)->assertSee('data-header-search-form', false)
             ->assertSee('data-catalog-mega-tree', false);
+    }
+
+    public function test_page_reveal_bootstrap_precedes_styles_and_the_decorative_veil_is_the_first_body_element(): void
+    {
+        $this->configure();
+        foreach (['Mozilla/5.0 Desktop', 'iPhone Mobile'] as $userAgent) {
+            $html = $this->withHeader('User-Agent', $userAgent)->get(route('home'))->assertOk()->getContent();
+            $xpath = $this->xpath($html);
+            $this->assertSame(1, $xpath->query('//head/script[@data-storefront-page-reveal-boot]')->count());
+            $this->assertSame(1, $xpath->query('//head/script[@defer and contains(@src, "storefront-page-reveal.js")]')->count());
+            $this->assertSame(1, $xpath->query('//body/*[1][@data-storefront-page-loader and @aria-hidden="true"]')->count());
+            $this->assertSame(3, $xpath->query('//*[@data-storefront-page-loader]/span/span')->count());
+            $this->assertSame(0, $xpath->query('//html[@data-storefront-page-loading or @data-storefront-page-ready]')->count());
+            $this->assertLessThan(strpos($html, 'rel="stylesheet"'), strpos($html, 'data-storefront-page-reveal-boot'));
+        }
     }
 
     private function configure(string $brand = 'Herrera'): void

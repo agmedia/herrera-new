@@ -24,7 +24,7 @@
                 <input type="hidden" name="token" value="{{ $token }}">
 
                 <div>
-                    <label for="reset-password-email" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.email') }}</label>
+                    <label for="reset-password-email" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.email') }} <x-front.required-mark /></label>
                     <input
                         id="reset-password-email"
                         type="email"
@@ -41,7 +41,7 @@
                 </div>
 
                 <div>
-                    <label for="reset-password-password" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.password') }}</label>
+                    <label for="reset-password-password" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.password') }} <x-front.required-mark /></label>
                     <input id="reset-password-password" type="password" name="password" class="w-full px-3 text-sm" autocomplete="new-password" autofocus required @error('password') aria-invalid="true" aria-describedby="reset-password-password-error" @enderror>
                     @error('password')
                         <p id="reset-password-password-error" class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
@@ -49,7 +49,7 @@
                 </div>
 
                 <div>
-                    <label for="reset-password-confirmation" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.password_confirmation') }}</label>
+                    <label for="reset-password-confirmation" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.password_confirmation') }} <x-front.required-mark /></label>
                     <input id="reset-password-confirmation" type="password" name="password_confirmation" class="w-full px-3 text-sm" autocomplete="new-password" required>
                 </div>
 

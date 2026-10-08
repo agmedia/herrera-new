@@ -195,11 +195,11 @@
                 <p class="text-[11px] leading-none {{ $isB2BPrice ? 'font-semibold text-cyan-800' : 'text-slate-700' }}">
                     {{ $isB2BPrice ? __('ui.product.b2b_contract_price') : __('ui.shop.filters.price') }}
                 </p>
+                @if (! empty($oldPrice))
+                    <p class="mt-1 text-[11px] leading-none text-slate-500 line-through sm:text-[12px]">{{ $oldPrice }}</p>
+                @endif
                 <div class="product-card-price-row mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                    @if (! empty($oldPrice))
-                        <p class="text-[11px] leading-none text-slate-500 line-through sm:text-[12px]">{{ $oldPrice }}</p>
-                    @endif
-                    <p class="text-[14px] font-extrabold leading-none text-slate-900 sm:text-[15px]">{{ $price }}</p>
+                    <p class="product-card-current-price text-[14px] font-extrabold leading-none text-slate-900 sm:text-[15px]">{{ $price }}</p>
                     <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
                     <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
                 </div>
@@ -333,11 +333,11 @@
                 @if ($isB2BPrice)
                     <p class="text-[10px] font-semibold leading-tight text-cyan-800 sm:text-[11px]">{{ __('ui.product.b2b_contract_price') }}</p>
                 @endif
+                @if (! empty($oldPrice))
+                    <p class="text-[11px] leading-none text-slate-500 line-through sm:text-[13px]">{{ $oldPrice }}</p>
+                @endif
                 <div class="product-card-price-row flex flex-wrap items-center gap-x-2 gap-y-1">
-                    @if (! empty($oldPrice))
-                        <p class="text-[11px] leading-none text-slate-500 line-through sm:text-[13px]">{{ $oldPrice }}</p>
-                    @endif
-                    <p class="text-[13px] font-bold leading-none text-slate-900 sm:text-[15px]">{{ $price }}</p>
+                    <p class="product-card-current-price text-[13px] font-bold leading-none text-slate-900 sm:text-[15px]">{{ $price }}</p>
                     <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
                     <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
                 </div>
@@ -371,8 +371,8 @@
             <p class="mt-1 text-[11px] leading-tight text-slate-500 sm:text-[12px]">{{ $materialLabel }}</p>
         @endif
         @include('front.partials.product-identifiers')
-        <div class="mt-2 flex items-end justify-between">
-            <div class="flex flex-col gap-1">
+        <div class="product-card-purchase-footer mt-2 flex items-end justify-between">
+            <div class="product-card-purchase-summary flex flex-col gap-1">
                 @if (! $canViewPrices)
                     @include('front.partials.b2b-price-access', ['compact' => true])
                     <div class="product-card-energy-documents">
@@ -383,11 +383,11 @@
                 @if ($isB2BPrice)
                     <p class="text-[10px] font-semibold leading-tight text-cyan-800 sm:text-[11px]">{{ __('ui.product.b2b_contract_price') }}</p>
                 @endif
+                @if (! empty($oldPrice))
+                    <p class="text-[11px] leading-none text-slate-500 line-through sm:text-[13px]">{{ $oldPrice }}</p>
+                @endif
                 <div class="product-card-price-row flex flex-wrap items-center gap-x-2 gap-y-1">
-                    @if (! empty($oldPrice))
-                        <p class="text-[11px] leading-none text-slate-500 line-through sm:text-[13px]">{{ $oldPrice }}</p>
-                    @endif
-                    <p class="text-[13px] font-bold leading-none text-slate-900 sm:text-[15px]">{{ $price }}</p>
+                    <p class="product-card-current-price text-[13px] font-bold leading-none text-slate-900 sm:text-[15px]">{{ $price }}</p>
                     <x-front.energy-label-arrow :declaration="$energyDeclaration ?? null" />
                     <x-front.energy-information-sheet-link :declaration="$energyDeclaration ?? null" />
                 </div>

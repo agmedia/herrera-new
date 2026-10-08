@@ -1,0 +1,183 @@
+.header-search-panel-close { display: none; }
+
+.herrera-storefront .header-search-suggestions-grid > .is-categories {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.herrera-storefront .header-search-suggestions-grid.has-no-related {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.herrera-storefront .header-search-suggestions-grid.has-no-related .header-search-products-group {
+    border-right: 0;
+}
+
+@media (max-width: 1023px) {
+    body.herrera-storefront.header-search-overlay-open {
+        overflow: hidden;
+    }
+
+    .herrera-storefront.header-search-overlay-open .site-main-header {
+        z-index: 9800;
+    }
+
+    .herrera-storefront.header-search-overlay-open #cookie-consent-floating-button {
+        display: none !important;
+    }
+
+    .herrera-storefront .herrera-header-layout [data-header-search-fullscreen].is-open,
+    .herrera-storefront .site-main-header.is-sticky .herrera-header-layout [data-header-search-fullscreen].is-open {
+        position: fixed;
+        inset: var(--header-search-viewport-top, 0px) 0 auto;
+        z-index: 9801;
+        display: flex !important;
+        width: 100%;
+        height: var(--header-search-viewport-height, 100dvh);
+        max-height: none;
+        padding: max(12px, env(safe-area-inset-top)) 16px 0;
+        overflow: hidden;
+        border: 0;
+        background: #fff;
+        opacity: 1;
+        pointer-events: auto;
+        box-shadow: none;
+        transition: none;
+    }
+
+    .herrera-storefront .herrera-header-layout [data-header-search-fullscreen] .header-search-form {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 44px 44px;
+        grid-template-rows: 48px minmax(0, 1fr);
+        align-items: stretch;
+        column-gap: 0;
+        row-gap: 12px;
+        min-width: 0;
+        min-height: 0;
+        height: 100%;
+        padding: 0;
+        border: 0;
+        border-radius: 0;
+        background: #fff;
+    }
+
+    .herrera-storefront .herrera-header-layout [data-header-search-fullscreen] .header-search-input {
+        grid-column: 1;
+        grid-row: 1;
+        height: 48px;
+        padding: 0 12px;
+        border: 1px solid var(--herrera-header-line, #d6e6ea);
+        border-right: 0;
+        border-radius: 8px 0 0 8px;
+        background: var(--herrera-header-surface, #edf7f9);
+        font-size: 16px;
+    }
+
+    .herrera-storefront .herrera-header-layout [data-header-search-fullscreen] .header-search-submit {
+        grid-column: 2;
+        grid-row: 1;
+        height: 48px;
+        border: 1px solid var(--herrera-header-line, #d6e6ea);
+        border-left: 0;
+        border-radius: 0 8px 8px 0;
+        background: var(--herrera-header-surface, #edf7f9);
+        color: var(--herrera-action);
+    }
+
+    .herrera-storefront .herrera-header-layout [data-header-search-fullscreen] .header-search-input:focus,
+    .herrera-storefront .herrera-header-layout [data-header-search-fullscreen] .header-search-input:focus + .header-search-submit {
+        border-color: var(--herrera-action);
+    }
+
+    .herrera-storefront .header-search-panel-close {
+        grid-column: 3;
+        grid-row: 1;
+        display: inline-flex;
+        width: 44px;
+        height: 48px;
+        align-items: center;
+        justify-content: center;
+        border: 0;
+        background: #fff;
+        color: var(--herrera-header-ink, #24353b);
+    }
+
+    .herrera-storefront .header-search-panel-close svg { width: 20px; height: 20px; }
+
+    .herrera-storefront [data-header-search-fullscreen] .header-search-suggestions {
+        position: static;
+        grid-column: 1 / -1;
+        grid-row: 2;
+        display: flex;
+        min-width: 0;
+        min-height: 0;
+        flex-direction: column;
+        margin: 0 -16px;
+        overflow: hidden;
+        border: 0;
+        box-shadow: none;
+    }
+
+    .herrera-storefront [data-header-search-fullscreen] .header-search-suggestions-close { display: none; }
+
+    .herrera-storefront [data-header-search-fullscreen] .header-search-suggestions-meta {
+        min-height: 0;
+        flex: none;
+        padding: 12px 16px;
+        border-top: 1px solid var(--herrera-header-line, #d6e6ea);
+        border-bottom: 1px solid var(--herrera-header-line, #d6e6ea);
+        background: var(--herrera-header-surface, #edf7f9);
+        color: var(--herrera-header-ink, #24353b);
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .herrera-storefront [data-header-search-fullscreen] .header-search-suggestions-meta:empty { display: none; }
+
+    .herrera-storefront [data-header-search-fullscreen] .header-search-suggestions-list {
+        min-height: 0;
+        max-height: none;
+        flex: 1 1 auto;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .herrera-storefront [data-header-search-fullscreen] :is(.header-search-suggestions-empty, .header-search-suggestions-loading) {
+        flex: none;
+        padding: 24px 16px;
+        color: var(--herrera-header-muted, #52666d);
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .herrera-storefront [data-header-search-fullscreen] .header-search-suggestions-footer {
+        flex: none;
+        padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+        border-top: 1px solid var(--herrera-header-line, #d6e6ea);
+        background: #fff;
+        box-shadow: 0 -4px 16px #24353b08;
+    }
+
+    .herrera-storefront [data-header-search-fullscreen] .header-search-suggestions-link {
+        min-height: 48px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        background: var(--herrera-action);
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .herrera-storefront [data-header-search-fullscreen] .header-search-suggestions-link:hover { background: #006574; color: #fff; }
+
+    .herrera-storefront [data-header-search-fullscreen] :is(button, a):focus-visible {
+        outline: 2px solid var(--herrera-action);
+        outline-offset: -3px;
+    }
+
+    .herrera-storefront [data-header-search-fullscreen] .header-search-suggestions-link:focus-visible {
+        outline-color: #fff;
+        outline-offset: -4px;
+    }
+}

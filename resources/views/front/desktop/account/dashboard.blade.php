@@ -51,13 +51,13 @@
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.dashboard.cards.user') }}</p>
                     <h2 class="mt-2 text-xl font-bold text-slate-900">{{ $user->name }}</h2>
                     <p class="mt-1 text-sm text-slate-600">{{ $user->email }}</p>
-                    <a href="{{ route('account.profile') }}" class="mt-3 inline-flex border-b border-slate-900 text-sm font-semibold text-slate-900 hover:text-slate-700">{{ __('ui.account.nav.edit_account') }}</a>
+                    <a href="{{ route('account.profile') }}" class="store-text-link mt-3 inline-flex border-b border-current text-sm font-semibold">{{ __('ui.account.nav.edit_account') }}</a>
                 </article>
 
                 <article class="border border-slate-200 bg-white p-5">
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.dashboard.cards.orders') }}</p>
                     <h2 class="mt-2 text-xl font-bold text-slate-900">{{ $orderCount }}</h2>
-                    <a href="{{ route('account.orders') }}" class="mt-3 inline-flex border-b border-slate-900 text-sm font-semibold text-slate-900 hover:text-slate-700">{{ __('ui.account.dashboard.cards.view_orders') }}</a>
+                    <a href="{{ route('account.orders') }}" class="store-text-link mt-3 inline-flex border-b border-current text-sm font-semibold">{{ __('ui.account.dashboard.cards.view_orders') }}</a>
                 </article>
 
                 <article class="border border-slate-200 bg-white p-5">
@@ -76,7 +76,7 @@
                         <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.dashboard.cards.loyalty') }}</p>
                         <h2 class="mt-2 text-xl font-bold text-slate-900">{{ $loyaltyBalance }} {{ __('ui.account.dashboard.cards.points') }}</h2>
                         <p class="mt-1 text-sm text-slate-600">{{ __('ui.account.dashboard.cards.loyalty_enabled') }}</p>
-                        <a href="{{ route('account.loyalty') }}" class="mt-3 inline-flex border-b border-slate-900 text-sm font-semibold text-slate-900 hover:text-slate-700">{{ __('ui.account.loyalty.open') }}</a>
+                        <a href="{{ route('account.loyalty') }}" class="store-text-link mt-3 inline-flex border-b border-current text-sm font-semibold">{{ __('ui.account.loyalty.open') }}</a>
                     </article>
                 @endif
             </div>
@@ -121,7 +121,7 @@
                             <tbody>
                             @forelse ($orders as $order)
                                 <tr class="border-t border-slate-200">
-                                    <td class="px-4 py-3"><a href="{{ route('account.orders.show', ['orderNumber' => $order->order_number]) }}" class="break-all font-semibold text-slate-900 underline-offset-2 hover:underline">{{ $order->order_number }}</a></td>
+                                    <td class="px-4 py-3"><a href="{{ route('account.orders.show', ['orderNumber' => $order->order_number]) }}" class="store-text-link break-all font-semibold underline-offset-2 hover:underline">{{ $order->order_number }}</a></td>
                                     <td class="px-4 py-3">{{ optional($order->placed_at ?? $order->created_at)->format('Y-m-d H:i') }}</td>
                                     <td class="px-4 py-3">{{ $order->status?->name ?? __('ui.account.orders.status_new') }}</td>
                                     <td class="px-4 py-3 font-semibold">{{ \App\Support\Currency::format((float) $order->grand_total, $order->currency_code) }}</td>

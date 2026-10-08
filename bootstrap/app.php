@@ -13,6 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->prepend(\App\Http\Middleware\PreventPreviewIndexing::class);
         $middleware->prependToGroup('web', \App\Http\Middleware\ResolveHerreraLegacyUrl::class);
 
         $middleware->prependToPriorityList(

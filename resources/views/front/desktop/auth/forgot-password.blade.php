@@ -23,7 +23,7 @@
                 @csrf
 
                 <div>
-                    <label for="forgot-password-email" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.email') }}</label>
+                    <label for="forgot-password-email" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.email') }} <x-front.required-mark /></label>
                     <input
                         id="forgot-password-email"
                         type="email"

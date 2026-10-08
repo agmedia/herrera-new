@@ -13,6 +13,7 @@
             $compact ? 'text-xs leading-tight' : 'text-sm',
         ]) }}
         aria-label="{{ __('ui.product.open_product_information_sheet') }}"
+        title="{{ __('ui.product.product_information_sheet') }}"
         data-product-information-sheet
     >
         {{ $compact ? __('ui.product.information_sheet_short') : __('ui.product.product_information_sheet') }}

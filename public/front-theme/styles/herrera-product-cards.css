@@ -13,6 +13,10 @@
     text-decoration-thickness: 2px;
 }
 
+.herrera-storefront [data-product-card] {
+    container: herrera-product-card / inline-size;
+}
+
 .herrera-storefront [data-product-card] :is(.product-card-price-row, .product-card-energy-documents) {
     display: flex;
     flex-wrap: wrap;
@@ -21,19 +25,71 @@
 }
 
 .herrera-storefront [data-product-card] .product-card-price-row {
+    flex-wrap: nowrap;
+    gap: 4px;
+    min-width: 0;
     margin-top: 6px;
 }
 
 .herrera-storefront [data-product-card] .product-card-price-row > p,
 .herrera-storefront [data-product-card] [data-energy-label-arrow] {
     flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .herrera-storefront [data-product-card] .product-information-sheet-link {
+    display: block;
+    min-width: 0;
     min-height: 24px;
     max-width: 100%;
+    overflow: hidden;
     font-size: 11px;
     font-weight: 500;
+    line-height: 24px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.herrera-storefront [data-product-card] .product-card-purchase-summary {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.herrera-storefront [data-product-card] .product-card-purchase-footer {
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.herrera-storefront [data-product-card] .product-card-purchase-footer:has([data-product-information-sheet]) .product-card-purchase-summary {
+    flex-basis: 100%;
+}
+
+.herrera-storefront [data-continuous-card-carousel] .splide__slide:has([data-product-card]) {
+    min-width: 210px;
+}
+
+.herrera-storefront [data-continuous-card-carousel] .splide__slide:has([data-product-card] > .product-card-purchase-footer) {
+    min-width: 240px;
+}
+
+@container herrera-product-card (max-width: 215px) {
+    .herrera-storefront [data-product-card] .product-card-price-row {
+        gap: 2px;
+    }
+
+    .herrera-storefront [data-product-card] .product-card-current-price {
+        font-size: 13px;
+    }
+}
+
+@container herrera-product-card (min-width: 260px) {
+    .herrera-storefront [data-product-card] .product-card-current-price {
+        font-size: 16px;
+    }
+
+    .herrera-storefront [data-product-card] .product-information-sheet-link {
+        font-size: 12px;
+    }
 }
 
 .herrera-storefront [data-product-card] .product-card-energy-documents:not(:has(> *)) {
@@ -120,5 +176,12 @@
 
     .herrera-storefront .product-card-lined .product-card-lined-controls .product-card-lined-cart {
         width: 100%;
+    }
+}
+
+/* Keep prices and energy documents readable on narrow phones. */
+@media (max-width: 439px) {
+    .herrera-storefront :is([data-catalog-grid], [data-continuous-card-grid]:has(> [data-product-card])) {
+        grid-template-columns: minmax(0, 1fr);
     }
 }

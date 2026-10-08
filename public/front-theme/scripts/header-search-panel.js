@@ -27,6 +27,7 @@
         const emptyState = form.querySelector('[data-header-search-empty]');
         const footer = form.querySelector('[data-header-search-footer]');
         const viewAllLink = form.querySelector('[data-header-search-view-all]');
+        const panelClose = panel.querySelector('[data-header-search-close]');
         const b2bPriceLabel = String(form.dataset.autocompleteB2bLabel || 'B2B').trim();
 
         const autocompleteEnabled = form.dataset.autocompleteEnabled === '1'
@@ -48,6 +49,18 @@
             return isMobileViewport() && panel.hasAttribute('data-header-search-persistent');
         };
 
+        const isFullscreenMobileSearch = () => isMobileViewport() && panel.hasAttribute('data-header-search-fullscreen');
+        const syncFullscreenViewport = function () {
+            if (!isFullscreenMobileSearch() || !isOpen) {
+                panel.style.removeProperty('--header-search-viewport-height');
+                panel.style.removeProperty('--header-search-viewport-top');
+                return;
+            }
+            const viewport = window.visualViewport;
+            panel.style.setProperty('--header-search-viewport-height', `${viewport?.height || window.innerHeight}px`);
+            panel.style.setProperty('--header-search-viewport-top', `${viewport?.offsetTop || 0}px`);
+        };
+
         let isOpen = !isMobileViewport() || isPersistentMobileSearch();
         let debounceId = 0;
         let activeIndex = -1;
@@ -60,6 +73,19 @@
             const mobileOpen = isMobileViewport() && isOpen;
             panel.setAttribute('aria-hidden', isMobileViewport() && !isOpen ? 'true' : 'false');
             toggles.forEach((toggle) => toggle.setAttribute('aria-expanded', mobileOpen ? 'true' : 'false'));
+            const fullscreenOpen = isFullscreenMobileSearch() && isOpen;
+            document.body.classList.toggle('header-search-overlay-open', fullscreenOpen);
+            panel.inert = isMobileViewport() && !isOpen;
+            if (fullscreenOpen) {
+                panel.setAttribute('role', 'dialog');
+                panel.setAttribute('aria-modal', 'true');
+                panel.setAttribute('aria-label', panel.dataset.headerSearchLabel || 'Pretraga');
+            } else {
+                panel.removeAttribute('role');
+                panel.removeAttribute('aria-modal');
+                panel.removeAttribute('aria-label');
+            }
+            syncFullscreenViewport();
         };
         // Keep results within this document only: personalized prices must never
         // be shared through browser storage or survive a page/account change.
@@ -94,7 +120,7 @@
         };
 
         const ensurePanelVisible = function () {
-            if (!isMobileViewport()) {
+            if (!isMobileViewport() || isFullscreenMobileSearch()) {
                 return;
             }
 
@@ -118,6 +144,28 @@
             resultLinks.forEach((link, index) => {
                 link.classList.toggle('is-active', index === activeIndex);
             });
+            resultLinks[activeIndex]?.scrollIntoView?.({ block: 'nearest' });
+        };
+
+        const updateViewAllLink = function (query, total = 0, searchUrl = '') {
+            if (!footer || !viewAllLink) return;
+            const url = new URL(searchUrl || form.action, window.location.origin);
+            if (query) url.searchParams.set('q', query);
+            else url.searchParams.delete('q');
+            form.querySelectorAll('input[type="hidden"][name]').forEach((field) => {
+                url.searchParams.set(field.name, field.value);
+            });
+            viewAllLink.href = url.toString();
+            viewAllLink.textContent = `${form.dataset.autocompleteViewAllLabel || 'Prikaži sve'}${total > 0 ? ` (${total})` : ''}`;
+        };
+
+        const showMobileSearchPrompt = function (message = '') {
+            if (!isFullscreenMobileSearch() || !isOpen || !suggestions) return;
+            suggestions.hidden = false;
+            footer.hidden = false;
+            emptyState.hidden = false;
+            emptyState.textContent = message || form.dataset.autocompletePromptLabel || '';
+            updateViewAllLink(input.value.trim());
         };
 
         const closeSuggestions = function () {
@@ -140,6 +188,7 @@
             loadingState.hidden = true;
             emptyState.hidden = true;
             footer.hidden = true;
+            showMobileSearchPrompt();
         };
 
         suggestionsClose?.addEventListener('click', function () {
@@ -315,7 +364,8 @@
             loadingState.textContent = form.dataset.autocompleteLoadingLabel || '';
             loadingState.hidden = false;
             emptyState.hidden = true;
-            footer.hidden = true;
+            footer.hidden = !isFullscreenMobileSearch();
+            if (isFullscreenMobileSearch()) updateViewAllLink(input.value.trim());
             activeIndex = -1;
             resultLinks = [];
         };
@@ -341,18 +391,20 @@
                 };
             const productGroup = groups.products || { total: 0, items: [] };
             const productItems = Array.isArray(productGroup.items) ? productGroup.items : [];
-            const relatedGroupKeys = ['manufacturers', 'categories', 'blog'];
+            const categorySection = buildRelatedGroup('categories', groups.categories || { total: 0, items: [] });
+            const relatedGroupKeys = ['manufacturers', 'blog'];
             const relatedSections = relatedGroupKeys
                 .map((groupKey) => buildRelatedGroup(groupKey, groups[groupKey] || { total: 0, items: [] }))
                 .filter(Boolean);
 
-            if (productItems.length === 0 && relatedSections.length === 0) {
+            if (!categorySection && productItems.length === 0 && relatedSections.length === 0) {
                 suggestionsMeta.textContent = '';
                 emptyState.textContent = setMetaLabel(form.dataset.autocompleteEmptyLabel, {
                     '__QUERY__': query,
                 });
                 emptyState.hidden = false;
-                footer.hidden = true;
+                footer.hidden = !isFullscreenMobileSearch();
+                if (isFullscreenMobileSearch()) updateViewAllLink(query, 0, payload.search_url);
                 resultLinks = [];
                 return;
             }
@@ -365,6 +417,11 @@
             const grid = document.createElement('div');
             grid.className = 'header-search-suggestions-grid';
             grid.classList.toggle('has-no-products', productItems.length === 0);
+            grid.classList.toggle('has-no-related', relatedSections.length === 0);
+
+            if (categorySection) {
+                grid.appendChild(categorySection);
+            }
 
             if (productItems.length > 0) {
                 const productSection = document.createElement('section');
@@ -396,12 +453,9 @@
             suggestionsList.appendChild(grid);
             bindSuggestionLinks();
 
-            footer.hidden = productItems.length === 0;
+            footer.hidden = !isFullscreenMobileSearch() && productItems.length === 0;
             if (!footer.hidden) {
-                const productTotal = Number(productGroup.total || 0);
-                const totalSuffix = productTotal > 0 ? ` (${productTotal})` : '';
-                viewAllLink.textContent = `${form.dataset.autocompleteViewAllLabel || ''}${totalSuffix}`;
-                viewAllLink.href = payload.search_url || `${form.action}?q=${encodeURIComponent(query)}`;
+                updateViewAllLink(query, Number(productGroup.total || 0), payload.search_url);
             }
         };
 
@@ -472,6 +526,7 @@
                     }
 
                     closeSuggestions();
+                    showMobileSearchPrompt(form.dataset.autocompleteErrorLabel || '');
                 })
                 .finally(() => {
                     if (abortController === requestController) {
@@ -512,6 +567,11 @@
             syncPanelAccessibility();
 
             ensurePanelVisible();
+            if (isFullscreenMobileSearch()) {
+                showMobileSearchPrompt();
+                input.focus({ preventScroll: true });
+                return;
+            }
 
             window.clearTimeout(focusTimer);
             focusTimer = window.setTimeout(function () {
@@ -532,6 +592,7 @@
             if (isMobileViewport() && !isPersistentMobileSearch()) {
                 panel.classList.remove('is-open');
                 isOpen = false;
+                if (suggestions) suggestions.hidden = true;
                 dismissMobileKeyboard();
                 syncPanelAccessibility();
                 if (restoreFocus) {
@@ -543,6 +604,8 @@
             isOpen = true;
             syncPanelAccessibility();
         };
+
+        panelClose?.addEventListener('click', () => closePanel(true));
 
         toggles.forEach(function (toggle) {
             toggle.addEventListener('click', function () {
@@ -567,6 +630,7 @@
         });
 
         input.addEventListener('input', function () {
+            if (isFullscreenMobileSearch()) updateViewAllLink(input.value.trim());
             queueAutocomplete();
         });
 
@@ -606,7 +670,7 @@
 
         if (autocompleteEnabled) {
             suggestionsList.addEventListener('touchmove', dismissMobileKeyboard, { passive: true });
-            suggestionsList.addEventListener('scroll', dismissMobileKeyboard, { passive: true });
+            // Native scroll also fires for keyboard selection; only user gestures dismiss the input.
             suggestionsList.addEventListener('wheel', dismissMobileKeyboard, { passive: true });
         }
 
@@ -654,7 +718,24 @@
 
         document.addEventListener('keydown', function (event) {
             if (event.key === 'Escape' && isOpen) {
+                event.preventDefault?.();
                 closePanel(true);
+            }
+            if (event.key === 'Tab' && isOpen && isFullscreenMobileSearch()) {
+                const focusable = Array.from(panel.querySelectorAll('input:not([type="hidden"]), button, a[href]'))
+                    .filter((element) => !element.disabled && element.getClientRects().length > 0);
+                const first = focusable[0];
+                const last = focusable[focusable.length - 1];
+                if (!panel.contains(document.activeElement)) {
+                    event.preventDefault();
+                    (event.shiftKey ? last : first)?.focus();
+                } else if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last?.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first?.focus();
+                }
             }
         });
 
@@ -662,6 +743,7 @@
             if (!isMobileViewport()) {
                 panel.classList.remove('is-open');
                 isOpen = true;
+                closeSuggestions();
                 syncPanelAccessibility();
                 return;
             }
@@ -674,6 +756,9 @@
         };
 
         syncViewportState();
+        window.visualViewport?.addEventListener('resize', syncFullscreenViewport);
+        window.visualViewport?.addEventListener('scroll', syncFullscreenViewport);
+        window.addEventListener('resize', syncFullscreenViewport, { passive: true });
 
         if (typeof mobileViewport.addEventListener === 'function') {
             mobileViewport.addEventListener('change', syncViewportState);

@@ -75,14 +75,14 @@
                         <input type="hidden" name="checkout_login" value="1">
                         <input type="hidden" name="intended" value="{{ route('checkout.create') }}">
                         <div>
-                            <label for="checkout-login-email" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.checkout.login.email') }}</label>
+                            <label for="checkout-login-email" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.checkout.login.email') }} <x-front.required-mark /></label>
                             <input id="checkout-login-email" type="email" name="email" value="{{ old('email') }}" autocomplete="email" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" required @error('email') aria-invalid="true" aria-describedby="checkout-login-email-error" @enderror>
                             @error('email')
                                 <p id="checkout-login-email-error" class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                             @enderror
                         </div>
                         <div>
-                            <label for="checkout-login-password" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.checkout.login.password') }}</label>
+                            <label for="checkout-login-password" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.checkout.login.password') }} <x-front.required-mark /></label>
                             <input id="checkout-login-password" type="password" name="password" autocomplete="current-password" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" required @error('password') aria-invalid="true" aria-describedby="checkout-login-password-error" @enderror>
                             @error('password')
                                 <p id="checkout-login-password-error" class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
@@ -94,7 +94,7 @@
                                     <input type="checkbox" name="remember" class="h-4 w-4 border-slate-300 text-slate-900 focus:ring-0">
                                     {{ __('ui.checkout.login.remember') }}
                                 </label>
-                                <a href="{{ route('front.auth.password.request') }}" class="checkout-inline-link text-sm font-semibold">
+                                <a href="{{ route('front.auth.password.request') }}" class="store-text-link checkout-inline-link text-sm font-semibold">
                                     {{ __('ui.auth.login.forgot_password') }}
                                 </a>
                             </div>
@@ -121,28 +121,28 @@
 
                 <div class="mt-4 grid gap-4 md:grid-cols-2">
                     <div>
-                        <label for="billing-first-name" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.first_name') }}</label>
+                        <label for="billing-first-name" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.first_name') }} <x-front.required-mark /></label>
                         <input id="billing-first-name" type="text" name="billing_first_name" value="{{ old('billing_first_name', $prefill['billing']['first_name']) }}" autocomplete="billing given-name" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" data-billing-first required @error('billing_first_name') aria-invalid="true" aria-describedby="billing-first-name-error" @enderror>
                         @error('billing_first_name')
                             <p id="billing-first-name-error" class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                         @enderror
                     </div>
                     <div>
-                        <label for="billing-last-name" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.last_name') }}</label>
+                        <label for="billing-last-name" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.last_name') }} <x-front.required-mark /></label>
                         <input id="billing-last-name" type="text" name="billing_last_name" value="{{ old('billing_last_name', $prefill['billing']['last_name']) }}" autocomplete="billing family-name" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" data-billing-last required @error('billing_last_name') aria-invalid="true" aria-describedby="billing-last-name-error" @enderror>
                         @error('billing_last_name')
                             <p id="billing-last-name-error" class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                         @enderror
                     </div>
                     <div>
-                        <label for="customer-email" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.email') }}</label>
+                        <label for="customer-email" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.email') }} <x-front.required-mark /></label>
                         <input id="customer-email" type="email" name="customer_email" value="{{ old('customer_email', $prefill['email']) }}" autocomplete="email" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" required @error('customer_email') aria-invalid="true" aria-describedby="customer-email-error" @enderror>
                         @error('customer_email')
                             <p id="customer-email-error" class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                         @enderror
                     </div>
                     <div>
-                        <label for="customer-phone" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.phone') }}</label>
+                        <label for="customer-phone" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.phone') }} <x-front.required-mark /></label>
                         <input id="customer-phone" type="tel" name="customer_phone" value="{{ old('customer_phone', $prefill['phone']) }}" autocomplete="tel" inputmode="tel" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" required @error('customer_phone') aria-invalid="true" aria-describedby="customer-phone-error" @enderror>
                         @error('customer_phone')
                             <p id="customer-phone-error" class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
@@ -161,28 +161,28 @@
                         </div>
                     </div>
                     <div>
-                        <label for="billing-address" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.address_line_1') }}</label>
+                        <label for="billing-address" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.address_line_1') }} <x-front.required-mark /></label>
                         <input id="billing-address" type="text" name="billing_address_line_1" value="{{ old('billing_address_line_1', $prefill['billing']['address_line_1']) }}" autocomplete="billing street-address" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" required @error('billing_address_line_1') aria-invalid="true" aria-describedby="billing-address-error" @enderror>
                         @error('billing_address_line_1')
                             <p id="billing-address-error" class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                         @enderror
                     </div>
                     <div>
-                        <label for="billing-postal-code" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.postal_code') }}</label>
+                        <label for="billing-postal-code" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.postal_code') }} <x-front.required-mark /></label>
                         <input id="billing-postal-code" type="text" name="billing_postal_code" value="{{ old('billing_postal_code', $prefill['billing']['postal_code']) }}" autocomplete="billing postal-code" inputmode="numeric" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" data-address-postal required @error('billing_postal_code') aria-invalid="true" aria-describedby="billing-postal-code-error" @enderror>
                         @error('billing_postal_code')
                             <p id="billing-postal-code-error" class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                         @enderror
                     </div>
                     <div>
-                        <label for="billing-city" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.city') }}</label>
+                        <label for="billing-city" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.city') }} <x-front.required-mark /></label>
                         <input id="billing-city" type="text" name="billing_city" value="{{ old('billing_city', $prefill['billing']['city']) }}" autocomplete="billing address-level2" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" data-address-city required @error('billing_city') aria-invalid="true" aria-describedby="billing-city-error" @enderror>
                         @error('billing_city')
                             <p id="billing-city-error" class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                         @enderror
                     </div>
                     <div>
-                        <label for="billing-country" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.country_code') }}</label>
+                        <label for="billing-country" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.country_code') }} <x-front.required-mark /></label>
                         <select id="billing-country" name="billing_country_code" autocomplete="billing country" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" data-address-country required>
                             @foreach ($countryOptions as $countryOption)
                                 <option value="{{ $countryOption['code'] }}" @selected(old('billing_country_code', $prefill['billing']['country_code']) === $countryOption['code'])>{{ $countryOption['label'] }}</option>
@@ -201,14 +201,14 @@
                         <div id="register-account-fields" class="overflow-hidden transition-all duration-300" data-register-account-panel aria-hidden="{{ $showRegisterPanel ? 'false' : 'true' }}" style="{{ $showRegisterPanel ? '' : 'max-height:0;opacity:0;' }}">
                             <div class="mt-4 grid gap-4 border-t border-slate-200 pt-4 md:grid-cols-2">
                                 <div>
-                                    <label for="register-password" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.checkout.register.password') }}</label>
+                                    <label for="register-password" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.checkout.register.password') }} <x-front.required-mark /></label>
                                     <input id="register-password" type="password" name="register_password" autocomplete="new-password" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" data-register-password @disabled(! $showRegisterPanel) @error('register_password') aria-invalid="true" aria-describedby="register-password-error" @enderror>
                                     @error('register_password')
                                         <p id="register-password-error" class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
                                     @enderror
                                 </div>
                                 <div>
-                                    <label for="register-password-confirmation" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.checkout.register.password_repeat') }}</label>
+                                    <label for="register-password-confirmation" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.checkout.register.password_repeat') }} <x-front.required-mark /></label>
                                     <input id="register-password-confirmation" type="password" name="register_password_confirmation" autocomplete="new-password" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" data-register-password-confirmation @disabled(! $showRegisterPanel)>
                                 </div>
                             </div>
@@ -230,14 +230,14 @@
 
                 <div id="shipping-address-fields" class="overflow-hidden transition-all duration-300" data-shipping-fields aria-hidden="{{ $showShippingAddress ? 'false' : 'true' }}" @if (! $showShippingAddress) inert @endif style="{{ $showShippingAddress ? '' : 'max-height:0;opacity:0;' }}">
                     <div class="mt-4 grid gap-4 border-t border-slate-200 pt-4 md:grid-cols-2">
-                        <div><label for="shipping-first-name" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.first_name') }}</label><input id="shipping-first-name" type="text" name="shipping_first_name" value="{{ old('shipping_first_name', $prefill['shipping']['first_name']) }}" autocomplete="shipping given-name" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0"></div>
-                        <div><label for="shipping-last-name" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.last_name') }}</label><input id="shipping-last-name" type="text" name="shipping_last_name" value="{{ old('shipping_last_name', $prefill['shipping']['last_name']) }}" autocomplete="shipping family-name" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0"></div>
+                        <div><label for="shipping-first-name" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.first_name') }} <x-front.required-mark /></label><input id="shipping-first-name" type="text" name="shipping_first_name" value="{{ old('shipping_first_name', $prefill['shipping']['first_name']) }}" autocomplete="shipping given-name" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0"></div>
+                        <div><label for="shipping-last-name" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.last_name') }} <x-front.required-mark /></label><input id="shipping-last-name" type="text" name="shipping_last_name" value="{{ old('shipping_last_name', $prefill['shipping']['last_name']) }}" autocomplete="shipping family-name" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0"></div>
                         <div><label for="shipping-vat-id" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.vat_id') }}</label><input id="shipping-vat-id" type="text" name="shipping_vat_id" value="{{ old('shipping_vat_id', $prefill['shipping']['vat_id']) }}" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0"></div>
-                        <div><label for="shipping-address" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.address_line_1') }}</label><input id="shipping-address" type="text" name="shipping_address_line_1" value="{{ old('shipping_address_line_1', $prefill['shipping']['address_line_1']) }}" autocomplete="shipping street-address" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0"></div>
-                        <div><label for="shipping-postal-code" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.postal_code') }}</label><input id="shipping-postal-code" type="text" name="shipping_postal_code" value="{{ old('shipping_postal_code', $prefill['shipping']['postal_code']) }}" autocomplete="shipping postal-code" inputmode="numeric" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" data-address-postal></div>
-                        <div><label for="shipping-city" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.city') }}</label><input id="shipping-city" type="text" name="shipping_city" value="{{ old('shipping_city', $prefill['shipping']['city']) }}" autocomplete="shipping address-level2" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" data-address-city></div>
+                        <div><label for="shipping-address" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.address_line_1') }} <x-front.required-mark /></label><input id="shipping-address" type="text" name="shipping_address_line_1" value="{{ old('shipping_address_line_1', $prefill['shipping']['address_line_1']) }}" autocomplete="shipping street-address" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0"></div>
+                        <div><label for="shipping-postal-code" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.postal_code') }} <x-front.required-mark /></label><input id="shipping-postal-code" type="text" name="shipping_postal_code" value="{{ old('shipping_postal_code', $prefill['shipping']['postal_code']) }}" autocomplete="shipping postal-code" inputmode="numeric" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" data-address-postal></div>
+                        <div><label for="shipping-city" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.city') }} <x-front.required-mark /></label><input id="shipping-city" type="text" name="shipping_city" value="{{ old('shipping_city', $prefill['shipping']['city']) }}" autocomplete="shipping address-level2" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" data-address-city></div>
                         <div>
-                            <label for="shipping-country" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.country_code') }}</label>
+                            <label for="shipping-country" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.country_code') }} <x-front.required-mark /></label>
                             <select id="shipping-country" name="shipping_country_code" autocomplete="shipping country" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" data-address-country>
                                 @foreach ($countryOptions as $countryOption)
                                     <option value="{{ $countryOption['code'] }}" @selected(old('shipping_country_code', $prefill['shipping']['country_code']) === $countryOption['code'])>{{ $countryOption['label'] }}</option>
@@ -253,7 +253,7 @@
 
                 <div class="mt-4 space-y-5">
                     <fieldset>
-                        <legend class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.checkout.labels.shipping_method') }}</legend>
+                        <legend class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.checkout.labels.shipping_method') }} <x-front.required-mark /></legend>
                         <div class="grid gap-2" data-checkout-shipping-options>
                             @foreach ($shippingMethods as $method)
                                 <label class="checkout-option-card flex cursor-pointer items-start justify-between gap-3 px-3 py-2.5 text-sm">
@@ -340,7 +340,7 @@
                     </fieldset>
 
                     <fieldset>
-                        <legend class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.checkout.labels.payment_method') }}</legend>
+                        <legend class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.checkout.labels.payment_method') }} <x-front.required-mark /></legend>
                         <div class="grid gap-2" data-checkout-payment-options>
                             @foreach ($paymentMethods as $method)
                                 <label class="checkout-option-card flex cursor-pointer items-start justify-between gap-3 px-3 py-2.5 text-sm">
@@ -379,10 +379,11 @@
                         <span>
                             {{ __('ui.checkout.options.accept_terms_prefix') }}
                             @if (!empty($storeSettings['legal']['terms']['url']))
-                                <a href="{{ $storeSettings['legal']['terms']['url'] }}" class="font-semibold text-blue-700 underline underline-offset-2" target="_blank" rel="noopener noreferrer">{{ $storeSettings['legal']['terms']['title'] }}</a>.
+                                <a href="{{ $storeSettings['legal']['terms']['url'] }}" class="store-text-link font-semibold underline underline-offset-2" target="_blank" rel="noopener noreferrer">{{ $storeSettings['legal']['terms']['title'] }}</a>.
                             @else
                                 {{ __('ui.auth.register.terms_link') }}.
                             @endif
+                            <x-front.required-mark />
                         </span>
                     </label>
 
@@ -394,7 +395,7 @@
                 <p class="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600" data-checkout-legal-links>
                     @foreach (['shipping_payment', 'privacy', 'withdrawal'] as $legalPageType)
                         @if (!empty($storeSettings['legal'][$legalPageType]['url']))
-                            <a href="{{ $storeSettings['legal'][$legalPageType]['url'] }}" class="underline underline-offset-2" target="_blank" rel="noopener noreferrer">{{ $storeSettings['legal'][$legalPageType]['title'] }}</a>
+                            <a href="{{ $storeSettings['legal'][$legalPageType]['url'] }}" class="store-text-link underline underline-offset-2" target="_blank" rel="noopener noreferrer">{{ $storeSettings['legal'][$legalPageType]['title'] }}</a>
                         @endif
                     @endforeach
                 </p>

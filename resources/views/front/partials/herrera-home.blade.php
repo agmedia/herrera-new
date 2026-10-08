@@ -1,4 +1,4 @@
-@once
+@once('herrera-home-b2b-styles')
     @push('styles')
         <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-home-b2b.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-home-b2b.css')) }}">
     @endpush
@@ -24,7 +24,7 @@
             <h1 id="herrera-home-title" aria-label="{{ $herreraHeadline }}">@if (count($herreraHeadlineParts) === 2)<span class="herrera-hero-headline-line">{{ $herreraHeadlineParts[0] }}. </span><span class="herrera-hero-headline-line">{{ $herreraHeadlineParts[1] }}</span>@else{{ $herreraHeadline }}@endif</h1>
             <p class="herrera-hero-description">{{ __('herrera.description') }}</p>
             <div class="herrera-hero-actions">
-                <a class="herrera-hero-primary-action" href="{{ route('shop.index') }}">{{ __('herrera.catalog') }} <x-fa-icon name="arrow-right" /></a>
+                <a class="herrera-hero-primary-action" href="{{ route('categories.index') }}">{{ __('herrera.catalog') }} <x-fa-icon name="arrow-right" /></a>
                 @auth
                     <a class="herrera-hero-secondary-action" href="{{ route('account.dashboard') }}"><x-fa-icon name="user" /> {{ __('herrera.account') }}</a>
                 @else
@@ -131,14 +131,14 @@
     @if ($herreraProducts->isNotEmpty())
         <section class="herrera-home-section herrera-b2b-products" aria-labelledby="herrera-home-products-title" data-herrera-home-products>
             @include('front.partials.splide-assets')
-            <div class="splide herrera-home-product-carousel" data-herrera-home-products-splide data-continuous-card-carousel data-splide='@json($herreraProductCarouselOptions)' aria-labelledby="herrera-home-products-title" style="--herrera-product-columns: {{ $herreraProductCarouselOptions['perPage'] }}; --herrera-product-tablet-columns: {{ $herreraProductCarouselOptions['breakpoints'][1279]['perPage'] }}; --herrera-product-mobile-columns: {{ $herreraProductCarouselOptions['breakpoints'][767]['perPage'] }};">
+            <div class="splide herrera-home-product-carousel" data-herrera-home-products-splide data-herrera-home-carousel data-continuous-card-carousel data-splide='@json($herreraProductCarouselOptions)' aria-labelledby="herrera-home-products-title" style="--herrera-product-columns: {{ $herreraProductCarouselOptions['perPage'] }}; --herrera-product-tablet-columns: {{ $herreraProductCarouselOptions['breakpoints'][1279]['perPage'] }}; --herrera-product-mobile-columns: {{ $herreraProductCarouselOptions['breakpoints'][767]['perPage'] }};">
                 <div class="herrera-home-heading">
                     <div>
                         <p class="herrera-home-section-eyebrow">{{ __('herrera.products_eyebrow') }}</p>
                         <h2 id="herrera-home-products-title">{{ __('herrera.products') }}</h2>
                     </div>
                     <div class="herrera-home-product-actions">
-                        <a class="herrera-home-products-link" href="{{ route('shop.index') }}">{{ __('herrera.all_products') }} <x-fa-icon name="arrow-right" /></a>
+                        <a class="herrera-home-products-link" href="{{ route('categories.index') }}">{{ __('herrera.all_products') }} <x-fa-icon name="arrow-right" /></a>
                         @if ($herreraProductCount > 1)
                             <div class="splide__arrows">
                                 <button class="splide__arrow splide__arrow--prev" type="button" aria-label="{{ $herreraProductPreviousLabel }}" disabled><x-fa-icon name="chevron-right" style="solid" /></button>
@@ -159,41 +159,7 @@
             </div>
         </section>
 
-        @once
-            @push('scripts')
-                <script>
-                    (function () {
-                        const init = function () {
-                            if (typeof window.Splide !== 'function') {
-                                return false;
-                            }
-
-                            document.querySelectorAll('[data-herrera-home-products-splide]').forEach(function (el) {
-                                if (el.dataset.splideReady === '1') {
-                                    return;
-                                }
-                                new window.Splide(el).mount();
-                                el.dataset.splideReady = '1';
-                            });
-
-                            return true;
-                        };
-
-                        if (init()) {
-                            return;
-                        }
-
-                        let attempts = 0;
-                        const timer = window.setInterval(function () {
-                            attempts += 1;
-                            if (init() || attempts > 40) {
-                                window.clearInterval(timer);
-                            }
-                        }, 120);
-                    })();
-                </script>
-            @endpush
-        @endonce
+        @include('front.partials.herrera-home-carousel-script')
     @endif
 @endif
 

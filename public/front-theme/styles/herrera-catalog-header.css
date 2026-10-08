@@ -1,0 +1,67 @@
+/* A continuous heading band for Herrera category and catalog browsing. */
+.herrera-storefront .herrera-wide-catalog-main:has(> .herrera-catalog-heading-band) {
+    padding-top: 0;
+}
+
+.herrera-storefront .herrera-catalog-heading-band {
+    position: relative;
+    isolation: isolate;
+    margin-bottom: 20px;
+    background: #edf7f9;
+    box-shadow: 0 0 0 100vmax #edf7f9;
+    clip-path: inset(0 -100vmax);
+}
+
+.herrera-storefront .herrera-catalog-heading-band::after {
+    position: absolute;
+    inset: auto 0 0;
+    height: 1px;
+    background: #d7e7eb;
+    box-shadow: 0 0 0 100vmax #d7e7eb;
+    clip-path: inset(0 -100vmax);
+    content: "";
+    pointer-events: none;
+}
+
+.herrera-storefront .herrera-catalog-heading-band .front-soft-hero {
+    padding: 24px 0;
+    background: transparent;
+}
+
+.herrera-storefront .herrera-catalog-heading-band .front-soft-hero::after {
+    content: none;
+}
+
+.herrera-storefront .herrera-catalog-heading-band h1 {
+    color: #2e3539;
+    font-size: clamp(26px, 2.3vw, 34px);
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -.03em;
+    overflow-wrap: anywhere;
+}
+
+.herrera-storefront .herrera-catalog-heading-band .front-soft-hero > p {
+    margin-top: 6px;
+    color: #637179;
+    line-height: 1.5;
+}
+
+.herrera-storefront .herrera-catalog-heading-band nav li {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.herrera-storefront .herrera-catalog-heading-band nav a:is(:hover, :focus-visible) {
+    color: var(--herrera-action, #007b8b);
+}
+
+.herrera-storefront.category-index-page .herrera-catalog-heading-band {
+    margin-bottom: 0;
+}
+
+@media (min-width: 640px) {
+    .herrera-storefront .herrera-catalog-heading-band .front-soft-hero {
+        padding-block: 30px;
+    }
+}

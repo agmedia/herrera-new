@@ -29,10 +29,39 @@ class SitemapFeatureTest extends TestCase
 
     public function test_robots_blocks_preview_and_uses_own_domain_in_production(): void
     {
-        $this->get('/robots.txt')->assertOk()->assertSee('Disallow: /', false);
+        $this->get('/robots.txt')->assertOk()->assertContent("User-agent: *\nDisallow: /\n")
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
         $this->app->detectEnvironment(fn () => 'production');
         config(['app.url' => 'https://www.herrera.hr']);
-        $this->get('/robots.txt')->assertOk()->assertSee('Sitemap: https://www.herrera.hr/sitemap.xml', false)->assertDontSee('videonadzor');
+        $this->get('https://www.herrera.hr/robots.txt')->assertOk()
+            ->assertSee('Sitemap: https://www.herrera.hr/sitemap.xml', false)
+            ->assertDontSee("Disallow: /\n", false)->assertDontSee('videonadzor')
+            ->assertHeaderMissing('X-Robots-Tag');
+    }
+
+    public function test_known_test_hosts_remain_blocked_even_with_production_environment(): void
+    {
+        $this->app->detectEnvironment(fn () => 'production');
+        config(['app.url' => 'https://www.herrera.hr']);
+
+        foreach (['http://herrera-new.test', 'https://herrera.herrera.hr'] as $origin) {
+            $this->get($origin.'/robots.txt')->assertOk()
+                ->assertHeader('Content-Type', 'text/plain; charset=UTF-8')
+                ->assertHeader('X-Robots-Tag', 'noindex, nofollow')
+                ->assertContent("User-agent: *\nDisallow: /\n");
+            $this->get($origin.'/contact')->assertOk()->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+            $this->get($origin.'/sitemap.xml')->assertOk()->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+        }
+
+        $this->get('https://www.herrera.hr/contact')->assertOk()->assertHeaderMissing('X-Robots-Tag');
+    }
+
+    public function test_staging_environment_blocks_indexing_regardless_of_requested_host(): void
+    {
+        $this->app->detectEnvironment(fn () => 'staging');
+        config(['app.url' => 'https://herrera.herrera.hr']);
+        $this->get('https://www.herrera.hr/robots.txt')->assertOk()->assertContent("User-agent: *\nDisallow: /\n");
+        $this->get('https://www.herrera.hr/contact')->assertOk()->assertHeader('X-Robots-Tag', 'noindex, nofollow');
     }
 
     public function test_blog_sitemap_only_lists_enabled_published_posts(): void

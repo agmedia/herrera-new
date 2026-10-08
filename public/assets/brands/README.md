@@ -27,22 +27,23 @@ locally, without third-party logo hotlinks.
 - `uni-trend.png`: original official header logo at
   https://www.uni-trend.com/wp-content/uploads/2021/10/UNIT.png, linked by
   https://www.uni-trend.com/. It is white artwork for the manufacturer's red
-  header, so it is not included in this neutral strip.
+  header. It is displayed unchanged on a red inset within its white logo tile.
 
 ## Catalog behavior
 
-`config/herrera-brand-logos.php` selects the seven existing brands by translated
-name or slug instead of an environment-specific database ID. The partial checks
-that a manufacturer and active products exist, uses its current/fallback locale's
-real manufacturer route, and prefers an available uploaded local logo. No
-manufacturer records or media-library rows were changed.
+`config/herrera-brand-logos.php` prioritizes the first seven existing brands by
+translated name or slug instead of an environment-specific database ID. The
+carousel also includes other active manufacturers with active products and a
+verified asset from `config/manufacturer-logo-assets.php` or a usable uploaded
+logo. It uses real current/fallback locale manufacturer routes and prefers
+uploaded artwork. No manufacturer records or media-library rows were changed.
 
 ## Manufacturer directory assets
 
 The directory and manufacturer blocks resolve these additional originals by
 translated name or slug, including verified catalog supplier aliases. Usable
 uploaded logos take precedence, then local originals, then existing fallbacks.
-The homepage strip keeps its original seven selected brands.
+The homepage carousel uses these local originals after its seven priority brands.
 
 | Catalog label / key | Local original | Source page | Original asset | Notes |
 | --- | --- | --- | --- | --- |

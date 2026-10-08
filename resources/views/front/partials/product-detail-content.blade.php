@@ -120,13 +120,13 @@
                     @csrf
                     <div class="product-detail-comment-grid">
                         <div class="product-detail-field">
-                            <label for="product-comment-author">{{ __('ui.product.comment_form.name') }}</label>
-                            <input id="product-comment-author" type="text" name="author_name" value="{{ old('author_name', $commentUser?->name ?? '') }}" @if($commentUser) readonly @endif>
+                            <label for="product-comment-author">{{ __('ui.product.comment_form.name') }} <x-front.required-mark :required="! $commentUser" /></label>
+                            <input id="product-comment-author" type="text" name="author_name" value="{{ old('author_name', $commentUser?->name ?? '') }}" @if($commentUser) readonly @else required @endif>
                             @error('author_name') <p class="product-detail-field-error">{{ $message }}</p> @enderror
                         </div>
                         <div class="product-detail-field">
-                            <label for="product-comment-email">{{ __('ui.product.comment_form.email') }}</label>
-                            <input id="product-comment-email" type="email" name="author_email" value="{{ old('author_email', $commentUser?->email ?? '') }}" @if($commentUser) readonly @endif>
+                            <label for="product-comment-email">{{ __('ui.product.comment_form.email') }} <x-front.required-mark :required="! $commentUser" /></label>
+                            <input id="product-comment-email" type="email" name="author_email" value="{{ old('author_email', $commentUser?->email ?? '') }}" @if($commentUser) readonly @else required @endif>
                             @error('author_email') <p class="product-detail-field-error">{{ $message }}</p> @enderror
                         </div>
                     </div>
@@ -143,7 +143,7 @@
                     </div>
 
                     <div class="product-detail-field">
-                        <label for="product-comment-body">{{ __('ui.product.comment_form.body') }}</label>
+                        <label for="product-comment-body">{{ __('ui.product.comment_form.body') }} <x-front.required-mark /></label>
                         <textarea id="product-comment-body" name="body" rows="5" required>{{ old('body') }}</textarea>
                         @error('body') <p class="product-detail-field-error">{{ $message }}</p> @enderror
                     </div>

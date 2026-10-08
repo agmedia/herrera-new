@@ -1,15 +1,22 @@
 @extends('front.desktop.layouts.store')
 
+@php
+    $isHerreraCategoryIndex = str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera');
+@endphp
+
 @section('title', __('ui.category_index.page_title'))
 @section('main_class', 'w-full px-0 pt-3 pb-4 sm:pt-3 sm:pb-6'.(str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera') ? ' herrera-wide-catalog-main' : ''))
 @section('body_class', 'category-index-page')
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('front-theme/styles/category-index.css') }}?v={{ filemtime(public_path('front-theme/styles/category-index.css')) }}">
+    @if ($isHerreraCategoryIndex)
+        <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-catalog-header.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-catalog-header.css')) }}">
+    @endif
 @endpush
 
 @section('content')
-    <section class="storefront-container px-3 sm:px-4 lg:px-6">
+    <section class="{{ $isHerreraCategoryIndex ? 'herrera-catalog-heading-band ' : '' }}storefront-container px-3 sm:px-4 lg:px-6">
         <div class="front-soft-hero px-4 py-4 text-center sm:px-6 sm:py-5">
             <nav aria-label="Breadcrumb" class="mb-2">
                 <ol class="flex flex-wrap items-center justify-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-500 sm:gap-2">

@@ -46,7 +46,7 @@
 
                 @foreach ($fields as $field)
                     <div class="{{ $field[0] === 'company_name' ? 'md:col-span-2' : '' }}">
-                        <label for="b2b-{{ $field[0] }}" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $field[1] }}</label>
+                        <label for="b2b-{{ $field[0] }}" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $field[1] }} <x-front.required-mark :required="$field[3]" /></label>
                         <input
                             id="b2b-{{ $field[0] }}"
                             type="{{ $field[4] ?? 'text' }}"
@@ -66,7 +66,7 @@
                 @endforeach
 
                 <div>
-                    <label for="b2b-country" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Država') }}</label>
+                    <label for="b2b-country" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Država') }} <x-front.required-mark /></label>
                     <select
                         id="b2b-country"
                         name="country_code"
@@ -87,14 +87,14 @@
                 <div></div>
 
                 <div>
-                    <label for="b2b-password" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Lozinka') }}</label>
+                    <label for="b2b-password" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Lozinka') }} <x-front.required-mark /></label>
                     <input id="b2b-password" type="password" name="password" class="w-full px-3 text-sm @error('password') border-rose-500 @enderror" autocomplete="new-password" required @error('password') aria-invalid="true" aria-describedby="b2b-password-error" @enderror>
                     @error('password')
                         <p id="b2b-password-error" class="mt-2 text-xs font-semibold text-rose-600" aria-live="polite">{{ $message }}</p>
                     @enderror
                 </div>
                 <div>
-                    <label for="b2b-password-confirmation" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Potvrda lozinke') }}</label>
+                    <label for="b2b-password-confirmation" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Potvrda lozinke') }} <x-front.required-mark /></label>
                     <input id="b2b-password-confirmation" type="password" name="password_confirmation" class="w-full px-3 text-sm @error('password_confirmation') border-rose-500 @enderror" autocomplete="new-password" required @error('password_confirmation') aria-invalid="true" aria-describedby="b2b-password-confirmation-error" @enderror>
                     @error('password_confirmation')
                         <p id="b2b-password-confirmation-error" class="mt-2 text-xs font-semibold text-rose-600" aria-live="polite">{{ $message }}</p>
@@ -108,10 +108,11 @@
                             {{ __('ui.auth.register.b2b_accuracy') }}
                             {{ __('ui.auth.register.terms_prefix') }}
                             @if (!empty($storeSettings['legal']['terms']['url']))
-                                <a href="{{ $storeSettings['legal']['terms']['url'] }}" class="font-semibold text-blue-700 underline underline-offset-2" target="_blank" rel="noopener noreferrer">{{ $storeSettings['legal']['terms']['title'] }}</a>.
+                                <a href="{{ $storeSettings['legal']['terms']['url'] }}" class="store-text-link font-semibold underline underline-offset-2" target="_blank" rel="noopener noreferrer">{{ $storeSettings['legal']['terms']['title'] }}</a>.
                             @else
                                 {{ __('ui.auth.register.terms_link') }}.
                             @endif
+                            <x-front.required-mark />
                         </span>
                     </label>
                     @error('terms_accepted')

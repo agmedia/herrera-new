@@ -35,7 +35,7 @@
                 <input type="hidden" name="recaptcha_token" value="" data-recaptcha-token>
 
                 <div>
-                    <label for="auth-login-email" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.email') }}</label>
+                    <label for="auth-login-email" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.email') }} <x-front.required-mark /></label>
                     <input id="auth-login-email" type="email" name="email" value="{{ old('email') }}" class="w-full px-3 text-sm" autocomplete="email" required>
                     @error('email')
                         <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
@@ -43,7 +43,7 @@
                 </div>
 
                 <div>
-                    <label for="auth-login-password" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.password') }}</label>
+                    <label for="auth-login-password" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.password') }} <x-front.required-mark /></label>
                     <input id="auth-login-password" type="password" name="password" class="w-full px-3 text-sm" autocomplete="current-password" required>
                     @error('password')
                         <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
@@ -55,7 +55,7 @@
                         <input type="checkbox" name="remember" value="1" class="h-4 w-4 border-slate-300 text-slate-900 focus:ring-0" @checked(old('remember'))>
                         {{ __('ui.auth.login.remember') }}
                     </label>
-                    <a href="{{ route('front.auth.password.request') }}" class="auth-inline-link text-sm font-semibold">
+                    <a href="{{ route('front.auth.password.request') }}" class="store-text-link auth-inline-link text-sm font-semibold">
                         {{ __('ui.auth.login.forgot_password') }}
                     </a>
                 </div>

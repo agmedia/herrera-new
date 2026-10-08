@@ -8,16 +8,18 @@ use App\Models\Catalog\Manufacturer\Manufacturer;
 use App\Models\Catalog\Product\Product;
 use App\Models\Content\Blog\BlogPost;
 use App\Models\Content\Page\InfoPage;
+use App\Support\SearchEngineIndexing;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class SitemapController extends Controller
 {
     private const PAGE_SIZE = 10000;
 
-    public function robots(): Response
+    public function robots(Request $request): Response
     {
-        if (! app()->environment('production')) {
+        if (SearchEngineIndexing::shouldBlock($request)) {
             return response("User-agent: *\nDisallow: /\n", 200, ['Content-Type' => 'text/plain; charset=UTF-8']);
         }
 

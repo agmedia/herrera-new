@@ -26,7 +26,7 @@
                 @endphp
                 <a
                     href="{{ $href }}"
-                    class="site-main-nav-link {{ $itemClass }} inline-flex h-full w-full items-center justify-center gap-2 px-3 text-[15px] font-bold tracking-[-0.01em] transition focus-visible:outline-none"
+                    class="site-main-nav-link {{ !empty($herreraCatalogHeader) ? 'herrera-catalog-control' : '' }} {{ $itemClass }} inline-flex h-full w-full items-center justify-center gap-2 px-3 text-[15px] font-bold tracking-[-0.01em] transition focus-visible:outline-none"
                     aria-haspopup="true"
                     aria-controls="{{ $megaMenuId }}"
                     aria-expanded="false"
@@ -34,7 +34,7 @@
                     @if($target) target="{{ $target }}" rel="{{ $rel }}" @endif
                 >
                     @if (!empty($herreraCatalogHeader))
-                        <x-fa-icon :inline="!empty($herreraCatalogHeader)" name="bars" class="h-4 w-4" />
+                        <span class="herrera-catalog-icon" aria-hidden="true"><x-fa-icon :inline="!empty($herreraCatalogHeader)" name="bars" class="h-4 w-4" /></span>
                     @endif
                     <span>{{ $item['label'] }}</span>
                     @if ($isCatalogItem)
@@ -152,7 +152,10 @@
                 @endif
             </div>
         @else
-            <a href="{{ $href }}" class="site-main-nav-link {{ $itemClass }} inline-flex h-full min-w-0 items-center justify-center px-3 text-center text-[15px] font-bold tracking-[-0.01em] transition focus-visible:outline-none" @if($target) target="{{ $target }}" rel="{{ $rel }}" @endif>
+            <a href="{{ $href }}" class="site-main-nav-link {{ !empty($herreraCatalogHeader) ? 'herrera-catalog-control' : '' }} {{ $itemClass }} inline-flex h-full min-w-0 items-center justify-center px-3 text-center text-[15px] font-bold tracking-[-0.01em] transition focus-visible:outline-none" @if($target) target="{{ $target }}" rel="{{ $rel }}" @endif>
+                @if (!empty($herreraCatalogHeader))
+                    <span class="herrera-catalog-icon" aria-hidden="true"><x-fa-icon :inline="true" name="bars" class="h-4 w-4" /></span>
+                @endif
                 <span>{{ $item['label'] }}</span>
             </a>
         @endif

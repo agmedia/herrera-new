@@ -131,11 +131,25 @@
     font-size: 13px;
     font-weight: 500;
 }
-.herrera-storefront .product-detail-pricing > .product-information-sheet-link {
+.herrera-storefront .product-detail-pricing .product-detail-price-row {
+    flex-wrap: nowrap;
+    gap: 10px;
+    min-width: 0;
+}
+.herrera-storefront .product-detail-price-row :is([data-product-price-current], [data-energy-label-arrow]) {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+.herrera-storefront .product-detail-price-row .product-information-sheet-link {
+    display: block;
     min-height: 32px;
-    margin-top: 6px;
+    min-width: 0;
+    overflow: hidden;
     font-size: 13px;
     font-weight: 500;
+    line-height: 32px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .herrera-storefront [data-product-energy-declarations] .product-information-sheet-link {
     font-size: 12px;
@@ -332,6 +346,15 @@
     }
 }
 @media (max-width: 479px) {
+    .herrera-storefront .product-detail-pricing .product-detail-price-row {
+        gap: 8px;
+    }
+    .herrera-storefront .product-detail-price-row [data-product-price-current] {
+        font-size: 28px;
+    }
+    .herrera-storefront .product-detail-price-row .product-information-sheet-link {
+        font-size: 12px;
+    }
     .herrera-storefront .product-detail-breadcrumb {
         font-size: 11px;
     }

@@ -80,7 +80,7 @@
 
     @if ($homeHeroBlocks->isNotEmpty())
         <section class="-mt-px" data-herrera-home-hero-placement>
-            @include('components.content-placement', ['items' => $homeHeroBlocks])
+            @include('front.partials.herrera-home-placement', ['items' => $homeHeroBlocks])
         </section>
     @elseif ($useHerreraHomeFallback)
         @include('front.partials.herrera-home', ['herreraHomeSection' => 'hero'])
@@ -88,15 +88,15 @@
 
     @if ($homeHeroBenefitsBlocks->isNotEmpty())
         <section class="mt-8">
-            @include('components.content-placement', ['items' => $homeHeroBenefitsBlocks])
+            @include('front.partials.herrera-home-placement', ['items' => $homeHeroBenefitsBlocks])
         </section>
     @endif
 
     @if ($isHerreraHome && $homeCategoriesBlocks->isNotEmpty() && $homeCategoriesBlocks->every(fn ($item) => (string) data_get($item, 'block.type') === 'featured_categories'))
-        @include('components.content-placement', ['items' => $homeCategoriesBlocks])
+        @include('front.partials.herrera-home-placement', ['items' => $homeCategoriesBlocks])
     @elseif ($homeCategoriesBlocks->isNotEmpty())
         <section class="mt-8">
-            @include('components.content-placement', ['items' => $homeCategoriesBlocks])
+            @include('front.partials.herrera-home-placement', ['items' => $homeCategoriesBlocks])
         </section>
     @elseif ($useHerreraHomeFallback && ! $hasManagedHerreraHomeCategories)
         @include('front.partials.herrera-home', ['herreraHomeSection' => 'categories'])
@@ -104,7 +104,7 @@
 
     @if ($homeBeforeProductsBlocks->isNotEmpty())
         <section class="mt-8">
-            @include('components.content-placement', ['items' => $homeBeforeProductsBlocks])
+            @include('front.partials.herrera-home-placement', ['items' => $homeBeforeProductsBlocks])
         </section>
     @endif
 
@@ -114,18 +114,23 @@
 
     @if ($homeAfterProductsBlocks->isNotEmpty())
         <section class="mt-8">
-            @include('components.content-placement', ['items' => $homeAfterProductsBlocks])
+            @include('front.partials.herrera-home-placement', ['items' => $homeAfterProductsBlocks])
         </section>
     @endif
 
     @if ($useHerreraHomeFallback && ! $hasHomeBrandsBlock)
         @include('front.partials.herrera-home', ['herreraHomeSection' => 'brands'])
+        @include('front.partials.herrera-popular-products')
     @endif
 
     @if ($homeBottomBlocks->isNotEmpty())
         <section class="{{ $homeBottomIsInstagramOnly ? 'mt-0' : 'mt-8' }}">
-            @include('components.content-placement', ['items' => $homeBottomBlocks])
+            @include('front.partials.herrera-home-placement', ['items' => $homeBottomBlocks])
         </section>
+    @endif
+
+    @if ($isHerreraHome && ! $hasHomeBrandsBlock)
+        @include('front.partials.herrera-popular-products')
     @endif
 
     @if (

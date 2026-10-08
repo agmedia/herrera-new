@@ -25,6 +25,8 @@ return [
     'all_categories' => 'All categories',
     'products' => 'From our range',
     'products_eyebrow' => 'Selected from our range',
+    'popular_products' => 'Most popular in the last 30 days',
+    'popular_products_eyebrow' => 'Most frequently ordered products',
     'all_products' => 'All products',
     'brands_eyebrow' => 'Selected brands',
     'brands_title' => 'Trusted manufacturers for your business',

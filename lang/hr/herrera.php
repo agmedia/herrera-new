@@ -18,6 +18,8 @@ return [
     'all_categories' => 'Sve kategorije',
     'products' => 'Iz našeg asortimana',
     'products_eyebrow' => 'Odabrano iz ponude',
+    'popular_products' => 'Najpopularnije u zadnjih 30 dana',
+    'popular_products_eyebrow' => 'Najčešće naručivani artikli',
     'all_products' => 'Svi proizvodi',
     'brands_eyebrow' => 'Odabrani brandovi',
     'brands_title' => 'Pouzdani proizvođači za vaš posao',

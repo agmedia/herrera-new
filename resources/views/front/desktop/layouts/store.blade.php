@@ -65,6 +65,8 @@
     <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera.css')) }}-{{ $storefrontAssetVersion }}">
     @if (str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera'))
         <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-b2b.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-b2b.css')) }}-{{ $storefrontAssetVersion }}">
+        <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-forms.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-forms.css')) }}-{{ $storefrontAssetVersion }}">
+        <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-search.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-search.css')) }}-{{ $storefrontAssetVersion }}">
         <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-product-cards.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-product-cards.css')) }}-{{ $storefrontAssetVersion }}">
     @endif
     @if ($storeSettings['legal_warranty']['enabled'] ?? false)
@@ -74,6 +76,7 @@
     <link rel="stylesheet" href="{{ asset('front-theme/styles/manufacturer-logos.css') }}?v={{ filemtime(public_path('front-theme/styles/manufacturer-logos.css')) }}">
     @if (str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera'))
         <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-typography.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-typography.css')) }}-{{ $storefrontAssetVersion }}">
+        <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-surfaces.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-surfaces.css')) }}-{{ $storefrontAssetVersion }}">
     @endif
 </head>
 @php
@@ -227,7 +230,7 @@
                 </a>
             @endif
 
-            <div id="header-search-panel" class="header-search-panel-shell" data-header-search-panel data-header-search-breakpoint="{{ $herreraStorefront ? '1023' : '1279' }}" @unless($herreraStorefront) data-header-search-persistent @endunless>
+            <div id="header-search-panel" class="header-search-panel-shell" data-header-search-panel data-header-search-breakpoint="{{ $herreraStorefront ? '1023' : '1279' }}" @if($herreraStorefront) data-header-search-fullscreen data-header-search-label="{{ __('ui.front.desktop.search') }}" @endif @unless($herreraStorefront) data-header-search-persistent @endunless>
                 <form
                     method="GET"
                     action="{{ route('shop.index') }}"
@@ -246,6 +249,8 @@
                     data-autocomplete-manufacturers-label="{{ __('ui.shop.search_autocomplete.groups.manufacturers') }}"
                     data-autocomplete-blog-label="{{ __('ui.shop.search_autocomplete.groups.blog') }}"
                     data-autocomplete-b2b-label="{{ __('ui.product.b2b_contract_price') }}"
+                    data-autocomplete-prompt-label="{{ __('Upišite najmanje 2 znaka za pretragu proizvoda.') }}"
+                    data-autocomplete-error-label="{{ __('Prijedlozi trenutačno nisu dostupni. Prikažite sve rezultate pretrage.') }}"
                 >
                     @foreach (['category', 'manufacturer', 'size', 'sort', 'cols'] as $queryKey)
                         @if (request()->routeIs('shop.index') && request()->filled($queryKey))
@@ -268,6 +273,11 @@
                     <button type="submit" class="header-search-submit" aria-label="{{ __('ui.shop.filters.search') }}">
                         <x-fa-icon :inline="$herreraStorefront" name="magnifying-glass" />
                     </button>
+                    @if ($herreraStorefront)
+                        <button type="button" class="header-search-panel-close" aria-label="{{ __('Zatvori pretragu') }}" data-header-search-close>
+                            <x-fa-icon inline name="xmark" />
+                        </button>
+                    @endif
                     <div class="header-search-suggestions" data-header-search-suggestions hidden>
                         <div class="header-search-suggestions-meta" data-header-search-suggestions-meta></div>
                         <button type="button" class="header-search-suggestions-close" aria-label="{{ __('Zatvori rezultate pretrage') }}" data-header-search-suggestions-close>
@@ -393,14 +403,14 @@
             @endphp
             <div class="herrera-mobile-shortcuts herrera-layout-container">
                 @if ($herreraMobileCatalogExpandable)
-                <button type="button" data-mobile-menu-open data-mobile-menu-open-categories aria-label="{{ __('herrera.header.categories') }}">
-                    <x-fa-icon :inline="$herreraStorefront" name="bars" />
+                <button type="button" class="herrera-catalog-control" data-mobile-menu-open data-mobile-menu-open-categories aria-label="{{ __('herrera.header.categories') }}">
+                    <span class="herrera-catalog-icon" aria-hidden="true"><x-fa-icon :inline="$herreraStorefront" name="bars" /></span>
                     <span>{{ __('herrera.header.categories') }}</span>
                     <x-fa-icon :inline="$herreraStorefront" name="chevron-down" />
                 </button>
                 @else
-                <a href="{{ route('categories.index') }}" aria-label="{{ __('herrera.header.categories') }}">
-                    <x-fa-icon :inline="$herreraStorefront" name="bars" />
+                <a href="{{ route('categories.index') }}" class="herrera-catalog-control" aria-label="{{ __('herrera.header.categories') }}">
+                    <span class="herrera-catalog-icon" aria-hidden="true"><x-fa-icon :inline="$herreraStorefront" name="bars" /></span>
                     <span>{{ __('herrera.header.categories') }}</span>
                     <x-fa-icon :inline="$herreraStorefront" name="arrow-right" />
                 </a>
@@ -531,9 +541,13 @@
                     @if($newsletterCaptchaEnabled)
                         <input type="hidden" name="recaptcha_token" value="" data-recaptcha-token>
                     @endif
+                    @if ($herreraStorefront)
+                        <label for="footer-newsletter-email" class="herrera-newsletter-email-label sm:col-span-2">{{ __('ui.auth.fields.email') }} <x-front.required-mark /></label>
+                    @endif
                     <div class="space-y-1.5">
                         <input
                             type="email"
+                            id="footer-newsletter-email"
                             aria-label="{{ __('ui.front.desktop.newsletter.placeholder') }}"
                             name="newsletter_email"
                             value="{{ (string) old('newsletter_email', '') }}"
@@ -565,7 +579,7 @@
                                 @checked((bool) old('newsletter_accept_terms'))
                                 data-newsletter-accept-terms
                             >
-                            {{ $newsletterConsentLabel }}
+                            <span>{{ $newsletterConsentLabel }} <x-front.required-mark /></span>
                         </label>
                         <p class="mt-2 text-xs font-semibold text-rose-600 {{ $newsletterErrors->has('newsletter_accept_terms') ? '' : 'hidden' }}" data-newsletter-accept-error aria-live="polite">{{ $newsletterErrors->first('newsletter_accept_terms') }}</p>
                         <p class="mt-2 text-xs font-semibold text-rose-600 {{ $newsletterErrors->has('recaptcha_token') ? '' : 'hidden' }}" data-newsletter-recaptcha-error aria-live="polite">{{ $newsletterErrors->first('recaptcha_token') }}</p>

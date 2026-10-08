@@ -1,0 +1,124 @@
+/* One quiet diagonal motif connects the header with Herrera's content bands. */
+body.herrera-storefront {
+    --herrera-surface-pattern: linear-gradient(135deg, transparent 54%, rgb(0 181 204 / 8%) 54%, rgb(0 181 204 / 8%) 67%, transparent 67%);
+}
+
+.herrera-storefront .site-top-bar,
+.herrera-storefront .herrera-b2b-hero,
+.herrera-storefront .herrera-catalog-heading-band,
+.herrera-storefront .herrera-brand-strip,
+.herrera-storefront .site-footer-newsletter {
+    background-image: var(--herrera-surface-pattern);
+    background-position: center top;
+    background-repeat: no-repeat;
+    background-size: 100vw max(900px, 100vh);
+}
+
+/* Keep each visible portion of the motif on the same desktop coordinates. */
+@media (min-width: 1024px) {
+    .herrera-storefront .site-top-bar,
+    .herrera-storefront .herrera-b2b-hero,
+    .herrera-storefront .herrera-catalog-heading-band,
+    .herrera-storefront .herrera-header-layout .header-search-form {
+        background-attachment: fixed;
+    }
+    .herrera-storefront .herrera-header-layout .header-search-form {
+        background-image: var(--herrera-surface-pattern);
+        background-position: center top;
+        background-repeat: no-repeat;
+        background-size: 100vw max(900px, 100vh);
+    }
+}
+
+.herrera-storefront .site-main-header-shell,
+.herrera-storefront .herrera-header-layout,
+.herrera-storefront .herrera-primary-navigation,
+.herrera-storefront .herrera-catalog-navigation,
+.herrera-storefront .herrera-mobile-shortcuts,
+.herrera-storefront .site-top-bar-shell {
+    background: transparent;
+}
+
+.herrera-storefront .herrera-header-layout :is(.desktop-header-actions > a, .header-cart-trigger, .responsive-header-action) {
+    background-color: transparent;
+}
+
+.herrera-storefront .herrera-header-layout .header-search-form {
+    background-color: #edf7f9;
+}
+
+.herrera-storefront .site-top-bar {
+    background-color: #edf7f9;
+}
+
+.herrera-storefront .herrera-b2b-hero::before {
+    content: none;
+}
+
+.herrera-storefront .herrera-catalog-heading-band,
+.herrera-storefront .herrera-brand-strip,
+.herrera-storefront .site-footer-newsletter {
+    position: relative;
+    isolation: isolate;
+    background-color: #edf7f9;
+    background-image: none;
+    box-shadow: 0 0 0 100vmax #edf7f9;
+}
+
+/* Paint the motif across the viewport too, rather than stopping at the content gutter. */
+.herrera-storefront .herrera-catalog-heading-band::before,
+.herrera-storefront .herrera-brand-strip::before,
+.herrera-storefront .site-footer-newsletter::before {
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    bottom: 0;
+    left: calc(50% - 50vw);
+    width: 100vw;
+    background-color: #edf7f9;
+    background-image: var(--herrera-surface-pattern);
+    background-position: center top;
+    background-repeat: no-repeat;
+    background-size: 100vw max(900px, 100vh);
+    background-attachment: fixed;
+    content: "";
+    pointer-events: none;
+}
+
+.herrera-storefront .site-footer-newsletter h3 {
+    font-size: clamp(23px, 2vw, 30px);
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -.035em;
+}
+
+.herrera-storefront .site-footer-newsletter h3::before {
+    display: none;
+}
+
+.herrera-storefront .site-footer-newsletter .herrera-newsletter-eyebrow {
+    margin-bottom: 6px;
+    color: #007c8d;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.5;
+    letter-spacing: .11em;
+}
+
+/* Keep header interaction feedback above the decorative surface. */
+.herrera-storefront .herrera-header-layout :is(.desktop-header-actions > a, .header-cart-trigger, .responsive-header-action):is(:hover, :focus-visible),
+.herrera-storefront .herrera-header-layout .header-cart-hover.is-open .header-cart-trigger {
+    background-color: var(--herrera-header-hover);
+}
+
+@media (max-width: 1023px) {
+    .herrera-storefront .herrera-b2b-hero,
+    .herrera-storefront .herrera-catalog-heading-band,
+    .herrera-storefront .herrera-brand-strip,
+    .herrera-storefront .site-footer-newsletter,
+    .herrera-storefront .herrera-catalog-heading-band::before,
+    .herrera-storefront .herrera-brand-strip::before,
+    .herrera-storefront .site-footer-newsletter::before {
+        background-size: 100vw max(600px, 100vh);
+    }
+}

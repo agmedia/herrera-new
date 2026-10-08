@@ -1,0 +1,39 @@
+/* Text links are explicit so navigation, product titles and action buttons keep their design. */
+body.herrera-storefront .store-text-link,
+body.herrera-storefront .content-richtext a,
+body.herrera-storefront .legal-warranty-notice:not(.legal-warranty-notice--footer) > a,
+body.herrera-storefront .legal-warranty-modal-footer > a {
+    color: var(--herrera-action, #007b8b);
+    text-decoration-color: currentColor;
+    text-underline-offset: 3px;
+}
+
+body.herrera-storefront .store-text-link:hover,
+body.herrera-storefront .content-richtext a:hover,
+body.herrera-storefront .legal-warranty-notice:not(.legal-warranty-notice--footer) > a:hover,
+body.herrera-storefront .legal-warranty-modal-footer > a:hover {
+    color: #005f6c;
+    text-decoration: underline;
+}
+
+body.herrera-storefront .store-text-link:focus-visible,
+body.herrera-storefront .content-richtext a:focus-visible {
+    outline: 2px solid var(--herrera-action, #007b8b);
+    outline-offset: 3px;
+}
+
+.store-form-required {
+    display: inline;
+    margin-inline-start: .2em;
+    color: #bd3042;
+    font-weight: 600;
+    line-height: 1;
+}
+
+body.herrera-storefront .herrera-newsletter-email-label {
+    margin-bottom: -4px;
+    color: #58686e;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.4;
+}

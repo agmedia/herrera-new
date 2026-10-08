@@ -6,6 +6,7 @@ use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Manufacturer\Manufacturer;
 use App\Services\Front\NavigationMenuService;
 use App\Services\Settings\SystemSettingsService;
+use App\Support\FontAwesomeIcon;
 use DOMDocument;
 use DOMXPath;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,8 +29,8 @@ class HerreraLayoutAlignmentFeatureTest extends TestCase
         }
         $this->assertSame(1, $xpath->query('//main[@data-herrera-main]')->count());
         $this->assertSame(1, $xpath->query('//main[contains(@class, "herrera-home-main")]')->count());
-        $this->assertSame(1, $xpath->query('//*[contains(@class, "site-top-bar-links")]/a[@href="mailto:info@example.test"]//use[contains(@href, "/storefront-sprites/regular.svg") and contains(@href, "#envelope")]')->count());
-        $this->assertSame(1, $xpath->query('//*[contains(@class, "site-top-bar-links")]/a[@href="tel:+38512345678"]//use[contains(@href, "/storefront-sprites/regular.svg") and contains(@href, "#phone")]')->count());
+        $this->assertInlineIcon($xpath, '//*[contains(@class, "site-top-bar-links")]/a[@href="mailto:info@example.test"]', 'envelope', 'regular');
+        $this->assertInlineIcon($xpath, '//*[contains(@class, "site-top-bar-links")]/a[@href="tel:+38512345678"]', 'phone', 'regular');
         $this->get(route('front.storefront.styles'))->assertOk()
             ->assertSee('--storefront-container-width:1860px;--header-content-width:1860px;', false);
     }
@@ -46,6 +47,11 @@ class HerreraLayoutAlignmentFeatureTest extends TestCase
         $xpath = $this->xpath($response->getContent());
         $carousel = $xpath->query('//*[@data-herrera-home-products-splide and @data-continuous-card-carousel]')->item(0);
         $this->assertNotNull($carousel);
+        foreach (['herrera-hero-primary-action', 'herrera-home-products-link'] as $linkClass) {
+            $link = $xpath->query('//a[contains(concat(" ", normalize-space(@class), " "), " '.$linkClass.' ")]')->item(0);
+            $this->assertNotNull($link);
+            $this->assertSame(route('categories.index'), $link->getAttribute('href'));
+        }
         $cards = $xpath->query('.//*[contains(concat(" ", normalize-space(@class), " "), " splide__slide ")]/*[@data-product-card]', $carousel);
         $this->assertSame(8, $cards->count());
         $options = json_decode($carousel->getAttribute('data-splide'), true, flags: JSON_THROW_ON_ERROR);
@@ -164,9 +170,9 @@ class HerreraLayoutAlignmentFeatureTest extends TestCase
         $this->assertSame(array_column($profiles, 'url'), array_map(fn ($node): string => $node->getAttribute('href'), iterator_to_array($topbarLinks)));
         $this->assertSame(['Facebook', 'LinkedIn', 'X / Twitter'], array_map(fn ($node): string => $node->getAttribute('aria-label'), iterator_to_array($topbarLinks)));
         $this->assertSame(['Facebook', 'LinkedIn', 'X'], array_map(fn ($node): string => trim($node->textContent), iterator_to_array($topbarLinks)));
-        foreach (['facebook-f', 'linkedin-in', 'x-twitter'] as $icon) {
+        foreach (['facebook-f', 'linkedin-in', 'x-twitter'] as $index => $icon) {
             $this->assertSame(1, $xpath->query('//*[contains(@class, "site-footer-links")]//*[contains(@class, "herrera-footer-socials")]//use[contains(@href, "#'.$icon.'")]')->count());
-            $this->assertSame(1, $xpath->query('//*[contains(@class, "site-top-bar-socials")]//use[contains(@href, "#'.$icon.'")]')->count());
+            $this->assertInlineIcon($xpath, '//*[contains(@class, "site-top-bar-socials")]/a[@href="'.$profiles[$index]['url'].'"]', $icon, 'brands');
         }
         $response->assertSee('vendor/fontawesome-pro-7.3.1/', false)->assertDontSee('Font Awesome Free 6.5.1', false);
     }
@@ -214,6 +220,27 @@ class HerreraLayoutAlignmentFeatureTest extends TestCase
                 ],
             ],
         ]);
+    }
+
+    private function assertInlineIcon(DOMXPath $xpath, string $selector, string $name, string $style): void
+    {
+        $icons = $xpath->query($selector.'/svg');
+        $this->assertSame(1, $icons->count());
+        $icon = $icons->item(0);
+        $expected = FontAwesomeIcon::inline($name, $style);
+        $this->assertNotNull($expected);
+        $this->assertSame($expected['viewBox'], $icon->getAttribute('viewbox'));
+        $this->assertSame(0, $icon->getElementsByTagName('use')->length);
+
+        $expectedDocument = new DOMDocument;
+        $expectedDocument->loadXML('<svg>'.$expected['content'].'</svg>');
+        $pathData = static fn ($paths): array => array_map(
+            static fn ($path): string => $path->getAttribute('d'),
+            iterator_to_array($paths),
+        );
+        $expectedPaths = $pathData($expectedDocument->getElementsByTagName('path'));
+        $this->assertNotEmpty($expectedPaths);
+        $this->assertSame($expectedPaths, $pathData($icon->getElementsByTagName('path')));
     }
 
     private function xpath(string $html): DOMXPath

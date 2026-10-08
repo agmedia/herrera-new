@@ -63,12 +63,12 @@
                 <legend class="mb-4 text-base font-bold text-slate-900">{{ __('return_request.form.identity_section') }}</legend>
                 <div class="grid gap-4 md:grid-cols-2">
                     <div>
-                        <label for="withdrawal-full-name" class="{{ $labelClass }}">{{ __('return_request.form.full_name') }}</label>
+                        <label for="withdrawal-full-name" class="{{ $labelClass }}">{{ __('return_request.form.full_name') }} <x-front.required-mark /></label>
                         <input id="withdrawal-full-name" type="text" name="full_name" value="{{ old('full_name', $prefill['full_name'] ?? '') }}" autocomplete="name" class="{{ $fieldClass }}" required maxlength="191" @error('full_name') aria-invalid="true" @enderror>
                         @error('full_name') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label for="withdrawal-email" class="{{ $labelClass }}">{{ __('return_request.form.email') }}</label>
+                        <label for="withdrawal-email" class="{{ $labelClass }}">{{ __('return_request.form.email') }} <x-front.required-mark /></label>
                         <input id="withdrawal-email" type="email" name="email" value="{{ old('email', $prefill['email'] ?? '') }}" autocomplete="email" class="{{ $fieldClass }}" required maxlength="191" @error('email') aria-invalid="true" @enderror>
                         <p class="mt-1 text-xs text-slate-500">{{ __('return_request.form.email_help') }}</p>
                         @error('email') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
@@ -79,23 +79,23 @@
                         @error('phone') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label for="withdrawal-address" class="{{ $labelClass }}">{{ __('return_request.form.address_line') }}</label>
+                        <label for="withdrawal-address" class="{{ $labelClass }}">{{ __('return_request.form.address_line') }} <x-front.required-mark /></label>
                         <input id="withdrawal-address" type="text" name="address_line" value="{{ old('address_line', $prefill['address_line'] ?? '') }}" autocomplete="street-address" class="{{ $fieldClass }}" required maxlength="255" @error('address_line') aria-invalid="true" @enderror>
                         @error('address_line') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
                     </div>
                     <div>
-                        <label for="withdrawal-postal-code" class="{{ $labelClass }}">{{ __('return_request.form.postal_code') }}</label>
+                        <label for="withdrawal-postal-code" class="{{ $labelClass }}">{{ __('return_request.form.postal_code') }} <x-front.required-mark /></label>
                         <input id="withdrawal-postal-code" type="text" name="postal_code" value="{{ old('postal_code', $prefill['postal_code'] ?? '') }}" autocomplete="postal-code" class="{{ $fieldClass }}" required maxlength="32" @error('postal_code') aria-invalid="true" @enderror>
                         @error('postal_code') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
                     </div>
                     <div class="grid grid-cols-[minmax(0,1fr)_110px] gap-3">
                         <div>
-                            <label for="withdrawal-city" class="{{ $labelClass }}">{{ __('return_request.form.city') }}</label>
+                            <label for="withdrawal-city" class="{{ $labelClass }}">{{ __('return_request.form.city') }} <x-front.required-mark /></label>
                             <input id="withdrawal-city" type="text" name="city" value="{{ old('city', $prefill['city'] ?? '') }}" autocomplete="address-level2" class="{{ $fieldClass }}" required maxlength="120" @error('city') aria-invalid="true" @enderror>
                             @error('city') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
                         </div>
                         <div>
-                            <label for="withdrawal-country" class="{{ $labelClass }}">{{ __('return_request.form.country_code') }}</label>
+                            <label for="withdrawal-country" class="{{ $labelClass }}">{{ __('return_request.form.country_code') }} <x-front.required-mark /></label>
                             <input id="withdrawal-country" type="text" name="country_code" value="{{ old('country_code', $prefill['country_code'] ?? 'HR') }}" autocomplete="country" class="{{ $fieldClass }} uppercase" required minlength="2" maxlength="2" pattern="[A-Za-z]{2}" @error('country_code') aria-invalid="true" @enderror>
                             @error('country_code') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
                         </div>
@@ -107,7 +107,7 @@
                 <legend class="mb-4 text-base font-bold text-slate-900">{{ __('return_request.form.contract_section') }}</legend>
                 <div class="grid gap-4 md:grid-cols-2">
                     <div>
-                        <label for="withdrawal-order-number" class="{{ $labelClass }}">{{ __('return_request.form.order_number') }}</label>
+                        <label for="withdrawal-order-number" class="{{ $labelClass }}">{{ __('return_request.form.order_number') }} <x-front.required-mark /></label>
                         <input id="withdrawal-order-number" type="text" name="order_number" value="{{ old('order_number') }}" class="{{ $fieldClass }}" required maxlength="80" @error('order_number') aria-invalid="true" @enderror>
                         @error('order_number') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
                     </div>
@@ -124,7 +124,7 @@
                     </div>
                 </div>
                 <div class="mt-4">
-                    <label for="withdrawal-items" class="{{ $labelClass }}">{{ __('return_request.form.items') }}</label>
+                    <label for="withdrawal-items" class="{{ $labelClass }}">{{ __('return_request.form.items') }} <x-front.required-mark /></label>
                     <textarea id="withdrawal-items" name="items" rows="6" class="{{ $fieldClass }}" placeholder="{{ __('return_request.form.items_placeholder') }}" required maxlength="5000" @error('items') aria-invalid="true" @enderror>{{ old('items') }}</textarea>
                     @error('items') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
                 </div>

@@ -39,39 +39,39 @@
 
             <div class="grid gap-4 md:grid-cols-2">
                 <div>
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('contact.form.name') }}</label>
-                    <input type="text" name="name" value="{{ old('name', auth()->user()?->name) }}" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" required>
+                    <label for="contact-name" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('contact.form.name') }} <x-front.required-mark /></label>
+                    <input type="text" id="contact-name" name="name" value="{{ old('name', auth()->user()?->name) }}" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" required>
                     <p class="mt-2 text-xs font-semibold text-rose-600 {{ $errors->has('name') ? '' : 'hidden' }}" data-field-error="name">@error('name'){{ $message }}@enderror</p>
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('contact.form.email') }}</label>
-                    <input type="email" name="email" value="{{ old('email', auth()->user()?->email) }}" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" required>
+                    <label for="contact-email" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('contact.form.email') }} <x-front.required-mark /></label>
+                    <input type="email" id="contact-email" name="email" value="{{ old('email', auth()->user()?->email) }}" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" required>
                     <p class="mt-2 text-xs font-semibold text-rose-600 {{ $errors->has('email') ? '' : 'hidden' }}" data-field-error="email">@error('email'){{ $message }}@enderror</p>
                 </div>
             </div>
 
             <div class="mt-4">
-                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('contact.form.phone') }}</label>
-                <input type="text" name="phone" value="{{ old('phone') }}" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0">
+                <label for="contact-phone" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('contact.form.phone') }}</label>
+                <input type="text" id="contact-phone" name="phone" value="{{ old('phone') }}" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0">
                 <p class="mt-2 text-xs font-semibold text-rose-600 {{ $errors->has('phone') ? '' : 'hidden' }}" data-field-error="phone">@error('phone'){{ $message }}@enderror</p>
             </div>
 
             <div class="mt-4">
-                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('contact.form.subject') }}</label>
-                <input type="text" name="subject" value="{{ old('subject') }}" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0">
+                <label for="contact-subject" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('contact.form.subject') }}</label>
+                <input type="text" id="contact-subject" name="subject" value="{{ old('subject') }}" class="h-11 w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0">
                 <p class="mt-2 text-xs font-semibold text-rose-600 {{ $errors->has('subject') ? '' : 'hidden' }}" data-field-error="subject">@error('subject'){{ $message }}@enderror</p>
             </div>
 
             <div class="mt-4">
-                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('contact.form.message') }}</label>
-                <textarea name="message" rows="8" class="w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" required>{{ old('message') }}</textarea>
+                <label for="contact-message" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('contact.form.message') }} <x-front.required-mark /></label>
+                <textarea id="contact-message" name="message" rows="8" class="w-full border-slate-300 text-sm focus:border-slate-500 focus:ring-0" required>{{ old('message') }}</textarea>
                 <p class="mt-2 text-xs font-semibold text-rose-600 {{ $errors->has('message') ? '' : 'hidden' }}" data-field-error="message">@error('message'){{ $message }}@enderror</p>
             </div>
 
             <div class="mt-4">
                 <label class="inline-flex items-start gap-2 text-sm text-slate-700">
-                    <input type="checkbox" name="accept_terms" value="1" class="mt-0.5 h-4 w-4 border-slate-300 text-slate-900 focus:ring-0" @checked((bool) old('accept_terms'))>
-                    <span>{{ __('contact.form.accept_terms') }}</span>
+                    <input type="checkbox" name="accept_terms" value="1" required class="mt-0.5 h-4 w-4 border-slate-300 text-slate-900 focus:ring-0" @checked((bool) old('accept_terms'))>
+                    <span>{{ __('contact.form.accept_terms') }} <x-front.required-mark /></span>
                 </label>
                 <p class="mt-2 text-xs font-semibold text-rose-600 {{ $errors->has('accept_terms') ? '' : 'hidden' }}" data-field-error="accept_terms">@error('accept_terms'){{ $message }}@enderror</p>
             </div>

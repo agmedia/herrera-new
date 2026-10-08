@@ -109,7 +109,7 @@ class HerreraHeaderPresentationFeatureTest extends TestCase
 
         $css = file_get_contents(public_path('front-theme/styles/herrera-b2b.css'));
         $mobileCss = substr($css, strpos($css, '@media (max-width: 1023px)'));
-        $this->assertStringContainsString('grid-template-rows: 72px', $mobileCss);
+        $this->assertStringContainsString('grid-template-rows: 80px', $mobileCss);
         $this->assertStringNotContainsString('grid-template-rows: 64px', $mobileCss);
     }
 

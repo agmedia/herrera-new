@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Sales\Order;
 
 use App\Models\Sales\Order\Order;
 use App\Models\Settings\Local\OrderStatus;
+use App\Services\Admin\OrderManagerAccess;
 use App\Services\Loyalty\LoyaltyService;
 use App\Services\Payments\BankTransferUpiService;
 use Illuminate\Support\Facades\DB;
@@ -30,8 +31,8 @@ class Show extends Component
 
     public function mount(int $orderId): void
     {
-        $this->authorizeAccess();
         $this->orderId = $orderId;
+        $this->authorizeAccess();
         $this->loadOrderDefaults();
     }
 
@@ -384,5 +385,6 @@ class Show extends Component
             $user && ($user->isA('superadmin') || ($user->can('admin.access') && $user->can($ability))),
             403
         );
+        app(OrderManagerAccess::class)->assertOrder(Order::query()->findOrFail($this->orderId), $user);
     }
 }

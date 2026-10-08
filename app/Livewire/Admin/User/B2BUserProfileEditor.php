@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\User\B2BAccount;
 use App\Models\User\CustomerGroup;
 use App\Models\User\UserAddress;
+use App\Services\Admin\OrderManagerAccess;
 use App\Services\B2B\B2BAccountService;
 use App\Services\Pricing\B2BAccessService;
 use Illuminate\Validation\Rule;
@@ -135,6 +136,7 @@ class B2BUserProfileEditor extends Component
         $current = auth()->user();
         abort_unless($current && ($current->isA('superadmin') || $current->isA('admin') || $current->can('users.list.view') || $current->can('users.profile.update')), 403);
         $target = User::query()->findOrFail($this->userId);
+        app(OrderManagerAccess::class)->assertCustomer($target, $current);
         abort_if(! $current->isA('superadmin') && $target->isA('superadmin'), 403);
     }
 

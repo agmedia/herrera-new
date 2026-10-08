@@ -18,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Livewire\Livewire;
 use Mockery\MockInterface;
+use Silber\Bouncer\BouncerFacade as Bouncer;
 use Tests\TestCase;
 
 class TermolPaymentMethodsFeatureTest extends TestCase
@@ -253,6 +254,7 @@ class TermolPaymentMethodsFeatureTest extends TestCase
     public function test_admin_does_not_hydrate_stored_corvus_secret_and_blank_value_preserves_it(): void
     {
         $user = User::factory()->create();
+        Bouncer::assign('admin')->to($user);
         $method = $this->createPaymentMethod('corvus', 'CorvusPay', true, [
             'corvus_mode' => 'test',
             'corvus_store_id' => 'termol-store',
@@ -284,11 +286,13 @@ class TermolPaymentMethodsFeatureTest extends TestCase
 
     public function test_admin_cannot_toggle_corvus_active_until_credentials_are_stored(): void
     {
+        $admin = User::factory()->create();
+        Bouncer::assign('admin')->to($admin);
         $method = $this->createPaymentMethod('corvus', 'Kartično plaćanje (CorvusPay)', false, [
             'corvus_mode' => 'test',
         ]);
 
-        Livewire::test(ResourceManager::class, ['resource' => 'payment-methods'])
+        Livewire::actingAs($admin)->test(ResourceManager::class, ['resource' => 'payment-methods'])
             ->call('toggleActive', $method->id)
             ->assertHasErrors(['form.corvus_store_id']);
 
@@ -300,7 +304,7 @@ class TermolPaymentMethodsFeatureTest extends TestCase
             'corvus_secret_key' => 'configured-secret',
         ]]);
 
-        Livewire::test(ResourceManager::class, ['resource' => 'payment-methods'])
+        Livewire::actingAs($admin)->test(ResourceManager::class, ['resource' => 'payment-methods'])
             ->call('toggleActive', $method->id)
             ->assertHasNoErrors();
 

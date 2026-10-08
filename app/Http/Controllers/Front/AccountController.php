@@ -190,7 +190,7 @@ class AccountController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:191'],
-            'email' => ['required', 'email', 'max:191', Rule::unique('users', 'email')->ignore($user->id)],
+            'email' => ['required', 'email', 'max:191', Rule::unique('users', 'email')->where('account_type', $user->account_type)->ignore($user->id)],
             'first_name' => ['nullable', 'string', 'max:120'],
             'last_name' => ['nullable', 'string', 'max:120'],
             'phone' => ['nullable', 'string', 'max:80'],

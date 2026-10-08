@@ -164,6 +164,7 @@ class AdvancedShippingFeatureTest extends TestCase
     public function test_admin_cannot_activate_boxnow_until_all_safety_settings_are_ready(): void
     {
         $admin = User::factory()->create();
+        Bouncer::assign('admin')->to($admin);
         $boxNow = ShippingMethod::query()->updateOrCreate(
             ['code' => 'boxnow'],
             [

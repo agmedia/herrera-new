@@ -54,7 +54,7 @@ class AuthenticationTest extends TestCase
             'store_captcha_recaptcha_v3_min_score' => 0.7,
         ]);
 
-        $user = User::factory()->create();
+        $user = User::factory()->create(['account_type' => 'staff']);
 
         Http::fake([
             'https://www.google.com/recaptcha/api/siteverify' => Http::response([
@@ -81,7 +81,7 @@ class AuthenticationTest extends TestCase
 
     public function test_users_can_authenticate_using_the_login_screen(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['account_type' => 'staff']);
 
         $component = Volt::test('pages.auth.login')
             ->set('form.email', $user->email)
@@ -99,6 +99,7 @@ class AuthenticationTest extends TestCase
     public function test_users_can_stay_signed_in_with_remember_me(): void
     {
         $user = User::factory()->create([
+            'account_type' => 'staff',
             'remember_token' => null,
         ]);
 
@@ -118,7 +119,7 @@ class AuthenticationTest extends TestCase
 
     public function test_users_can_not_authenticate_with_invalid_password(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['account_type' => 'staff']);
 
         $component = Volt::test('pages.auth.login')
             ->set('form.email', $user->email)
@@ -135,7 +136,7 @@ class AuthenticationTest extends TestCase
 
     public function test_admin_dashboard_can_be_rendered_via_dashboard_redirect(): void
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create(['account_type' => 'staff']);
         Bouncer::role()->firstOrCreate(['name' => 'admin']);
         Bouncer::assign('admin')->to($user);
 

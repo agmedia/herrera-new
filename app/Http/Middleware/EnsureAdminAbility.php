@@ -2,8 +2,10 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\AdminLocalSettingAccess;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
@@ -29,7 +31,7 @@ class EnsureAdminAbility
         // Global admin gate.
         abort_unless($user->can('admin.access'), 403, 'Missing admin access ability.');
 
-        $routeRule = $this->resolveRouteRule($routeName);
+        $routeRule = $this->resolveRouteRule($routeName, $route?->parameter('resource'));
 
         if ($request->has('components') && is_array($request->input('components'))) {
             $this->authorizeLivewireCalls($request, $user);
@@ -76,12 +78,13 @@ class EnsureAdminAbility
                 continue;
             }
 
-            $originRouteName = $this->resolveRouteNameFromSnapshot($snapshot);
+            $originRoute = $this->resolveRouteFromSnapshot($snapshot);
+            $originRouteName = $originRoute?->getName();
             if (! is_string($originRouteName) || ! Str::startsWith($originRouteName, 'admin.')) {
                 continue;
             }
 
-            $routeRule = $this->resolveRouteRule($originRouteName);
+            $routeRule = $this->resolveRouteRule($originRouteName, $originRoute?->parameter('resource'));
             $calls = Arr::get($payload, 'calls', []);
             if (! is_array($calls) || $calls === []) {
                 $this->authorizeAny($user, $this->normalizeAbilityList($routeRule['view'] ?? []));
@@ -166,7 +169,7 @@ class EnsureAdminAbility
     /**
      * @param  array<string, mixed>  $snapshot
      */
-    private function resolveRouteNameFromSnapshot(array $snapshot): ?string
+    private function resolveRouteFromSnapshot(array $snapshot): ?Route
     {
         $path = (string) data_get($snapshot, 'memo.path', '');
         if ($path === '') {
@@ -186,14 +189,22 @@ class EnsureAdminAbility
             return null;
         }
 
-        return $route->getName();
+        return $route;
     }
 
     /**
      * @return array<string, mixed>|null
      */
-    private function resolveRouteRule(string $routeName): ?array
+    private function resolveRouteRule(string $routeName, mixed $resource = null): ?array
     {
+        if (is_string($resource) && Str::startsWith($routeName, 'admin.settings.local.resource')) {
+            return [
+                'view' => AdminLocalSettingAccess::abilities($resource, $routeName !== 'admin.settings.local.resource'),
+                'mutate' => AdminLocalSettingAccess::abilities($resource, true),
+                'delete' => AdminLocalSettingAccess::abilities($resource, true),
+            ];
+        }
+
         /** @var array<string, array<string, mixed>> $rules */
         $rules = (array) config('admin_authorization.route_rules', []);
 

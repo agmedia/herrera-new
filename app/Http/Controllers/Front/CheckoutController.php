@@ -26,6 +26,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -246,7 +247,7 @@ class CheckoutController extends Controller
 
         if (! $checkoutUser && $registerAccount) {
             $request->validate([
-                'customer_email' => ['required', 'email', 'max:191', 'unique:users,email'],
+                'customer_email' => ['required', 'email', 'max:191', Rule::unique('users', 'email')->where('account_type', 'customer')],
                 'register_password' => ['required', 'string', 'min:8', 'confirmed'],
             ], [
                 'required' => __('ui.checkout.validation.required'),

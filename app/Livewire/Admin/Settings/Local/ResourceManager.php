@@ -14,7 +14,9 @@ use App\Models\Settings\Local\TaxRate;
 use App\Services\Front\AddressDirectoryService;
 use App\Services\Settings\LocalSettingsService;
 use App\Services\Settings\SystemSettingsService;
+use App\Support\AdminLocalSettingAccess;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -42,14 +44,17 @@ class ResourceManager extends Component
         'keks_advice_password',
     ];
 
+    #[Locked]
     public string $resource = 'payment-methods';
 
     public array $form = [];
 
     public ?int $editingId = null;
 
+    #[Locked]
     public bool $editPage = false;
 
+    #[Locked]
     public bool $createPage = false;
 
     public string $search = '';
@@ -61,6 +66,7 @@ class ResourceManager extends Component
     /**
      * @var array<string, array<string, mixed>>
      */
+    #[Locked]
     public array $resources = [
         'payment-methods' => [
             'title' => 'Payment Methods',
@@ -121,6 +127,7 @@ class ResourceManager extends Component
         $this->resource = $resource;
         $this->editPage = $editPage;
         $this->createPage = $createPage;
+        $this->authorizeSettingResource($editPage || $createPage);
         $this->search = trim((string) request()->query('search', ''));
         $this->returnPage = max(1, (int) request()->query('page', 1));
         $this->resetForm();
@@ -143,6 +150,7 @@ class ResourceManager extends Component
 
     public function save()
     {
+        $this->authorizeSettingResource(true);
         $validated = $this->validate($this->rules());
 
         $data = $validated['form'];
@@ -300,6 +308,7 @@ class ResourceManager extends Component
 
     public function edit(int $id): void
     {
+        $this->authorizeSettingResource(true);
         $modelClass = $this->modelClass();
         $record = $modelClass::query()->findOrFail($id);
         $this->editingId = $record->id;
@@ -357,6 +366,7 @@ class ResourceManager extends Component
 
     public function delete(int $id): void
     {
+        $this->authorizeSettingResource(true);
         $modelClass = $this->modelClass();
         $modelClass::query()->findOrFail($id)->delete();
 
@@ -369,6 +379,7 @@ class ResourceManager extends Component
 
     public function toggleActive(int $id): void
     {
+        $this->authorizeSettingResource(true);
         if (! $this->hasColumn('is_active')) {
             return;
         }
@@ -409,6 +420,7 @@ class ResourceManager extends Component
 
     public function makeDefault(int $id): void
     {
+        $this->authorizeSettingResource(true);
         if (! $this->hasColumn('is_default')) {
             return;
         }
@@ -461,6 +473,13 @@ class ResourceManager extends Component
     private function modelClass(): string
     {
         return $this->resources[$this->resource]['model'];
+    }
+
+    private function authorizeSettingResource(bool $write = false): void
+    {
+        $user = auth()->user();
+        abort_unless($user && ($user->isA('superadmin') || $user->can('admin.access')), 403);
+        abort_unless(AdminLocalSettingAccess::allows($user, $this->resource, $write), 403);
     }
 
     private function hasColumn(string $column): bool
@@ -682,6 +701,7 @@ class ResourceManager extends Component
 
     public function render()
     {
+        $this->authorizeSettingResource();
         $modelClass = $this->modelClass();
         $query = $modelClass::query();
 
@@ -712,6 +732,7 @@ class ResourceManager extends Component
             'perPage' => $this->adminPerPage(),
             'geoZoneLabels' => $this->geoZoneOptions(),
             'countryLabels' => $this->countryOptions(),
+            'canManage' => AdminLocalSettingAccess::allows(auth()->user(), $this->resource, true),
         ]);
     }
 

@@ -21,6 +21,8 @@ class EnsureAdminAccess
             abort(401);
         }
 
+        abort_if($user->account_type === 'staff' && ! $user->admin_login_enabled, 403, 'Admin login is disabled.');
+
         if (Bouncer::is($user)->an('superadmin') || $user->can('admin.access')) {
             return $next($request);
         }

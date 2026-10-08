@@ -87,7 +87,7 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
-        Auth::provider('opencart-migrating', fn ($app, array $config) => new \App\Auth\OpenCartUserProvider($app['hash'], $config['model']));
+        Auth::provider('opencart-migrating', fn ($app, array $config) => new \App\Auth\OpenCartUserProvider($app['hash'], $config['model'], $config['account_type'] ?? null));
 
         Queue::before(static function (JobProcessing $event): void {
             app(SystemSettingsService::class)->clearRuntimeCache();

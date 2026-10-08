@@ -77,6 +77,14 @@ Route::post('account/impersonation/stop', [CustomerImpersonationController::clas
     ->middleware('auth')
     ->name('front.impersonation.stop');
 
+Route::post('admin/users/{user}/staff-impersonation', [\App\Http\Controllers\Admin\StaffImpersonationController::class, 'start'])
+    ->middleware(['auth', 'verified'])
+    ->name('admin.users.staff-impersonation.start');
+
+// Session identity is verified by the service, including disabled preview targets.
+Route::post('admin/staff-impersonation/stop', [\App\Http\Controllers\Admin\StaffImpersonationController::class, 'stop'])
+    ->name('admin.staff-impersonation.stop');
+
 Route::middleware(['front.locale', 'front.device', 'front.search', 'front.b2b', 'front.cache'])
     ->group(function (): void {
         Route::get('locale/{code}', function (string $code, Request $request) {
@@ -331,9 +339,12 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
         Route::post('orders/{order}/gls/send', [OrderGlsController::class, 'send'])->name('orders.gls.send');
         Route::get('orders/{order}/gls/label', [OrderGlsController::class, 'label'])->name('orders.gls.label');
         Route::get('orders/{order}/show', function (SalesOrder $order) {
+            app(\App\Services\Admin\OrderManagerAccess::class)->assertOrder($order);
+
             return view('admin.orders.show', compact('order'));
         })->name('orders.show');
         Route::get('orders/{order}/invoice', function (SalesOrder $order) {
+            app(\App\Services\Admin\OrderManagerAccess::class)->assertOrder($order);
             $order->load([
                 'status:id,code,name,color',
                 'items',
@@ -441,6 +452,7 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
         Route::get('users/{user}/show', function (User $user) {
             $current = auth()->user();
             abort_unless($current && ($current->isA('superadmin') || $current->can('users.list.view')), 403);
+            app(\App\Services\Admin\OrderManagerAccess::class)->assertCustomer($user, $current);
 
             $user->load([
                 'roles:id,name,title',
@@ -509,6 +521,8 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
             ));
         })->name('users.show');
         Route::get('users/{user}/edit', function (User $user) {
+            app(\App\Services\Admin\OrderManagerAccess::class)->assertCustomer($user);
+
             return view('admin.users.edit', compact('user'));
         })->name('users.edit');
         Route::view('profile', 'profile')->name('profile');
@@ -664,6 +678,13 @@ Route::redirect('profile', '/admin/profile')
     ->name('profile');
 
 Route::post('logout', function (Request $request) {
+    $staffImpersonation = app(\App\Services\User\StaffImpersonationService::class);
+    if ($staffImpersonation->isActive($request)) {
+        $admin = $staffImpersonation->stop($request);
+
+        return $admin ? redirect()->route('admin.users') : redirect()->route('login');
+    }
+
     $impersonation = app(\App\Services\User\CustomerImpersonationService::class);
     if ($impersonation->isActive($request)) {
         $customerId = (int) $request->session()->get(\App\Services\User\CustomerImpersonationService::SESSION_KEY.'.customer_id');

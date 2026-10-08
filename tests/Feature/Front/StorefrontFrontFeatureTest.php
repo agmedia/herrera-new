@@ -47,6 +47,14 @@ class StorefrontFrontFeatureTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Livewire's static asset flags can survive an earlier admin component test.
+        app('livewire')->flushState();
+    }
+
     public function test_pretty_storefront_routes_are_available(): void
     {
         $this->useEnglishStorefrontLocale();
@@ -995,7 +1003,7 @@ class StorefrontFrontFeatureTest extends TestCase
             ->assertSee('data-mobile-menu-toggle', false)
             ->assertSee('data-mobile-menu-toggle-open', false)
             ->assertSee('data-mobile-menu-toggle-close', false)
-            ->assertSee('h-10 w-10', false)
+            ->assertSee('class="desktop-mobile-menu-toggle"', false)
             ->assertSee('data-mobile-nav-link', false)
             ->assertSee('/category/mega-category-level-1', false)
             ->assertSee('Mega category level 1')

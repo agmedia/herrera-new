@@ -11,11 +11,14 @@ new class extends Component
     public function logout(Logout $logout): void
     {
         $customerId = (int) session()->get(\App\Services\User\CustomerImpersonationService::SESSION_KEY.'.customer_id', 0);
+        $staffPreview = session()->has(\App\Services\User\StaffImpersonationService::SESSION_KEY);
         $logout();
 
-        $destination = $customerId > 0 && auth()->check()
-            ? route('admin.users.show', ['user' => $customerId])
-            : '/';
+        $destination = '/';
+        if (auth()->check()) {
+            $destination = $staffPreview ? route('admin.users')
+                : ($customerId > 0 ? route('admin.users.show', ['user' => $customerId]) : '/');
+        }
         $this->redirect($destination, navigate: true);
     }
 }; ?>

@@ -69,6 +69,13 @@ return [
             'model' => env('AUTH_MODEL', App\Models\User::class),
         ],
 
+        // Public reset tokens can only ever address customer identities.
+        'customer-passwords' => [
+            'driver' => 'opencart-migrating',
+            'model' => env('AUTH_MODEL', App\Models\User::class),
+            'account_type' => 'customer',
+        ],
+
         // 'users' => [
         //     'driver' => 'database',
         //     'table' => 'users',
@@ -96,7 +103,7 @@ return [
 
     'passwords' => [
         'users' => [
-            'provider' => 'users',
+            'provider' => 'customer-passwords',
             'table' => env('AUTH_PASSWORD_RESET_TOKEN_TABLE', 'password_reset_tokens'),
             'expire' => 60,
             'throttle' => 60,

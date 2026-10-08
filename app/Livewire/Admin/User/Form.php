@@ -5,6 +5,7 @@ namespace App\Livewire\Admin\User;
 use App\Models\User;
 use App\Models\User\CustomerGroup;
 use App\Models\User\UserAddress;
+use App\Services\Admin\OrderManagerAccess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -78,6 +79,19 @@ class Form extends Component
 
     public function save()
     {
+        $this->authorizeAccess();
+        $target = User::query()->with('roles')->findOrFail($this->userId);
+        $this->ensureCanManageTargetUser($target);
+        if (app(OrderManagerAccess::class)->isRestricted()) {
+            abort_if(
+                (string) $this->form['role'] !== $this->resolvePrimaryRoleName($target->roles)
+                || trim((string) $this->form['email']) !== $target->email
+                || (bool) $this->form['email_verified'] !== (bool) $target->email_verified_at
+                || ! empty($this->form['password'])
+                || ! empty($this->form['password_confirmation']),
+                403
+            );
+        }
         $validated = $this->validate($this->rules());
         $payload = $validated['form'];
 
@@ -88,18 +102,26 @@ class Form extends Component
             $this->ensureCanManageTargetUser($user);
 
             $user->name = trim((string) $payload['name']);
-            $user->email = trim((string) $payload['email']);
-            $user->email_verified_at = (bool) $payload['email_verified'] ? ($user->email_verified_at ?: now()) : null;
-
-            if (! empty($payload['password'])) {
-                $user->password = (string) $payload['password'];
+            $role = Role::query()->where('name', (string) $payload['role'])->firstOrFail();
+            $canManageSecurity = ! app(OrderManagerAccess::class)->isRestricted();
+            if ($canManageSecurity) {
+                if ($this->isStaffRole($role->name) && $user->account_type !== 'staff') {
+                    $user->account_type = 'staff';
+                    $user->admin_login_enabled = true;
+                }
+                $user->email = trim((string) $payload['email']);
+                $user->email_verified_at = (bool) $payload['email_verified'] ? ($user->email_verified_at ?: now()) : null;
+                if (! empty($payload['password'])) {
+                    $user->password = (string) $payload['password'];
+                }
             }
 
             $user->save();
 
-            $role = Role::query()->where('name', (string) $payload['role'])->firstOrFail();
-            $user->roles()->sync([$role->id]);
-            Bouncer::refreshFor($user);
+            if ($canManageSecurity) {
+                $user->roles()->sync([$role->id]);
+                Bouncer::refreshFor($user);
+            }
 
             $profilePayload = $this->normalizeProfilePayload((array) ($payload['profile'] ?? []));
             $billingPayload = $this->normalizeAddressPayload((array) ($payload['billing_address'] ?? []));
@@ -188,7 +210,11 @@ class Form extends Component
 
     public function render()
     {
+        $this->authorizeAccess();
+        $this->ensureCanManageTargetUser(User::query()->findOrFail($this->userId));
+
         return view('livewire.admin.user.form', [
+            'canManageSecurity' => ! app(OrderManagerAccess::class)->isRestricted(),
             'roles' => $this->assignableRoles(),
             'customerGroups' => CustomerGroup::query()
                 ->where('is_active', true)
@@ -203,9 +229,14 @@ class Form extends Component
      */
     private function rules(): array
     {
+        $accountType = User::query()->whereKey($this->userId)->value('account_type');
+        if (! app(OrderManagerAccess::class)->isRestricted() && $this->isStaffRole((string) $this->form['role'])) {
+            $accountType = 'staff';
+        }
+
         return [
             'form.name' => ['required', 'string', 'max:255'],
-            'form.email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->userId)],
+            'form.email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->where('account_type', $accountType)->ignore($this->userId)],
             'form.role' => ['required', 'string', Rule::in($this->assignableRoleNames())],
             'form.email_verified' => ['boolean'],
             'form.password' => ['nullable', 'string', 'min:8', 'confirmed'],
@@ -395,6 +426,7 @@ class Form extends Component
     private function assignableRoles(): Collection
     {
         return Role::query()
+            ->when(app(OrderManagerAccess::class)->isRestricted(), fn ($query) => $query->where('name', 'customer'))
             ->when(! $this->canAssignSuperadmin(), fn ($query) => $query->where('name', '!=', 'superadmin'))
             ->orderBy('name')
             ->get(['name', 'title']);
@@ -419,8 +451,16 @@ class Form extends Component
         return $current && Bouncer::is($current)->an('superadmin');
     }
 
+    private function isStaffRole(string $roleName): bool
+    {
+        return in_array($roleName, ['superadmin', 'super-admin', 'admin', 'editor', 'order_manager'], true)
+            || Role::query()->where('name', $roleName)->whereHas('abilities', fn ($query) => $query
+                ->whereIn('abilities.name', ['admin.access', '*'])->where('permissions.forbidden', false))->exists();
+    }
+
     private function ensureCanManageTargetUser(User $user): void
     {
+        app(OrderManagerAccess::class)->assertCustomer($user);
         if (! $this->canAssignSuperadmin() && $user->isA('superadmin')) {
             abort(403, 'Only superadmin can manage superadmin users.');
         }

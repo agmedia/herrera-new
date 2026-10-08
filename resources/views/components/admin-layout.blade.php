@@ -1282,6 +1282,43 @@
                         && auth()->user()
                         && (auth()->user()->isA('superadmin') || auth()->user()->can('users.loyalty.view'));
                     $usersOpen = $usersListActive || $usersB2BActive || $usersStatisticsActive || $usersGroupsActive || $usersAccessActive || $usersActivityActive || $usersNewsletterActive || ($userLoyaltyEnabled && $usersLoyaltyActive);
+                    $canAdminAbility = static fn (string $ability): bool => auth()->user()
+                        && (auth()->user()->isA('superadmin') || auth()->user()->can($ability));
+                    $catalogLinks = [
+                        'categories' => $canAdminAbility('catalog.categories.view'),
+                        'products' => $canAdminAbility('catalog.products.view'),
+                        'attributes' => $catalogUseAttributes && $canAdminAbility('catalog.attributes.view'),
+                        'options' => $catalogUseOptions && $canAdminAbility('catalog.options.view'),
+                        'manufacturers' => $catalogUseManufacturers && $canAdminAbility('catalog.manufacturers.view'),
+                        'actions' => $catalogUseActions && $canAdminAbility('catalog.actions.view'),
+                        'b2b-prices' => $canAdminAbility('catalog.b2b_prices.view'),
+                    ];
+                    $contentLinks = [
+                        'blog' => $catalogUseBlog && $canAdminAbility('content.blog.view'),
+                        'pages' => $canAdminAbility('content.pages.view'),
+                        'faqs' => $canAdminAbility('content.faqs.view'),
+                        'comments' => $canAdminAbility('content.comments.view'),
+                        'blocks' => $canAdminAbility('content.blocks.view'),
+                        'navigation' => $canAdminAbility('content.navigation.view'),
+                    ];
+                    $localSettingResources = array_filter([
+                        'payment-methods' => __('admin.layout.menu.payment_methods'),
+                        'shipping-methods' => __('admin.layout.menu.shipping_methods'),
+                        'geo-zones' => __('admin.layout.menu.geo_zones'),
+                        'geo-zone-countries' => __('admin.layout.menu.geo_zone_countries'),
+                        'regions' => __('admin.layout.menu.regions'),
+                        'currencies' => __('admin.layout.menu.currencies'),
+                        'tax-rates' => __('admin.layout.menu.tax_rates'),
+                        'order-statuses' => __('admin.layout.menu.order_statuses'),
+                        'languages' => __('admin.layout.menu.languages'),
+                    ], static fn (string $label, string $resource): bool => \App\Support\AdminLocalSettingAccess::allows(auth()->user(), $resource), ARRAY_FILTER_USE_BOTH);
+                    $canViewCatalogSection = in_array(true, $catalogLinks, true);
+                    $canViewContentSection = in_array(true, $contentLinks, true);
+                    $canViewOrders = $canAdminAbility('sales.orders.view');
+                    $canManageAdminAppearance = $canAdminAbility('settings.system.admin_appearance.manage');
+                    $canManageUserSettings = $canAdminAbility('settings.user.manage');
+                    $canViewSystemSettings = $canManageRuntimeTools || $canManageAdminAppearance || $canManageCatalogFeatures || $canManageStoreSettings;
+                    $canViewSettingsSection = $localSettingResources !== [] || $canViewSystemSettings || $showSettingsApiMenu || $canManageUserSettings;
                     $settingsResource = request()->routeIs('admin.shipping.*')
                         ? 'shipping-methods'
                         : request()->route('resource');
@@ -1443,6 +1480,7 @@
                 @endphp
 
                 <nav class="space-y-1 p-4">
+                    @if ($canAdminAbility('dashboard.view'))
                     <a
                         href="{{ route('admin.dashboard') }}"
                         class="block rounded-lg px-3 py-2 text-sm font-medium {{ request()->routeIs('admin.dashboard') ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1455,7 +1493,9 @@
                             <span>{{ __('admin.layout.menu.dashboard') }}</span>
                         </span>
                     </a>
+                    @endif
 
+                    @if ($canViewCatalogSection)
                     <details class="group rounded-lg" @if($catalogOpen) open @endif>
                         <summary class="sidebar-dropdown-summary flex cursor-pointer list-none items-center justify-between rounded-lg font-medium [&::-webkit-details-marker]:hidden [&::marker]:content-[''] {{ $catalogOpen ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100' }}">
                             <span class="flex items-center gap-2">
@@ -1469,6 +1509,7 @@
                             </span>
                         </summary>
                         <div class="ml-3 mt-1 space-y-1 border-l border-slate-200 pl-4">
+                            @if ($catalogLinks['categories'])
                             <a
                                 href="{{ route('admin.categories') }}"
                                 class="sidebar-dropdown-link block rounded-lg font-medium {{ $catalogCategoriesActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1478,6 +1519,8 @@
                                     <span>{{ __('admin.layout.menu.categories') }}</span>
                                 </span>
                             </a>
+                            @endif
+                            @if ($catalogLinks['products'])
                             <a
                                 href="{{ route('admin.products') }}"
                                 class="sidebar-dropdown-link block rounded-lg font-medium {{ $catalogProductsActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1487,7 +1530,8 @@
                                     <span>{{ __('admin.layout.menu.products') }}</span>
                                 </span>
                             </a>
-                            @if ($catalogUseAttributes)
+                            @endif
+                            @if ($catalogLinks['attributes'])
                                 <a
                                     href="{{ route('admin.attributes') }}"
                                     class="sidebar-dropdown-link block rounded-lg font-medium {{ $catalogAttributesActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1498,7 +1542,7 @@
                                     </span>
                                 </a>
                             @endif
-                            @if ($catalogUseOptions)
+                            @if ($catalogLinks['options'])
                                 <a
                                     href="{{ route('admin.options') }}"
                                     class="sidebar-dropdown-link block rounded-lg font-medium {{ $catalogOptionsActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1509,7 +1553,7 @@
                                     </span>
                                 </a>
                             @endif
-                            @if ($catalogUseManufacturers)
+                            @if ($catalogLinks['manufacturers'])
                                 <a
                                     href="{{ route('admin.manufacturers') }}"
                                     class="sidebar-dropdown-link block rounded-lg font-medium {{ $catalogManufacturersActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1520,7 +1564,7 @@
                                     </span>
                                 </a>
                             @endif
-                            @if ($catalogUseActions)
+                            @if ($catalogLinks['actions'])
                                 <a
                                     href="{{ route('admin.actions') }}"
                                     class="sidebar-dropdown-link block rounded-lg font-medium {{ $catalogActionsActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1531,6 +1575,7 @@
                                     </span>
                                 </a>
                             @endif
+                            @if ($catalogLinks['b2b-prices'])
                             <a
                                 href="{{ route(app(\App\Services\Pricing\PriceCatalogResolver::class)->activeCatalog() ? 'admin.b2b-prices.catalogs' : 'admin.b2b-prices') }}"
                                 class="sidebar-dropdown-link block rounded-lg font-medium {{ $catalogB2bPricesActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1540,9 +1585,12 @@
                                     <span>{{ __('admin.layout.menu.b2b_prices') }}</span>
                                 </span>
                             </a>
+                            @endif
                         </div>
                     </details>
+                    @endif
 
+                    @if ($canViewOrders || $canViewWithdrawals)
                     <details class="group rounded-lg" @if($salesOpen) open @endif>
                         <summary class="sidebar-dropdown-summary flex cursor-pointer list-none items-center justify-between rounded-lg font-medium [&::-webkit-details-marker]:hidden [&::marker]:content-[''] {{ $salesOpen ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100' }}">
                             <span class="flex items-center gap-2">
@@ -1554,6 +1602,7 @@
                             </span>
                         </summary>
                         <div class="ml-3 mt-1 space-y-1 border-l border-slate-200 pl-4">
+                            @if ($canViewOrders)
                             <a
                                 href="{{ route('admin.orders') }}"
                                 class="sidebar-dropdown-link block rounded-lg font-medium {{ $salesOrdersActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1563,6 +1612,7 @@
                                     <span>{{ __('admin.layout.menu.orders') }}</span>
                                 </span>
                             </a>
+                            @endif
                             @if ($canViewWithdrawals)
                                 <a
                                     href="{{ route('admin.withdrawals.index') }}"
@@ -1576,7 +1626,9 @@
                             @endif
                         </div>
                     </details>
+                    @endif
 
+                    @if ($canViewContentSection)
                     <details class="group rounded-lg" @if($contentOpen) open @endif>
                         <summary class="sidebar-dropdown-summary flex cursor-pointer list-none items-center justify-between rounded-lg font-medium [&::-webkit-details-marker]:hidden [&::marker]:content-[''] {{ $contentOpen ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100' }}">
                             <span class="flex items-center gap-2">
@@ -1588,7 +1640,7 @@
                             </span>
                         </summary>
                         <div class="ml-3 mt-1 space-y-1 border-l border-slate-200 pl-4">
-                            @if ($catalogUseBlog)
+                            @if ($contentLinks['blog'])
                                 <a
                                     href="{{ route('admin.content.blog.index') }}"
                                     class="sidebar-dropdown-link block rounded-lg font-medium {{ $contentBlogActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1599,6 +1651,7 @@
                                     </span>
                                 </a>
                             @endif
+                            @if ($contentLinks['pages'])
                             <a
                                 href="{{ route('admin.content.pages.index') }}"
                                 class="sidebar-dropdown-link block rounded-lg font-medium {{ $contentPagesActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1608,6 +1661,8 @@
                                     <span>{{ __('admin.layout.menu.pages') }}</span>
                                 </span>
                             </a>
+                            @endif
+                            @if ($contentLinks['faqs'])
                             <a
                                 href="{{ route('admin.content.faqs.index') }}"
                                 class="sidebar-dropdown-link block rounded-lg font-medium {{ $contentFaqsActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1617,6 +1672,8 @@
                                     <span>{{ __('admin.layout.menu.faqs') }}</span>
                                 </span>
                             </a>
+                            @endif
+                            @if ($contentLinks['comments'])
                             <a
                                 href="{{ route('admin.content.comments.index') }}"
                                 class="sidebar-dropdown-link block rounded-lg font-medium {{ $contentCommentsActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1626,6 +1683,8 @@
                                     <span>{{ __('admin.layout.menu.comments') }}</span>
                                 </span>
                             </a>
+                            @endif
+                            @if ($contentLinks['blocks'])
                             <a
                                 href="{{ route('admin.content.blocks') }}"
                                 class="sidebar-dropdown-link block rounded-lg font-medium {{ $contentBlocksActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1635,6 +1694,8 @@
                                     <span>{{ __('admin.layout.menu.blocks') }}</span>
                                 </span>
                             </a>
+                            @endif
+                            @if ($contentLinks['navigation'])
                             <a
                                 href="{{ route('admin.content.navigation') }}"
                                 class="sidebar-dropdown-link block rounded-lg font-medium {{ $contentNavigationActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1644,8 +1705,10 @@
                                     <span>{{ __('admin.layout.menu.navigation') }}</span>
                                 </span>
                             </a>
+                            @endif
                         </div>
                     </details>
+                    @endif
 
                     @if ($canManageEprel || $canManageStock || $canManageEracuni || $canManageSpreadsheet || $canManageMedia)
                         <details class="group rounded-lg" @if($integrationsOpen) open @endif>
@@ -1690,6 +1753,7 @@
                         </details>
                     @endif
 
+                    @if ($canViewSettingsSection)
                     <details class="group rounded-lg" @if($settingsOpen) open @endif>
                         <summary class="sidebar-dropdown-summary flex cursor-pointer list-none items-center justify-between rounded-lg font-medium [&::-webkit-details-marker]:hidden [&::marker]:content-[''] {{ $settingsOpen ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100' }}">
                             <span class="flex items-center gap-2">
@@ -1704,6 +1768,7 @@
                         </summary>
 
                         <div class="ml-3 mt-1 space-y-1 border-l border-slate-200 pl-2">
+                            @if ($localSettingResources !== [])
                             <details class="group rounded-lg" @if($settingsLocalOpen) open @endif>
                                 <summary class="sidebar-dropdown-summary flex cursor-pointer list-none items-center justify-between rounded-lg text-xs font-semibold [&::-webkit-details-marker]:hidden [&::marker]:content-[''] {{ $settingsLocalOpen ? 'bg-slate-200 text-slate-900' : 'text-slate-700 hover:bg-slate-100' }}">
                                     <span class="flex items-center gap-2">
@@ -1712,17 +1777,7 @@
                                     </span>
                                 </summary>
                                 <div class="ml-2 mt-1 space-y-1 border-l border-slate-200 pl-2">
-                                    @foreach ([
-                                        'payment-methods' => __('admin.layout.menu.payment_methods'),
-                                        'shipping-methods' => __('admin.layout.menu.shipping_methods'),
-                                        'geo-zones' => __('admin.layout.menu.geo_zones'),
-                                        'geo-zone-countries' => __('admin.layout.menu.geo_zone_countries'),
-                                        'regions' => __('admin.layout.menu.regions'),
-                                        'currencies' => __('admin.layout.menu.currencies'),
-                                        'tax-rates' => __('admin.layout.menu.tax_rates'),
-                                        'order-statuses' => __('admin.layout.menu.order_statuses'),
-                                        'languages' => __('admin.layout.menu.languages'),
-                                    ] as $slug => $label)
+                                    @foreach ($localSettingResources as $slug => $label)
                                         <a
                                             href="{{ $slug === 'shipping-methods' ? route('admin.shipping.index') : route('admin.settings.local.resource', ['resource' => $slug]) }}"
                                             class="sidebar-dropdown-link block rounded-lg font-medium {{ $settingsResource === $slug ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1735,7 +1790,9 @@
                                     @endforeach
                                 </div>
                             </details>
+                            @endif
 
+                            @if ($canViewSystemSettings)
                             <details class="group rounded-lg" @if($settingsSystemOpen) open @endif>
                                 <summary class="sidebar-dropdown-summary flex cursor-pointer list-none items-center justify-between rounded-lg text-xs font-semibold [&::-webkit-details-marker]:hidden [&::marker]:content-[''] {{ $settingsSystemOpen ? 'bg-slate-200 text-slate-900' : 'text-slate-700 hover:bg-slate-100' }}">
                                     <span class="flex items-center gap-2">
@@ -1755,6 +1812,7 @@
                                             </span>
                                         </a>
                                     @endif
+                                    @if ($canManageAdminAppearance)
                                     <a
                                         href="{{ route('admin.settings.system.admin-appearance-controls') }}"
                                         class="sidebar-dropdown-link block rounded-lg font-medium {{ request()->routeIs('admin.settings.system.admin-appearance-controls') ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1764,6 +1822,7 @@
                                             <span>{{ __('admin.layout.menu.admin_appearance_controls') }}</span>
                                         </span>
                                     </a>
+                                    @endif
                                     @if ($canManageCatalogFeatures)
                                         <a
                                             href="{{ route('admin.settings.system.catalog-features') }}"
@@ -1797,6 +1856,7 @@
                                     @endif
                                 </div>
                             </details>
+                            @endif
 
                             @if ($showSettingsApiMenu)
                                 <details class="group rounded-lg" @if($settingsApiOpen) open @endif>
@@ -1822,6 +1882,7 @@
                                 </details>
                             @endif
 
+                            @if ($canManageUserSettings)
                             <a
                                 href="{{ route('admin.settings.user.index') }}"
                                 class="sidebar-dropdown-link block rounded-lg font-medium {{ request()->routeIs('admin.settings.user.*') ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}"
@@ -1831,8 +1892,10 @@
                                     <span>{{ __('admin.layout.menu.user') }}</span>
                                 </span>
                             </a>
+                            @endif
                         </div>
                     </details>
+                    @endif
 
                     @if ($canViewUsersSection)
                         <details class="group rounded-lg" @if($usersOpen) open @endif>
@@ -2073,6 +2136,16 @@
                         </details>
                     </div>
                 </header>
+
+                @if (is_array(session('admin.staff_impersonation')) && (int) session('admin.staff_impersonation.staff_id') === (int) auth()->id() && \Illuminate\Support\Facades\Route::has('admin.staff-impersonation.stop'))
+                    <div class="sticky top-16 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 md:px-6" role="status" data-staff-impersonation-banner>
+                        <p class="font-semibold">{{ __('Pregled kao :name', ['name' => auth()->user()->admin_username ?: auth()->user()->name]) }}</p>
+                        <form method="POST" action="{{ route('admin.staff-impersonation.stop') }}">
+                            @csrf
+                            <button type="submit" class="rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700">{{ __('Vrati se u svoj admin') }}</button>
+                        </form>
+                    </div>
+                @endif
 
                 <main class="flex-1 p-4 md:p-6">
                     {{ $slot }}

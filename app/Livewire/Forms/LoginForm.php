@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Forms;
 
-use Illuminate\Foundation\Http\MaintenanceModeBypassCookie;
 use Illuminate\Auth\Events\Lockout;
+use Illuminate\Foundation\Http\MaintenanceModeBypassCookie;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\RateLimiter;
@@ -15,7 +15,7 @@ use Throwable;
 
 class LoginForm extends Form
 {
-    #[Validate('required|string|email')]
+    #[Validate('required|string|max:255')]
     public string $email = '';
 
     #[Validate('required|string')]
@@ -33,7 +33,11 @@ class LoginForm extends Form
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only(['email', 'password']), $this->remember)) {
+        if (! Auth::attempt([
+            'login' => $this->email,
+            'account_type' => 'staff',
+            'password' => $this->password,
+        ], $this->remember)) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
@@ -72,7 +76,7 @@ class LoginForm extends Form
      */
     protected function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->email).'|'.request()->ip());
+        return Str::transliterate(Str::lower(trim($this->email)).'|'.request()->ip());
     }
 
     private function issueMaintenanceBypassCookieForPrivilegedUser(): void

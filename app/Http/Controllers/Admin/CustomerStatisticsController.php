@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Admin\OrderManagerAccess;
 use App\Services\Analytics\CustomerPurchaseStatistics;
 use App\Services\Settings\SystemSettingsService;
 use Illuminate\Http\Request;
@@ -31,6 +32,9 @@ class CustomerStatisticsController extends Controller
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
             'guest_email' => ['nullable', 'string', 'max:191'],
         ]);
+        if (! empty($validated['user_id'])) {
+            app(OrderManagerAccess::class)->assertCustomer(User::query()->findOrFail($validated['user_id']), $admin);
+        }
         if (empty($validated['currency']) && (! empty($validated['user_id']) || ! empty($validated['guest_email']))) {
             $customerCurrencies = $statistics->currencies(
                 isset($validated['user_id']) ? (int) $validated['user_id'] : null,

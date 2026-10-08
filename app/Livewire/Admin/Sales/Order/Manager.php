@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Sales\Order;
 
 use App\Models\Sales\Order\Order;
 use App\Models\Settings\Local\OrderStatus;
+use App\Services\Admin\OrderManagerAccess;
 use App\Services\Settings\SystemSettingsService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -81,6 +82,7 @@ class Manager extends Component
 
             return;
         }
+        app(OrderManagerAccess::class)->assertOrder($order);
 
         $properties = [
             'order_id' => $orderId,
@@ -131,7 +133,7 @@ class Manager extends Component
             200
         );
 
-        $rows = Order::query()
+        $rows = app(OrderManagerAccess::class)->scopeOrders(Order::query())
             ->with(['status:id,code,name,color', 'user:id,name,email'])
             ->withCount('items')
             ->when($this->status !== '', function (Builder $query): void {

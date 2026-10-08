@@ -174,11 +174,11 @@ new #[Layout('layouts.guest')] class extends Component
             novalidate
         >
             <div class="store-auth-field">
-                <label for="email">{{ __('ui.auth.fields.email') }}</label>
+                <label for="email">{{ __('E-mail ili korisničko ime') }}</label>
                 <input
                     wire:model="form.email"
                     id="email"
-                    type="email"
+                    type="text"
                     name="email"
                     autocomplete="username"
                     autofocus
@@ -208,11 +208,7 @@ new #[Layout('layouts.guest')] class extends Component
                     <span>{{ __('ui.auth.login.remember') }}</span>
                 </label>
 
-                @if (Route::has('password.request'))
-                    <a href="{{ route('password.request') }}" class="auth-inline-link" wire:navigate>
-                        {{ __('ui.auth.login.forgot_password') }}
-                    </a>
-                @endif
+                <span class="text-sm text-slate-600">{{ __('Za obnovu pristupa obratite se administratoru.') }}</span>
             </div>
 
             <x-input-error :messages="$errors->get('recaptchaToken')" class="store-auth-error" />

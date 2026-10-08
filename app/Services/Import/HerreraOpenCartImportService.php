@@ -34,10 +34,97 @@ class HerreraOpenCartImportService
 
     private array $columnCache = [];
 
+    /** Non-null only during the explicit assigned-customer prerequisite. */
+    private ?array $missingAssignedCustomerIds = null;
+
     /** Original cache values for writes in the current atomic order chunk. */
     private ?array $orderChunkMapUndo = null;
 
     public function __construct(private readonly ImportedDescriptionHtmlCleaner $cleaner) {}
+
+    public function importMissingAssignedCustomers(string $connection, string $prefix = 'oc_'): array
+    {
+        if (! preg_match('/^[a-zA-Z0-9_]*$/', $prefix)) {
+            throw new RuntimeException('Invalid source table prefix.');
+        }
+        $this->source = DB::connection($connection);
+        $this->prefix = $prefix;
+        $this->snapshot = $this->source->getDatabaseName();
+        if (app()->environment(['local', 'testing'])) {
+            $this->guardSource();
+        } elseif (! app()->environment('staging')
+            || DB::connection()->getDatabaseName() !== 'herrera_redesign'
+            || rtrim((string) config('app.url'), '/') !== 'https://herrera.herrera.hr'
+            || $this->source === DB::connection()
+            || $this->snapshot === DB::connection()->getDatabaseName()) {
+            throw new RuntimeException('Assigned-customer prerequisites are restricted to the verified Herrera test shop.');
+        }
+
+        if (! $this->has('customer_to_user') || ! $this->has('customer')) {
+            throw new RuntimeException('The assigned-customer source is incomplete.');
+        }
+        $this->maps = $this->checksums = $this->stats = $this->countries = [];
+        DB::table('herrera_import_maps')->where('source', 'herrera-opencart')->orderBy('id')->chunkById(5000, function ($maps): void {
+            foreach ($maps as $map) {
+                $this->maps[$map->entity][(string) $map->source_id] = (int) $map->target_id;
+                $this->checksums[$map->entity][(string) $map->source_id] = $map->checksum;
+            }
+        });
+        $missing = $this->source->table($this->table('customer_to_user'))->distinct()->pluck('customer_id')
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => $id > 0 && ! $this->id('customer', $id))
+            ->unique()->values()->all();
+        $report = ['missing_assigned_customers' => count($missing), 'imported_assigned_customers' => 0, 'imported_assigned_addresses' => 0];
+        if ($missing === []) {
+            return $report;
+        }
+
+        $rows = $this->source->table($this->table('customer'))->whereIn('customer_id', $missing)->get();
+        if ($rows->count() !== count($missing)) {
+            throw new RuntimeException('An assigned customer is missing from the source; no customers were imported.');
+        }
+        foreach ($rows as $row) {
+            $group = $this->id('customer_group', $row->customer_group_id);
+            if (! $row->status || ! $group || ! DB::table('customer_groups')->where('id', $group)->where('is_active', true)->exists()) {
+                throw new RuntimeException('An assigned customer is disabled or lacks an existing active mapped group.');
+            }
+            $email = strtolower(trim((string) $row->email));
+            if (! filter_var($email, FILTER_VALIDATE_EMAIL)
+                || DB::table('users')->where('account_type', 'customer')->where('email', $email)->exists()
+                || $this->id('profile', $row->customer_id) || $this->id('b2b_account', $row->customer_id)) {
+                throw new RuntimeException('An assigned customer has a conflicting identity or existing dependent mapping.');
+            }
+        }
+        if ($this->has('address')) {
+            foreach ($this->source->table($this->table('address'))->whereIn('customer_id', $missing)->pluck('address_id') as $addressId) {
+                if ($this->id('address', $addressId)) {
+                    throw new RuntimeException('An assigned customer address already has a target mapping.');
+                }
+            }
+        }
+        $this->each('country', function (array $row): void {
+            $this->countries[$row['country_id']] = strtoupper($row['iso_code_2'] ?: 'HR');
+        });
+
+        $this->missingAssignedCustomerIds = $missing;
+        try {
+            return DB::transaction(function () use ($missing, $report): array {
+                $this->customers();
+                foreach ($missing as $id) {
+                    if (! $this->id('customer', $id)) {
+                        throw new RuntimeException('Assigned-customer prerequisites could not be completed; no customers were imported.');
+                    }
+                }
+
+                return array_replace($report, [
+                    'imported_assigned_customers' => (int) ($this->stats['customer_written'] ?? 0),
+                    'imported_assigned_addresses' => (int) ($this->stats['address_written'] ?? 0),
+                ]);
+            });
+        } finally {
+            $this->missingAssignedCustomerIds = null;
+        }
+    }
 
     public function import(string $connection = 'herrera_source', string $prefix = 'oc_', bool $dryRun = false, array $only = [], ?callable $progress = null): array
     {
@@ -375,7 +462,7 @@ class HerreraOpenCartImportService
             $safe = array_diff_key($row, array_flip(['password', 'salt', 'token', 'code', 'cart', 'wishlist', 'ip']));
             $email = strtolower(trim($row['email']));
             $id = $this->id('customer', $row['customer_id']);
-            if (! $id && DB::table('users')->where('email', $email)->exists()) {
+            if (! $id && DB::table('users')->where('account_type', 'customer')->where('email', $email)->exists()) {
                 $this->issue('customer', $row['customer_id'], 'existing_email_not_merged');
                 $this->archiveRow('customer', (string) $row['customer_id'], $safe);
 
@@ -938,10 +1025,16 @@ class HerreraOpenCartImportService
 
     private function each(string $table, callable $callback): void
     {
+        if ($this->missingAssignedCustomerIds !== null && $table === 'customer_group') {
+            return;
+        }
         if (! $this->has($table)) {
             return;
         }
         $query = $this->source->table($this->table($table));
+        if ($this->missingAssignedCustomerIds !== null && in_array($table, ['customer', 'address'], true)) {
+            $query->whereIn('customer_id', $this->missingAssignedCustomerIds);
+        }
         $orderKey = [
             'order' => 'order_id',
             'order_product' => 'order_product_id',

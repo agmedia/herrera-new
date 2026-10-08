@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Sales\Order\Order;
+use App\Services\Admin\OrderManagerAccess;
 use App\Services\Integrations\Gls\GlsShipmentService;
 use Illuminate\Http\RedirectResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -12,6 +13,7 @@ class OrderGlsController extends Controller
 {
     public function send(Order $order, GlsShipmentService $gls): RedirectResponse
     {
+        app(OrderManagerAccess::class)->assertOrder($order);
         try {
             $shipment = $gls->send($order, auth()->id());
 
@@ -29,6 +31,7 @@ class OrderGlsController extends Controller
 
     public function label(Order $order, GlsShipmentService $gls): StreamedResponse|RedirectResponse
     {
+        app(OrderManagerAccess::class)->assertOrder($order);
         try {
             return $gls->downloadLabel($order);
         } catch (\Throwable $exception) {

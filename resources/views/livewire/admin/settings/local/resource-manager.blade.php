@@ -20,6 +20,7 @@
                         class="admin-search-input w-full rounded-xl border px-3 py-2 text-sm"
                     />
                 </div>
+                @if ($canManage)
                 <a href="{{ route('admin.settings.local.resource.create', array_filter([
                     'resource' => $resource,
                     'search' => $search !== '' ? $search : null,
@@ -27,6 +28,7 @@
                 ], static fn (int|string|null $value): bool => $value !== null)) }}" class="rounded-xl bg-cyan-700 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-cyan-800">
                     {{ __('Create item') }}
                 </a>
+                @endif
             </div>
         </div>
     </div>
@@ -552,7 +554,9 @@
                             <th class="px-3 py-2 text-left font-semibold">{{ __('Name') }}</th>
                             <th class="px-3 py-2 text-center font-semibold">{{ __('admin.common.sort') }}</th>
                             <th class="px-3 py-2 text-center font-semibold">{{ __('admin.common.state') }}</th>
-                            <th class="px-3 py-2 text-right font-semibold">{{ __('admin.common.actions') }}</th>
+                            @if ($canManage)
+                                <th class="px-3 py-2 text-right font-semibold">{{ __('admin.common.actions') }}</th>
+                            @endif
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -583,10 +587,12 @@
                                 </td>
                                 <td class="px-3 py-2 text-center text-slate-600">{{ $row->sort_order ?? '-' }}</td>
                                 <td class="px-3 py-2 text-center">
-                                    @if (isset($row->is_active))
+                                    @if (isset($row->is_active) && $canManage)
                                         <button type="button" wire:click="toggleActive({{ $row->id }})" class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $row->is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700' }}">
                                             {{ $row->is_active ? __('Active') : __('Inactive') }}
                                         </button>
+                                    @elseif (isset($row->is_active))
+                                        <span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $row->is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700' }}">{{ $row->is_active ? __('Active') : __('Inactive') }}</span>
                                     @else
                                         <span class="text-slate-500">-</span>
                                     @endif
@@ -595,6 +601,7 @@
                                         <span class="ml-1 rounded-full bg-cyan-100 px-2 py-0.5 text-xs font-semibold text-cyan-800">{{ __('Default') }}</span>
                                     @endif
                                 </td>
+                                @if ($canManage)
                                 <td class="px-3 py-2 text-right">
                                     <div class="inline-flex items-center gap-1">
                                         @if (isset($row->is_default))
@@ -609,10 +616,11 @@
                                         <button type="button" wire:click="delete({{ $row->id }})" wire:confirm="{{ __('Delete this item?') }}" class="rounded-lg border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50">{{ __('admin.common.delete') }}</button>
                                     </div>
                                 </td>
+                                @endif
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="px-3 py-8 text-center text-sm text-slate-500">{{ __('No records yet.') }}</td>
+                                <td colspan="{{ $canManage ? 5 : 4 }}" class="px-3 py-8 text-center text-sm text-slate-500">{{ __('No records yet.') }}</td>
                             </tr>
                         @endforelse
                     </tbody>

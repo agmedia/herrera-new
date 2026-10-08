@@ -47,6 +47,24 @@ class User extends Authenticatable implements HasMedia
         'remember_token',
     ];
 
+    protected $attributes = [
+        'account_type' => 'customer',
+        'admin_login_enabled' => true,
+    ];
+
+    protected static function booted(): void
+    {
+        static::updated(function (self $user): void {
+            if ($user->wasChanged('password')) {
+                \App\Models\User\LegacyCredential::query()
+                    ->where('user_id', $user->id)
+                    ->whereNull('retired_at')
+                    ->get()
+                    ->each->retire();
+            }
+        });
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -58,6 +76,7 @@ class User extends Authenticatable implements HasMedia
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'api_access_enabled' => 'boolean',
+            'admin_login_enabled' => 'boolean',
         ];
     }
 

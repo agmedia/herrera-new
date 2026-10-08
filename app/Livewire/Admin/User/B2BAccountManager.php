@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Admin\User;
 
+use App\Models\User;
 use App\Models\User\B2BAccount;
 use App\Models\User\CustomerGroup;
 use App\Models\User\UserAddress;
 use App\Models\User\UserProfile;
+use App\Services\Admin\OrderManagerAccess;
 use App\Services\B2B\B2BAccountService;
 use App\Services\Settings\SystemSettingsService;
 use Illuminate\Support\Facades\DB;
@@ -50,6 +52,7 @@ class B2BAccountManager extends Component
     {
         $this->ensureCanView();
         $account = B2BAccount::query()->findOrFail($accountId);
+        app(OrderManagerAccess::class)->assertCustomer(User::query()->findOrFail($account->user_id));
         $this->selectedId = (int) $account->getKey();
         $this->form = [
             'status' => $account->status,
@@ -118,6 +121,7 @@ class B2BAccountManager extends Component
         ]);
 
         $account = B2BAccount::query()->with('user')->findOrFail($this->selectedId);
+        app(OrderManagerAccess::class)->assertCustomer($account->user);
 
         DB::transaction(function () use ($account, $validated, $service): void {
             $account->fill([
@@ -177,8 +181,9 @@ class B2BAccountManager extends Component
         );
 
         $rows = B2BAccount::query()
+            ->whereHas('user', fn ($query) => app(OrderManagerAccess::class)->scopeCustomers($query))
             ->with([
-                'user:id,name,email',
+                'user:id,name,email,account_type,admin_username,admin_login_enabled',
                 'customerGroup:id,code,name',
                 'reviewer:id,name',
             ])

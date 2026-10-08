@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Dashboard;
 
 use App\Models\Sales\Order\Order;
 use App\Models\Settings\Local\OrderStatus;
+use App\Services\Admin\OrderManagerAccess;
 use App\Services\Settings\SystemSettingsService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -202,7 +203,7 @@ class Overview extends Component
             ];
         });
 
-        $recentOrders = Order::query()
+        $recentOrders = app(OrderManagerAccess::class)->scopeOrders(Order::query())
             ->with('status:id,name,color')
             ->orderByRaw('COALESCE(placed_at, created_at) DESC')
             ->orderByDesc('id')
@@ -248,7 +249,7 @@ class Overview extends Component
      */
     private function availableYears(CarbonImmutable $now): array
     {
-        $oldestOrderDate = Order::query()
+        $oldestOrderDate = app(OrderManagerAccess::class)->scopeOrders(Order::query())
             ->selectRaw('MIN(COALESCE(placed_at, created_at)) as oldest_order_date')
             ->value('oldest_order_date');
         $oldestYear = $oldestOrderDate
@@ -260,7 +261,7 @@ class Overview extends Component
 
     private function ordersInRange(CarbonImmutable $start, CarbonImmutable $end): Builder
     {
-        return Order::query()->where(function (Builder $query) use ($start, $end): void {
+        return app(OrderManagerAccess::class)->scopeOrders(Order::query())->where(function (Builder $query) use ($start, $end): void {
             $query->whereBetween('placed_at', [$start, $end])
                 ->orWhere(function (Builder $fallback) use ($start, $end): void {
                     $fallback->whereNull('placed_at')

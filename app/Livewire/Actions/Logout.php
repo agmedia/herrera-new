@@ -17,6 +17,13 @@ class Logout
             $request->setLaravelSession(Session::driver());
         }
 
+        $staffImpersonation = app(\App\Services\User\StaffImpersonationService::class);
+        if ($staffImpersonation->isActive($request)) {
+            $staffImpersonation->stop($request);
+
+            return;
+        }
+
         $impersonation = app(\App\Services\User\CustomerImpersonationService::class);
         if ($impersonation->isActive($request)) {
             $impersonation->stop($request);

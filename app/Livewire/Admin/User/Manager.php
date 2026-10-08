@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\User;
 
 use App\Models\User;
 use App\Models\User\CustomerGroup;
+use App\Services\Admin\OrderManagerAccess;
 use App\Services\Loyalty\LoyaltyService;
 use App\Services\Settings\SystemSettingsService;
 use Illuminate\Database\Eloquent\Builder;
@@ -77,7 +78,7 @@ class Manager extends Component
         $loyaltyService = app(LoyaltyService::class);
         $loyaltyEnabled = $loyaltyService->enabled();
 
-        $rowsQuery = User::query()
+        $rowsQuery = app(OrderManagerAccess::class)->scopeCustomers(User::query())
             ->with([
                 'roles:id,name,title',
                 'customerGroups:id,name,is_active',

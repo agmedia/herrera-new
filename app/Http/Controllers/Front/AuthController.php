@@ -204,7 +204,7 @@ class AuthController extends Controller
             [
                 'first_name' => ['required', 'string', 'max:120'],
                 'last_name' => ['required', 'string', 'max:120'],
-                'email' => ['required', 'email', 'max:191', 'unique:users,email'],
+                'email' => ['required', 'email', 'max:191', \Illuminate\Validation\Rule::unique('users', 'email')->where('account_type', 'customer')],
                 'phone' => ['required', 'string', 'max:80'],
                 'company_name' => ['required', 'string', 'max:191'],
                 'oib' => ['required', 'regex:/^\d{11}$/', 'unique:b2b_accounts,oib'],
@@ -323,7 +323,7 @@ class AuthController extends Controller
             [
                 'first_name' => ['required', 'string', 'max:120'],
                 'last_name' => ['required', 'string', 'max:120'],
-                'email' => ['required', 'email', 'max:191', 'unique:users,email'],
+                'email' => ['required', 'email', 'max:191', \Illuminate\Validation\Rule::unique('users', 'email')->where('account_type', 'customer')],
                 'phone' => ['required', 'string', 'max:80'],
                 'address_line_1' => ['required', 'string', 'max:191'],
                 'postal_code' => ['required', 'string', 'max:32'],

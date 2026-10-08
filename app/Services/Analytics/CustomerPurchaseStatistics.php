@@ -3,6 +3,7 @@
 namespace App\Services\Analytics;
 
 use App\Models\User;
+use App\Services\Admin\OrderManagerAccess;
 use App\Support\OrderStatusClassification;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
@@ -13,7 +14,7 @@ class CustomerPurchaseStatistics
 {
     public function currencies(?int $userId = null, ?string $guestEmail = null): Collection
     {
-        return DB::table('orders')
+        return app(OrderManagerAccess::class)->scopeOrders(DB::table('orders'))
             ->when($userId !== null, fn (Builder $query) => $query->where('user_id', $userId))
             ->when($guestEmail !== null && $guestEmail !== '', fn (Builder $query) => $query->whereNull('user_id')->whereRaw('LOWER(TRIM(customer_email)) = ?', [mb_strtolower(trim($guestEmail))]))
             ->selectRaw('UPPER(currency_code) AS currency')
@@ -146,7 +147,8 @@ class CustomerPurchaseStatistics
     /** @param array<string, mixed> $filters */
     private function orders(array $filters): Builder
     {
-        $query = DB::table('orders')->leftJoin('order_statuses', 'order_statuses.id', '=', 'orders.status_id');
+        $query = app(OrderManagerAccess::class)->scopeOrders(DB::table('orders'))
+            ->leftJoin('order_statuses', 'order_statuses.id', '=', 'orders.status_id');
 
         if (! empty($filters['currency'])) {
             $query->whereRaw('UPPER(orders.currency_code) = ?', [strtoupper($filters['currency'])]);

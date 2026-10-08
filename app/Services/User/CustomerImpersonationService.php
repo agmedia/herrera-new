@@ -3,6 +3,7 @@
 namespace App\Services\User;
 
 use App\Models\User;
+use App\Services\Admin\OrderManagerAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -13,14 +14,17 @@ class CustomerImpersonationService
     public function canStart(?User $admin, User $customer): bool
     {
         return $admin
+            && ! session()->has(StaffImpersonationService::SESSION_KEY)
+            && $customer->account_type === 'customer'
             && (int) $admin->id !== (int) $customer->id
             && ($admin->isA('superadmin') || (
                 $admin->can('admin.access')
                 && $admin->can('users.list.view')
                 && $admin->can('users.profile.update')
             ))
-            && ! $customer->isA('superadmin', 'admin', 'editor')
-            && ! $customer->can('admin.access');
+            && ! $customer->isA('superadmin', 'super-admin', 'admin', 'editor', 'order_manager')
+            && ! $customer->can('admin.access')
+            && app(OrderManagerAccess::class)->canAccessCustomer($customer, $admin);
     }
 
     public function isActive(Request $request): bool
@@ -30,6 +34,7 @@ class CustomerImpersonationService
 
     public function start(Request $request, User $customer): void
     {
+        abort_if($request->session()->has(StaffImpersonationService::SESSION_KEY), 409, __('Prvo završite pregled računa voditelja narudžbi.'));
         abort_if($this->isActive($request), 409, __('Već ste prijavljeni kao kupac. Prvo se vratite u admin.'));
         $admin = $request->user();
         abort_unless($this->canStart($admin, $customer), 403);

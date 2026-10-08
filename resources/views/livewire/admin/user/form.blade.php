@@ -27,16 +27,20 @@
                 </div>
                 <div style="grid-column: span 4;">
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Email') }}</label>
-                    <input type="email" wire:model="form.email" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+                    <input type="email" wire:model="form.email" @readonly(! $canManageSecurity) class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
                     @error('form.email') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
                 <div style="grid-column: span 2;">
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Role') }}</label>
+                    @if ($canManageSecurity)
                     <select wire:model="form.role" data-tom-select data-tom-no-search="1" class="admin-select w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
                         @foreach ($roles as $role)
                             <option value="{{ $role->name }}" @selected($form['role'] === $role->name)>{{ $role->title ?: ucfirst($role->name) }}</option>
                         @endforeach
                     </select>
+                    @else
+                        <p class="py-2 text-sm text-slate-700">{{ __('Customer') }}</p>
+                    @endif
                     @error('form.role') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
                 <div style="grid-column: span 2;">
@@ -50,6 +54,7 @@
                 </div>
             </div>
 
+            @if ($canManageSecurity)
             <div class="mt-4 flex flex-wrap items-center gap-3">
                 <button
                     type="button"
@@ -64,6 +69,7 @@
                     <span class="admin-switch-label">{{ $form['email_verified'] ? __('Email Verified') : __('Email Unverified') }}</span>
                 </button>
             </div>
+            @endif
         </div>
 
         <div class="admin-panel admin-form-panel p-6">
@@ -226,6 +232,7 @@
             </div>
         </div>
 
+        @if ($canManageSecurity)
         <div class="admin-panel admin-form-panel p-6">
             <p class="admin-section-title">{{ __('Password Reset (Optional)') }}</p>
             <p class="mt-1 text-sm text-slate-600">{{ __('Leave blank to keep current password.') }}</p>
@@ -242,6 +249,7 @@
                 </div>
             </div>
         </div>
+        @endif
 
         <div class="admin-form-actions flex items-center gap-2 pt-2">
             <button type="submit" class="rounded-xl bg-cyan-700 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-800">

@@ -49,6 +49,9 @@ class HerreraBrandStripFeatureTest extends TestCase
         $this->assertSame(7, $options['perPage']);
         $this->assertSame(6, $options['breakpoints'][1439]['perPage']);
         $this->assertSame(2, $options['breakpoints'][767]['perPage']);
+        $this->assertSame(0, $options['focus']);
+        $this->assertSame(0, $options['padding']);
+        $this->assertFalse($options['autoWidth']);
         $this->assertTrue($options['drag']);
         $this->assertSame(2, $xpath->query('//*[@data-herrera-brand-carousel]//button[contains(@class,"splide__arrow")]')->count());
         $this->assertSame(12, $xpath->query('//*[@data-herrera-brand-carousel]//*[contains(concat(" ",normalize-space(@class)," ")," splide__slide ")]')->count());

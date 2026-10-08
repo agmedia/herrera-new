@@ -224,8 +224,8 @@ class CatalogController extends Controller
             ->whereHas('translations', function ($translationQuery) use ($locale, $fallbackLocale, $search): void {
                 $translationQuery
                     ->where('scope', Category::SCOPE_CATALOG)
-                    ->whereIn('locale', [$locale, $fallbackLocale])
-                    ->whereRaw("name LIKE ? ESCAPE '!'", ['%'.app(StorefrontProductSearch::class)->literalLike($search).'%']);
+                    ->whereIn('locale', [$locale, $fallbackLocale]);
+                app(StorefrontProductSearch::class)->applyNameSearch($translationQuery, 'name', $locale, $fallbackLocale, $search);
             })
             ->with([
                 'translations' => fn ($translationQuery) => $translationQuery

@@ -29,6 +29,18 @@ class StorefrontProductSearch
         return $this->policy->literalLike($search);
     }
 
+    /** Apply the same bounded word forms to a translated category name. */
+    public function applyNameSearch(Builder $query, string $column, string $locale, string $fallbackLocale, string $search): void
+    {
+        $search = $this->normalize($search);
+        if ($search === '') {
+            return;
+        }
+
+        $terms = preg_split('/\s+/u', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $this->applyNameTerms($query->getQuery(), $column, $terms, $this->nameTermForms($terms, [$locale, $fallbackLocale]));
+    }
+
     public function apply(Builder $query, string $locale, string $fallbackLocale, string $search): void
     {
         $search = $this->normalize($search);
@@ -39,6 +51,7 @@ class StorefrontProductSearch
         $database = $query->getConnection();
         $locales = array_values(array_unique([$locale, $fallbackLocale]));
         $terms = preg_split('/\s+/u', $search, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $nameTermForms = $this->nameTermForms($terms, $locales);
         $normalized = mb_strtolower($search);
         $literal = $this->literalLike($normalized);
 
@@ -54,15 +67,21 @@ class StorefrontProductSearch
             )
             ->whereIn('search_names.locale', $locales);
 
-        $fulltextTerms = $this->eligibleFulltextTerms($query, $terms);
+        $fulltextTerms = $this->eligibleFulltextTerms($query, $terms, $nameTermForms);
         if (count($terms) === 1 && mb_strlen($terms[0]) < 3 && preg_match('/^\p{L}+$/u', $terms[0])) {
             $names->whereRaw("search_names.name LIKE ? ESCAPE '!'", [$this->literalLike($terms[0]).'%']);
         } elseif ($fulltextTerms !== []) {
-            $booleanSearch = implode(' ', array_map(fn ($term) => '+'.mb_strtolower($term).'*', $fulltextTerms));
+            // Each required word may match one known grammatical form. Keeping
+            // full words here preserves FULLTEXT narrowing without broad stems.
+            $booleanSearch = implode(' ', array_map(function (string $term) use ($nameTermForms): string {
+                $forms = array_map(fn (string $form): string => mb_strtolower($form).'*', $nameTermForms[$term]);
+
+                return count($forms) === 1 ? '+'.$forms[0] : '+('.implode(' ', $forms).')';
+            }, $fulltextTerms));
             $names->whereRaw('MATCH(search_names.name) AGAINST(? IN BOOLEAN MODE)', [$booleanSearch]);
-            $this->applyNameTerms($names, 'search_names.name', array_values(array_diff($terms, $fulltextTerms)));
+            $this->applyNameTerms($names, 'search_names.name', array_values(array_diff($terms, $fulltextTerms)), $nameTermForms);
         } else {
-            $this->applyNameTerms($names, 'search_names.name', $terms);
+            $this->applyNameTerms($names, 'search_names.name', $terms, $nameTermForms);
         }
 
         // Each candidate branch can use its own index; the catalog does not run
@@ -118,19 +137,57 @@ class StorefrontProductSearch
         }
     }
 
-    /** @param array<int, string> $terms */
-    private function applyNameTerms(QueryBuilder $query, string $column, array $terms): void
+    /**
+     * @param  array<int, string>  $terms
+     * @param  array<string, array<int, string>>  $nameTermForms
+     */
+    private function applyNameTerms(QueryBuilder $query, string $column, array $terms, array $nameTermForms): void
     {
         foreach ($terms as $term) {
-            $query->whereRaw("{$column} LIKE ? ESCAPE '!'", ['%'.$this->literalLike($term).'%']);
+            $query->where(function (QueryBuilder $wordQuery) use ($column, $term, $nameTermForms): void {
+                foreach ($nameTermForms[$term] as $form) {
+                    $wordQuery->orWhereRaw("{$column} LIKE ? ESCAPE '!'", ['%'.$this->literalLike($form).'%']);
+                }
+            });
         }
     }
 
     /**
      * @param  array<int, string>  $terms
+     * @param  array<int, string>  $locales
+     * @return array<string, array<int, string>>
+     */
+    private function nameTermForms(array $terms, array $locales): array
+    {
+        $knownForms = [];
+        if (in_array('hr', $locales, true)) {
+            foreach ((array) config('storefront-search.croatian_word_forms', []) as $group) {
+                foreach ($group as $form) {
+                    $knownForms[$form] = $group;
+                }
+            }
+        }
+
+        $result = [];
+        foreach ($terms as $term) {
+            $normalized = mb_strtolower($term);
+            $result[$term] = [$term];
+            foreach ($knownForms[$normalized] ?? [] as $form) {
+                if ($form !== $normalized) {
+                    $result[$term][] = $form;
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  array<int, string>  $terms
+     * @param  array<string, array<int, string>>  $nameTermForms
      * @return array<int, string>
      */
-    private function eligibleFulltextTerms(Builder $query, array $terms): array
+    private function eligibleFulltextTerms(Builder $query, array $terms, array $nameTermForms): array
     {
         if ($query->getConnection()->getDriverName() !== 'mysql') {
             return [];
@@ -152,8 +209,18 @@ class StorefrontProductSearch
         // stopwords remain literal residual conditions on those candidates.
         $stopwords = ['about', 'are', 'com', 'for', 'from', 'how', 'that', 'the', 'this', 'und', 'was', 'what', 'when', 'where', 'who', 'will', 'with', 'www'];
 
-        return array_values(array_filter($terms, fn ($term): bool => mb_strlen($term) >= $limits['minimum']
-            && mb_strlen($term) <= $limits['maximum'] && preg_match('/^[\p{L}\p{N}]+$/u', $term)
-            && (! $limits['stopwords_enabled'] || ! in_array(mb_strtolower($term), $stopwords, true))));
+        return array_values(array_filter($terms, function (string $term) use ($limits, $stopwords, $nameTermForms): bool {
+            // A short alternative might not exist in this server's FULLTEXT
+            // index; use the literal fallback for that whole word group.
+            foreach ($nameTermForms[$term] as $form) {
+                if (mb_strlen($form) < $limits['minimum'] || mb_strlen($form) > $limits['maximum']
+                    || ! preg_match('/^[\p{L}\p{N}]+$/u', $form)
+                    || ($limits['stopwords_enabled'] && in_array(mb_strtolower($form), $stopwords, true))) {
+                    return false;
+                }
+            }
+
+            return true;
+        }));
     }
 }

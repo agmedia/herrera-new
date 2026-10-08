@@ -170,6 +170,9 @@
 .herrera-storefront .product-detail-pricing .b2b-price-access a {
     font-weight: 600;
 }
+.herrera-storefront .product-detail-pricing > [data-b2b-price-access] + .product-detail-price-row {
+    margin-top: 16px;
+}
 .herrera-storefront .product-detail-card [data-product-availability] {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

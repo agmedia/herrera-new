@@ -56,6 +56,7 @@
     $brandStripOptions = [
         'type' => $brandStripCount > 1 ? 'loop' : 'slide', 'rewind' => false, 'perPage' => min(7, max(1, $brandStripCount)),
         'perMove' => 1, 'gap' => '12px', 'drag' => $brandStripCount > 1, 'snap' => true,
+        'focus' => 0, 'padding' => 0, 'autoWidth' => false,
         'pagination' => false, 'arrows' => $brandStripCount > 1, 'updateOnMove' => true, 'speed' => 420,
         'i18n' => ['prev' => $brandStripPrevious, 'next' => $brandStripNext, 'first' => $brandStripNext, 'last' => $brandStripPrevious],
         'breakpoints' => [

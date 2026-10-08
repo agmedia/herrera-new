@@ -1,3 +1,43 @@
+/* Shared form surfaces use the same pale blue as the Herrera hero. */
+body.herrera-storefront {
+    --herrera-form-surface: #edf7f9;
+    --herrera-form-pattern-size: 100vw max(900px, 100vh);
+}
+
+body.herrera-storefront:is(.commerce-body, .mobile-commerce-body) {
+    --commerce-surface: var(--herrera-form-surface);
+    --commerce-form-surface: var(--herrera-form-surface);
+}
+
+body.herrera-storefront :is(.checkout-shell, .mobile-checkout) {
+    --checkout-surface: var(--herrera-form-surface);
+    --checkout-form-surface: var(--herrera-form-surface);
+}
+
+/* Neutral inset panels include consent blocks, help panels and payment details. */
+body.herrera-storefront :is(.commerce-main, .checkout-shell, .checkout-status-card)
+    :is(div, section, aside, article, label, fieldset, thead, li):is(.bg-slate-50, .bg-slate-100, [class~="bg-slate-100/70"]),
+body.herrera-storefront :is(.auth-form-card, .auth-side-card, .contact-form-card, .returns-form-card, .returns-help-card, .checkout-card, .checkout-login-card, .auth-mobile-form, .contact-mobile-form, .returns-mobile-form),
+body.herrera-storefront .commerce-main fieldset,
+body.herrera-storefront.account-profile-commerce-body .commerce-main form.border-slate-200.bg-white,
+body.herrera-storefront.account-commerce-body .commerce-account-nav > div,
+body.herrera-storefront.mobile-commerce-body .card.card-style:has(> .content > form),
+body.herrera-storefront .commerce-main table thead,
+body.herrera-storefront .product-detail-lower .product-detail-comment-form {
+    background-color: var(--herrera-form-surface);
+    background-image: var(--herrera-surface-pattern);
+    background-position: center top;
+    background-repeat: no-repeat;
+    background-size: var(--herrera-form-pattern-size);
+    background-attachment: fixed;
+}
+
+@media (max-width: 1023px) {
+    body.herrera-storefront {
+        --herrera-form-pattern-size: 100vw max(600px, 100vh);
+    }
+}
+
 /* Text links are explicit so navigation, product titles and action buttons keep their design. */
 body.herrera-storefront .store-text-link,
 body.herrera-storefront .content-richtext a,

@@ -165,20 +165,15 @@
     gap: 20px;
     padding: clamp(18px, 1.6vw, 28px);
     border-color: #d4e9ec;
-    background: #edf7f9;
+    background-color: #edf7f9;
+    background-image: var(--herrera-surface-pattern);
+    background-position: center top;
+    background-repeat: no-repeat;
+    background-size: 100vw max(900px, 100vh);
 }
 
 .herrera-storefront .herrera-category-support:hover {
-    background: #edf7f9;
-}
-
-.herrera-storefront .herrera-category-support::before {
-    position: absolute;
-    z-index: 0;
-    inset: 0 0 0 55%;
-    background: linear-gradient(135deg, transparent 20%, rgb(0 181 204 / 8%) 20%, rgb(0 181 204 / 8%) 45%, transparent 45%);
-    content: '';
-    pointer-events: none;
+    background-color: #edf7f9;
 }
 
 .herrera-storefront .herrera-category-support-copy,
@@ -271,7 +266,17 @@
     }
 }
 
+@media (min-width: 1024px) {
+    .herrera-storefront .herrera-category-support {
+        background-attachment: fixed;
+    }
+}
+
 @media (max-width: 1023px) {
+    .herrera-storefront .herrera-category-support {
+        background-size: 100vw max(600px, 100vh);
+    }
+
     .herrera-storefront .herrera-category-module-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }

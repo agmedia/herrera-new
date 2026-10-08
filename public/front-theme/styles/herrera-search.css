@@ -1,8 +1,38 @@
 .header-search-panel-close { display: none; }
 
+.herrera-storefront :is(.header-search-suggestions-meta, .header-search-suggestions-footer) {
+    border-color: var(--herrera-header-line, #d6e6ea);
+    background: #edf7f9;
+    color: var(--herrera-header-ink, #24353b);
+}
+
+.herrera-storefront .header-search-suggestions-link {
+    color: var(--herrera-action, #007b8b);
+}
+
+.herrera-storefront .header-search-suggestions-link:is(:hover, :focus-visible) {
+    background: #def0f4;
+    color: #005f6c;
+}
+
+.herrera-storefront :is(.header-search-suggestion, .header-search-related-suggestion):is(:hover, :focus-visible, .is-active) {
+    border-color: var(--herrera-header-line, #d6e6ea);
+    background: #edf7f9;
+    color: var(--herrera-action, #007b8b);
+}
+
+.herrera-storefront .header-search-suggestion:is(:hover, :focus-visible, .is-active) .header-search-suggestion-title {
+    color: var(--herrera-action, #007b8b);
+}
+
+.herrera-storefront .header-search-suggestion-thumb {
+    border-color: var(--herrera-header-line, #d6e6ea);
+    background: #fff;
+}
+
 .herrera-storefront .header-search-suggestions-grid > .is-categories {
     grid-column: 1 / -1;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--herrera-header-line, #d6e6ea);
 }
 
 .herrera-storefront .header-search-suggestions-grid.has-no-related {

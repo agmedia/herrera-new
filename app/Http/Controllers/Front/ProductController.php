@@ -18,6 +18,7 @@ use App\Services\Content\ContentBlockResolver;
 use App\Services\Front\ProductColorVariantService;
 use App\Services\Front\WishlistService;
 use App\Services\Payments\CorvusPayFormService;
+use App\Services\Pricing\PriceCatalogResolver;
 use App\Services\Pricing\ProductPricePresentationService;
 use App\Services\Pricing\TaxPricingService;
 use App\Services\Settings\SystemSettingsService;
@@ -248,7 +249,13 @@ class ProductController extends Controller
             ])
             ->orderByDesc('id');
 
-        $related = collect();
+        $relatedSelectionQuery = Product::query()
+            ->select('products.id')
+            ->visibleOnStorefront($this->hideOutOfStockProducts())
+            ->where('id', '!=', $product->id)
+            ->orderByDesc('id');
+
+        $relatedIds = collect();
         $excludeIds = [(int) $product->id];
 
         $explicitRelatedIds = collect($product->payload['related_product_ids'] ?? [])
@@ -256,13 +263,14 @@ class ProductController extends Controller
             ->filter(fn ($id): bool => $id > 0 && $id !== (int) $product->id)
             ->unique()->values()->all();
         if ($explicitRelatedIds !== []) {
-            $related = (clone $relatedBaseQuery)->whereIn('id', $explicitRelatedIds)->get()
-                ->sortBy(fn (Product $row): int => array_search((int) $row->id, $explicitRelatedIds, true))
+            $relatedIds = (clone $relatedSelectionQuery)->whereIn('id', $explicitRelatedIds)->pluck('products.id')
+                ->map(fn ($id): int => (int) $id)
+                ->sortBy(fn (int $id): int => array_search($id, $explicitRelatedIds, true))
                 ->take($relatedLimit)->values();
-            $excludeIds = array_merge($excludeIds, $related->pluck('id')->all());
+            $excludeIds = array_merge($excludeIds, $relatedIds->all());
         }
 
-        if ($categoryIds !== []) {
+        if ($categoryIds !== [] && $relatedIds->count() < $relatedLimit) {
             $productCategories = Category::query()
                 ->select(['id', 'parent_id', '_lft', '_rgt'])
                 ->where('scope', Category::SCOPE_CATALOG)
@@ -278,20 +286,21 @@ class ProductController extends Controller
             $deepestCategoryIds = $deepestCategories->pluck('id')->map(fn ($id): int => (int) $id)->all();
 
             if ($deepestCategoryIds !== []) {
-                $sameSubcategory = (clone $relatedBaseQuery)
+                $sameSubcategory = (clone $relatedSelectionQuery)
                     ->whereHas('categories', fn ($categoryQuery) => $categoryQuery->whereIn('categories.id', $deepestCategoryIds))
                     ->whereNotIn('id', $excludeIds)
-                    ->limit(max(0, $relatedLimit - $related->count()))
-                    ->get();
+                    ->limit($relatedLimit - $relatedIds->count())
+                    ->pluck('products.id')
+                    ->map(fn ($id): int => (int) $id);
 
-                $related = $related->concat($sameSubcategory);
+                $relatedIds = $relatedIds->concat($sameSubcategory);
                 $excludeIds = array_values(array_unique(array_merge(
                     $excludeIds,
-                    $sameSubcategory->pluck('id')->map(fn ($id): int => (int) $id)->all()
+                    $sameSubcategory->all()
                 )));
             }
 
-            if ($related->count() < $relatedLimit) {
+            if ($relatedIds->count() < $relatedLimit) {
                 $rootCategories = Category::query()
                     ->select(['id', '_lft', '_rgt'])
                     ->where('scope', Category::SCOPE_CATALOG)
@@ -316,7 +325,7 @@ class ProductController extends Controller
                 }
 
                 if ($rootBoundaries !== []) {
-                    $fallback = (clone $relatedBaseQuery)
+                    $fallback = (clone $relatedSelectionQuery)
                         ->whereNotIn('id', $excludeIds)
                         ->whereHas('categories', function ($categoryQuery) use ($rootBoundaries): void {
                             $categoryQuery->where(function ($or) use ($rootBoundaries): void {
@@ -329,51 +338,62 @@ class ProductController extends Controller
                                 }
                             });
                         })
-                        ->limit($relatedLimit - $related->count())
-                        ->get();
+                        ->limit($relatedLimit - $relatedIds->count())
+                        ->pluck('products.id')
+                        ->map(fn ($id): int => (int) $id);
 
-                    $related = $related->concat($fallback);
+                    $relatedIds = $relatedIds->concat($fallback);
                     $excludeIds = array_values(array_unique(array_merge(
                         $excludeIds,
-                        $fallback->pluck('id')->map(fn ($id): int => (int) $id)->all()
+                        $fallback->all()
                     )));
                 }
             }
         }
 
-        if ($related->count() < $relatedLimit) {
-            $latestFallback = (clone $relatedBaseQuery)
+        if ($relatedIds->count() < $relatedLimit) {
+            $latestFallback = (clone $relatedSelectionQuery)
                 ->whereNotIn('id', $excludeIds)
-                ->limit($relatedLimit - $related->count())
-                ->get();
-            $related = $related->concat($latestFallback);
+                ->limit($relatedLimit - $relatedIds->count())
+                ->pluck('products.id')
+                ->map(fn ($id): int => (int) $id);
+            $relatedIds = $relatedIds->concat($latestFallback);
         }
 
-        $related = $related->take($relatedLimit)->values();
+        $relatedIds = $relatedIds->take($relatedLimit)->values();
         $recentlyViewedIds = collect((array) $request->session()->get(self::RECENTLY_VIEWED_SESSION_KEY, []))
             ->map(fn ($id): int => (int) $id)
             ->filter(fn (int $id): bool => $id > 0)
             ->reject(fn (int $id): bool => $id === (int) $product->id)
             ->values();
 
-        $recentlyViewed = collect();
+        $recentlyViewedCardIds = collect();
         if ($recentlyViewedIds->isNotEmpty()) {
             $recentlyViewedLookupIds = ($isHerreraStorefront ? $recentlyViewedIds->unique() : $recentlyViewedIds)
                 ->take($isHerreraStorefront ? self::RECENTLY_VIEWED_MAX : 12)
                 ->values()
                 ->all();
 
-            $recentlyViewed = (clone $relatedBaseQuery)
+            $recentlyViewedCardIds = (clone $relatedSelectionQuery)
                 ->whereIn('id', $recentlyViewedLookupIds)
-                ->get()
-                ->sortBy(function (Product $row) use ($recentlyViewedLookupIds): int {
-                    $position = array_search((int) $row->id, $recentlyViewedLookupIds, true);
+                ->pluck('products.id')
+                ->map(fn ($id): int => (int) $id)
+                ->sortBy(function (int $id) use ($recentlyViewedLookupIds): int {
+                    $position = array_search($id, $recentlyViewedLookupIds, true);
 
                     return $position === false ? PHP_INT_MAX : (int) $position;
                 })
                 ->take(12)
                 ->values();
         }
+
+        // Resolve ranking with IDs first, then load card relations once for both lists.
+        $cardIds = $relatedIds->concat($recentlyViewedCardIds)->unique()->values();
+        $cards = $cardIds->isEmpty()
+            ? collect()
+            : (clone $relatedBaseQuery)->whereIn('id', $cardIds->all())->get()->keyBy('id');
+        $related = $relatedIds->map(fn (int $id) => $cards->get($id))->filter()->values();
+        $recentlyViewed = $recentlyViewedCardIds->map(fn (int $id) => $cards->get($id))->filter()->values();
 
         $updatedRecentlyViewedIds = collect([(int) $product->id])
             ->concat($recentlyViewedIds)
@@ -439,6 +459,7 @@ class ProductController extends Controller
             ))
             ->values();
         $taxRate = app(TaxPricingService::class)->resolveRateForProduct($product);
+        app(PriceCatalogResolver::class)->preloadProducts(collect([$product])->concat($cards->values()), $request->user());
 
         $response = response()->view($this->frontendView($request, 'products.show'), [
             'product' => $product,

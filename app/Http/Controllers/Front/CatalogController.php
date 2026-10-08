@@ -22,6 +22,7 @@ use App\Services\Front\StorefrontSearchCountCache;
 use App\Services\Front\WishlistService;
 use App\Services\Pricing\B2BAccessService;
 use App\Services\Pricing\PriceCatalogQuery;
+use App\Services\Pricing\PriceCatalogResolver;
 use App\Services\Pricing\ProductPricePresentationService;
 use App\Services\Settings\SystemSettingsService;
 use App\Support\Media\MediaUrl;
@@ -624,6 +625,7 @@ class CatalogController extends Controller
         $products = $query
             ->paginate($this->shopPerPage($request), total: $this->searchPaginationTotal($request, $query, $search))
             ->withQueryString();
+        app(PriceCatalogResolver::class)->preloadProducts($products->getCollection(), $request->user());
 
         if ($promoOnly) {
             $categories = $this->promotionCatalogCategories(
@@ -972,6 +974,8 @@ class CatalogController extends Controller
             ))->withQueryString();
         }
 
+        app(PriceCatalogResolver::class)->preloadProducts($products->getCollection(), $request->user());
+
         $categories = $showCategoryFilters
             ? ($promoOnly
                 ? $this->promotionCatalogCategories(
@@ -1005,54 +1009,15 @@ class CatalogController extends Controller
                     ->with(['translations' => fn ($q) => $q
                         ->where('scope', Category::SCOPE_CATALOG)
                         ->whereIn('locale', [$locale, $fallbackLocale])])
-                    ->withCount(['products' => function ($q) use ($availableOnly, $manufacturerId): void {
-                        $q->visibleOnStorefront($this->hideOutOfStockProducts() || $availableOnly)->availableWithin48Hours($this->localAvailabilityOnly);
-                        if ($manufacturerId && $manufacturerId > 0) {
-                            $q->where('products.manufacturer_id', $manufacturerId);
-                        } elseif ($manufacturerId !== null) {
-                            $q->whereRaw('1 = 0');
-                        }
-                    }])
                     ->orderBy('sort_order')
                     ->orderBy('id')
                     ->get()
                 : collect();
-            $subcategories->transform(function (Category $subCategory) use ($availableOnly, $manufacturerId): Category {
-                $subTreeIds = Category::query()
-                    ->descendantsAndSelf($subCategory->id)
-                    ->where('scope', Category::SCOPE_CATALOG)
-                    ->filter(fn (Category $category): bool => $category->isCurrentlyVisible())
-                    ->pluck('id');
-
-                if ($subTreeIds->isEmpty()) {
-                    $subCategory->setAttribute('products_count', 0);
-
-                    return $subCategory;
-                }
-
-                $recursiveCount = Product::query()
-                    ->visibleOnStorefront($this->hideOutOfStockProducts() || $availableOnly)->availableWithin48Hours($this->localAvailabilityOnly)
-                    ->when(
-                        $manufacturerId && $manufacturerId > 0,
-                        fn (Builder $query) => $query->where('products.manufacturer_id', $manufacturerId)
-                    )
-                    ->when(
-                        $manufacturerId !== null && $manufacturerId <= 0,
-                        fn (Builder $query) => $query->whereRaw('1 = 0')
-                    )
-                    ->whereHas('categories', function ($categoryQuery) use ($subTreeIds): void {
-                        $categoryQuery
-                            ->where('scope', Category::SCOPE_CATALOG)
-                            ->currentlyVisible()
-                            ->whereIn('categories.id', $subTreeIds);
-                    })
-                    ->distinct('products.id')
-                    ->count('products.id');
-
-                $subCategory->setAttribute('products_count', $recursiveCount);
-
-                return $subCategory;
-            })->filter(fn (Category $subCategory): bool => (int) $subCategory->products_count > 0)->values();
+            $this->withRecursiveCatalogProductCounts(
+                $subcategories,
+                $this->hideOutOfStockProducts() || $availableOnly,
+                $manufacturerId
+            );
         }
 
         $breadcrumbCategories = $category->ancestors()
@@ -1296,30 +1261,7 @@ class CatalogController extends Controller
                 ->orderBy('id')
                 ->get();
 
-            return $categories->map(function (Category $category) use ($hideOutOfStock): Category {
-                $treeIds = Category::query()
-                    ->descendantsAndSelf($category->id)
-                    ->where('scope', Category::SCOPE_CATALOG)
-                    ->filter(fn (Category $treeCategory): bool => $treeCategory->isCurrentlyVisible())
-                    ->pluck('id');
-
-                $productCount = $treeIds->isEmpty()
-                    ? 0
-                    : Product::query()
-                        ->visibleOnStorefront($hideOutOfStock)->availableWithin48Hours($this->localAvailabilityOnly)
-                        ->whereHas('categories', function ($categoryQuery) use ($treeIds): void {
-                            $categoryQuery
-                                ->where('scope', Category::SCOPE_CATALOG)
-                                ->currentlyVisible()
-                                ->whereIn('categories.id', $treeIds);
-                        })
-                        ->distinct('products.id')
-                        ->count('products.id');
-
-                $category->setAttribute('products_count', $productCount);
-
-                return $category;
-            })
+            return $this->withRecursiveCatalogProductCounts($categories, $hideOutOfStock)
                 ->filter(fn (Category $category): bool => (int) $category->products_count > 0)
                 ->values();
         });
@@ -1402,36 +1344,58 @@ class CatalogController extends Controller
             $hideOutOfStock,
             $availableOnly
         ) {
-            return $this->cachedShopCatalogCategories($locale, $fallbackLocale, $availableOnly)
-                ->map(function (Category $category) use ($manufacturerId, $hideOutOfStock): Category {
-                    $category = clone $category;
-                    $treeIds = Category::query()
-                        ->descendantsAndSelf($category->id)
-                        ->where('scope', Category::SCOPE_CATALOG)
-                        ->filter(fn (Category $treeCategory): bool => $treeCategory->isCurrentlyVisible())
-                        ->pluck('id');
+            $categories = $this->cachedShopCatalogCategories($locale, $fallbackLocale, $availableOnly)
+                ->map(fn (Category $category): Category => clone $category);
 
-                    $productCount = $treeIds->isEmpty()
-                        ? 0
-                        : Product::query()
-                            ->visibleOnStorefront($hideOutOfStock)->availableWithin48Hours($this->localAvailabilityOnly)
-                            ->where('manufacturer_id', $manufacturerId)
-                            ->whereHas('categories', function ($categoryQuery) use ($treeIds): void {
-                                $categoryQuery
-                                    ->where('scope', Category::SCOPE_CATALOG)
-                                    ->currentlyVisible()
-                                    ->whereIn('categories.id', $treeIds);
-                            })
-                            ->distinct('products.id')
-                            ->count('products.id');
-
-                    $category->setAttribute('products_count', $productCount);
-
-                    return $category;
-                })
+            return $this->withRecursiveCatalogProductCounts($categories, $hideOutOfStock, $manufacturerId)
                 ->filter(fn (Category $category): bool => (int) $category->products_count > 0)
                 ->values();
         });
+    }
+
+    /**
+     * Count products for all requested category trees together. A product may
+     * belong to both an ancestor and a child, so each tree counts it only once.
+     */
+    private function withRecursiveCatalogProductCounts(
+        Collection $categories,
+        bool $hideOutOfStock,
+        ?int $manufacturerId = null
+    ): Collection {
+        if ($categories->isEmpty()) {
+            return $categories;
+        }
+        if ($manufacturerId !== null && $manufacturerId <= 0) {
+            return $categories->each(fn (Category $category) => $category->setAttribute('products_count', 0));
+        }
+
+        $productsQuery = Product::query()
+            ->visibleOnStorefront($hideOutOfStock)
+            ->availableWithin48Hours($this->localAvailabilityOnly)
+            ->join('category_product as recursive_category_product', 'recursive_category_product.product_id', '=', 'products.id')
+            ->join('categories as recursive_product_categories', 'recursive_product_categories.id', '=', 'recursive_category_product.category_id')
+            ->join('categories as recursive_filter_categories', function ($join): void {
+                $join
+                    ->on('recursive_product_categories._lft', '>=', 'recursive_filter_categories._lft')
+                    ->on('recursive_product_categories._rgt', '<=', 'recursive_filter_categories._rgt');
+            })
+            ->where('recursive_product_categories.scope', Category::SCOPE_CATALOG)
+            ->where('recursive_product_categories.is_active', true)
+            ->whereIn('recursive_filter_categories.id', $categories->pluck('id')->all());
+        $this->applyCategoryScheduleToBaseQuery($productsQuery->getQuery(), 'recursive_product_categories');
+        if ($manufacturerId !== null) {
+            $productsQuery->where('products.manufacturer_id', $manufacturerId);
+        }
+
+        $counts = $productsQuery
+            ->selectRaw('recursive_filter_categories.id as category_id, COUNT(DISTINCT products.id) as products_count')
+            ->groupBy('recursive_filter_categories.id')
+            ->toBase()
+            ->pluck('products_count', 'category_id');
+
+        return $categories->each(
+            fn (Category $category) => $category->setAttribute('products_count', (int) ($counts[$category->id] ?? 0))
+        );
     }
 
     private function hideOutOfStockProducts(): bool

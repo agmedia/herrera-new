@@ -113,9 +113,9 @@
                                     @if($link['open_in_new_tab']) target="_blank" rel="noopener noreferrer" @endif
                                 >
                                     @if ($herreraStorefront && str_starts_with(strtolower($link['url']), 'mailto:'))
-                                        <x-fa-icon name="envelope" style="regular" />
+                                        <x-fa-icon :inline="$herreraStorefront" name="envelope" style="regular" />
                                     @elseif ($herreraStorefront && str_starts_with(strtolower($link['url']), 'tel:'))
-                                        <x-fa-icon name="phone" style="regular" />
+                                        <x-fa-icon :inline="$herreraStorefront" name="phone" style="regular" />
                                     @endif
                                     {{ $link['label'] }}
                                 </a>
@@ -145,19 +145,19 @@
                             >
                                 @switch($social['network'])
                                     @case('youtube')
-                                        <x-fa-icon name="youtube" style="brands" />
+                                        <x-fa-icon :inline="$herreraStorefront" name="youtube" style="brands" />
                                         @break
                                     @case('instagram')
-                                        <x-fa-icon name="instagram" style="brands" />
+                                        <x-fa-icon :inline="$herreraStorefront" name="instagram" style="brands" />
                                         @break
                                     @case('linkedin')
-                                        <x-fa-icon name="linkedin-in" style="brands" />
+                                        <x-fa-icon :inline="$herreraStorefront" name="linkedin-in" style="brands" />
                                         @break
                                     @case('twitter')
-                                        <x-fa-icon name="x-twitter" style="brands" />
+                                        <x-fa-icon :inline="$herreraStorefront" name="x-twitter" style="brands" />
                                         @break
                                     @default
-                                        <x-fa-icon name="facebook-f" style="brands" />
+                                        <x-fa-icon :inline="$herreraStorefront" name="facebook-f" style="brands" />
                                 @endswitch
                                 @if ($herreraStorefront)
                                     <span class="site-top-bar-social-label" aria-hidden="true">{{ match ($social['network']) { 'linkedin' => 'LinkedIn', 'twitter' => 'X', default => ucfirst($social['network']) } }}</span>
@@ -198,10 +198,10 @@
                     $herreraCatalogNavigation['label'] = __('herrera.header.categories');
                 @endphp
                 <nav class="herrera-catalog-navigation" aria-label="{{ __('herrera.header.categories') }}" data-herrera-catalog-navigation>
-                    @include('front.desktop.partials.main-nav', ['mainNavigation' => [$herreraCatalogNavigation], 'herreraCatalogHeader' => true])
+                    @include('front.desktop.partials.main-nav', ['mainNavigation' => [$herreraCatalogNavigation], 'herreraCatalogHeader' => true, 'deferCatalogMega' => true])
                 </nav>
                 <a class="herrera-header-quick-order" href="{{ route('account.b2b.quick-order') }}" data-herrera-quick-order>
-                    <x-fa-icon name="list-check" style="regular" />
+                    <x-fa-icon :inline="$herreraStorefront" name="list-check" style="regular" />
                     <span>{{ __('herrera.header.quick_order') }}</span>
                 </a>
             @endif
@@ -245,12 +245,12 @@
                         data-header-search-input
                     >
                     <button type="submit" class="header-search-submit" aria-label="{{ __('ui.shop.filters.search') }}">
-                        <x-fa-icon name="magnifying-glass" />
+                        <x-fa-icon :inline="$herreraStorefront" name="magnifying-glass" />
                     </button>
                     <div class="header-search-suggestions" data-header-search-suggestions hidden>
                         <div class="header-search-suggestions-meta" data-header-search-suggestions-meta></div>
                         <button type="button" class="header-search-suggestions-close" aria-label="{{ __('Zatvori rezultate pretrage') }}" data-header-search-suggestions-close>
-                            <x-fa-icon name="xmark" />
+                            <x-fa-icon :inline="$herreraStorefront" name="xmark" />
                         </button>
                         <div class="header-search-suggestions-loading" data-header-search-loading hidden></div>
                         <div class="header-search-suggestions-empty" data-header-search-empty hidden></div>
@@ -283,18 +283,18 @@
 
                 @auth
                     <a href="{{ route('account.dashboard') }}" class="inline-flex min-w-[136px] items-center justify-center gap-2 border-r border-slate-200 px-4 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-black">
-                        <x-fa-icon name="user" style="regular" class="h-5 w-5" />
+                        <x-fa-icon :inline="$herreraStorefront" name="user" style="regular" class="h-5 w-5" />
                         {{ __('ui.front.desktop.account') }}
                     </a>
                 @else
                     <a href="{{ route('front.auth.login') }}" class="inline-flex min-w-[136px] items-center justify-center gap-2 border-r border-slate-200 px-4 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-black">
-                        <x-fa-icon name="user" style="regular" class="h-5 w-5" />
+                        <x-fa-icon :inline="$herreraStorefront" name="user" style="regular" class="h-5 w-5" />
                         {{ $herreraStorefront ? __('herrera.header.login') : __('ui.front.desktop.account') }}
                     </a>
                 @endauth
 
                 <a href="{{ route('wishlist.index') }}" class="relative inline-flex h-full w-[76px] items-center justify-center border-r border-slate-200 text-slate-700 transition hover:bg-slate-50 hover:text-black {{ $wishlistCount > 0 ? '' : 'hidden' }}" aria-label="{{ __('ui.front.desktop.favorites') }}: {{ $wishlistCount }}" data-wishlist-link>
-                    <x-fa-icon name="heart" style="regular" class="block h-5 w-5 text-current" />
+                    <x-fa-icon :inline="$herreraStorefront" name="heart" style="regular" class="block h-5 w-5 text-current" />
                     <span class="header-count-badge absolute right-3 top-4 z-10 inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold" data-wishlist-count>
                         {{ $wishlistCount }}
                     </span>
@@ -309,7 +309,7 @@
                         aria-expanded="false"
                         data-header-cart-trigger
                     >
-                        <x-fa-icon name="bag-shopping" class="header-cart-trigger-icon" />
+                        <x-fa-icon :inline="$herreraStorefront" name="bag-shopping" class="header-cart-trigger-icon" />
                         <span class="header-count-badge header-cart-count" data-cart-count>
                             {{ (int) $cartSummary['item_qty'] }}
                         </span>
@@ -332,35 +332,35 @@
                         aria-controls="header-search-panel"
                         data-header-search-toggle
                     >
-                        <x-fa-icon name="magnifying-glass" class="h-5 w-5" />
+                        <x-fa-icon :inline="$herreraStorefront" name="magnifying-glass" class="h-5 w-5" />
                     </button>
                 @endif
                 @auth
                     <a href="{{ route('account.dashboard') }}" class="responsive-header-action inline-flex w-12 items-center justify-center border-r border-slate-200 text-slate-700 transition hover:bg-slate-50 hover:text-black sm:w-14 lg:w-16" aria-label="{{ __('ui.front.desktop.account') }}">
-                        <x-fa-icon name="user" style="regular" class="h-5 w-5" />
+                        <x-fa-icon :inline="$herreraStorefront" name="user" style="regular" class="h-5 w-5" />
                     </a>
                 @else
                     <a href="{{ route('front.auth.login') }}" class="responsive-header-action inline-flex w-12 items-center justify-center border-r border-slate-200 text-slate-700 transition hover:bg-slate-50 hover:text-black sm:w-14 lg:w-16" aria-label="{{ __('ui.front.desktop.sign_in') }}">
-                        <x-fa-icon name="user" style="regular" class="h-5 w-5" />
+                        <x-fa-icon :inline="$herreraStorefront" name="user" style="regular" class="h-5 w-5" />
                     </a>
                 @endauth
 
                 <a href="{{ route('wishlist.index') }}" class="responsive-header-action relative inline-flex w-12 items-center justify-center border-r border-slate-200 text-slate-700 transition hover:bg-slate-50 hover:text-black sm:w-14 lg:w-16 {{ $herreraStorefront && $wishlistCount === 0 ? 'hidden' : '' }}" aria-label="{{ __('ui.front.desktop.favorites') }}: {{ $wishlistCount }}" data-wishlist-link @unless($herreraStorefront) data-wishlist-always-visible @endunless>
-                    <x-fa-icon name="heart" style="regular" class="h-5 w-5" />
+                    <x-fa-icon :inline="$herreraStorefront" name="heart" style="regular" class="h-5 w-5" />
                     <span class="header-count-badge absolute right-0.5 top-2.5 h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold {{ $wishlistCount > 0 ? 'inline-flex' : 'hidden' }}" data-wishlist-count>
                         {{ $wishlistCount }}
                     </span>
                 </a>
 
                 <a href="{{ route('cart.index') }}" class="responsive-header-action relative inline-flex h-full w-12 items-center justify-center border-r border-slate-200 text-slate-900 transition hover:bg-slate-50 hover:text-black sm:w-14 lg:w-16" aria-label="{{ __('ui.front.desktop.cart') }}: {{ (int) $cartSummary['item_qty'] }}">
-                    <x-fa-icon name="bag-shopping" class="h-6 w-6" />
+                    <x-fa-icon :inline="$herreraStorefront" name="bag-shopping" class="h-6 w-6" />
                     <span class="header-count-badge absolute right-0.5 top-2.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-bold" data-cart-count>
                         {{ (int) $cartSummary['item_qty'] }}
                     </span>
                 </a>
 
                 <button type="button" class="responsive-header-action flex h-full w-12 items-center justify-center border-r border-slate-200 bg-white text-slate-900 transition hover:bg-slate-50 sm:w-14 lg:w-16" aria-label="{{ __('ui.front.desktop.open_navigation') }}" data-mobile-menu-open>
-                    <x-fa-icon name="bars" class="h-5 w-5" />
+                    <x-fa-icon :inline="$herreraStorefront" name="bars" class="h-5 w-5" />
                 </button>
             </div>
         </div>
@@ -373,19 +373,19 @@
             <div class="herrera-mobile-shortcuts herrera-layout-container">
                 @if ($herreraMobileCatalogExpandable)
                 <button type="button" data-mobile-menu-open data-mobile-menu-open-categories aria-label="{{ __('herrera.header.categories') }}">
-                    <x-fa-icon name="bars" />
+                    <x-fa-icon :inline="$herreraStorefront" name="bars" />
                     <span>{{ __('herrera.header.categories') }}</span>
-                    <x-fa-icon name="chevron-down" />
+                    <x-fa-icon :inline="$herreraStorefront" name="chevron-down" />
                 </button>
                 @else
                 <a href="{{ route('categories.index') }}" aria-label="{{ __('herrera.header.categories') }}">
-                    <x-fa-icon name="bars" />
+                    <x-fa-icon :inline="$herreraStorefront" name="bars" />
                     <span>{{ __('herrera.header.categories') }}</span>
-                    <x-fa-icon name="arrow-right" />
+                    <x-fa-icon :inline="$herreraStorefront" name="arrow-right" />
                 </a>
                 @endif
                 <a href="{{ route('account.b2b.quick-order') }}">
-                    <x-fa-icon name="list-check" style="regular" />
+                    <x-fa-icon :inline="$herreraStorefront" name="list-check" style="regular" />
                     <span>{{ __('herrera.header.quick_order') }}</span>
                 </a>
             </div>
@@ -443,26 +443,12 @@
             </div>
         </div>
     @endif
+    @if ($herreraStorefront)
+        <span hidden data-header-rendered></span>
+    @endif
 </header>
 
 <div class="site-main-header-spacer" aria-hidden="true" data-site-main-header-spacer></div>
-
-<div class="pointer-events-none fixed inset-0 lg:hidden" data-mobile-menu-root>
-    <button type="button" class="absolute inset-0 bg-black/45 opacity-0 transition-opacity duration-300" aria-label="{{ __('ui.front.desktop.close_navigation') }}" data-mobile-menu-close></button>
-    <aside class="absolute inset-y-0 left-0 flex w-full max-w-none -translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out" data-mobile-menu-panel>
-        <div class="flex items-center justify-between border-b border-slate-200 px-4 py-4">
-            @if ($storeBrandLogoUrl !== '')
-                <img src="{{ $storeBrandLogoUrl }}" alt="{{ $storeBrandName }}" class="block h-10 w-auto max-w-[12rem] object-contain" width="{{ $storeBrandLogoWidth }}" height="{{ $storeBrandLogoHeight }}" data-store-brand-logo>
-            @else
-                <span class="text-xl font-black tracking-tight text-slate-900">{{ $storeBrandName }}</span>
-            @endif
-            <button type="button" class="inline-flex h-10 w-10 items-center justify-center border border-slate-200 text-slate-700 transition hover:bg-slate-50 hover:text-black" aria-label="{{ __('ui.front.desktop.close_navigation') }}" data-mobile-menu-close>
-                <x-fa-icon name="xmark" class="h-5 w-5" />
-            </button>
-        </div>
-        @include('front.desktop.partials.main-nav-mobile')
-    </aside>
-</div>
 
 @php
     $mainClasses = trim(($herreraStorefront ? 'herrera-main herrera-layout-container ' : '').$__env->yieldContent('main_class', 'mx-auto w-full max-w-7xl px-6 py-8'));
@@ -796,6 +782,26 @@
         </div>
     </div>
 </footer>
+
+{{-- Hidden navigation follows the visible page so it cannot delay header/content parsing. --}}
+@stack('deferred-header-menus')
+
+<div class="pointer-events-none fixed inset-0 lg:hidden" data-mobile-menu-root>
+    <button type="button" class="absolute inset-0 bg-black/45 opacity-0 transition-opacity duration-300" aria-label="{{ __('ui.front.desktop.close_navigation') }}" data-mobile-menu-close></button>
+    <aside class="absolute inset-y-0 left-0 flex w-full max-w-none -translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out" data-mobile-menu-panel>
+        <div class="flex items-center justify-between border-b border-slate-200 px-4 py-4">
+            @if ($storeBrandLogoUrl !== '')
+                <img src="{{ $storeBrandLogoUrl }}" alt="{{ $storeBrandName }}" class="block h-10 w-auto max-w-[12rem] object-contain" width="{{ $storeBrandLogoWidth }}" height="{{ $storeBrandLogoHeight }}" data-store-brand-logo>
+            @else
+                <span class="text-xl font-black tracking-tight text-slate-900">{{ $storeBrandName }}</span>
+            @endif
+            <button type="button" class="inline-flex h-10 w-10 items-center justify-center border border-slate-200 text-slate-700 transition hover:bg-slate-50 hover:text-black" aria-label="{{ __('ui.front.desktop.close_navigation') }}" data-mobile-menu-close>
+                <x-fa-icon name="xmark" class="h-5 w-5" />
+            </button>
+        </div>
+        @include('front.desktop.partials.main-nav-mobile')
+    </aside>
+</div>
 
 @if ($storeSettings['legal_warranty']['enabled'] ?? false)
     @include('front.partials.legal-warranty-modal', ['warranty' => $storeSettings['legal_warranty']])

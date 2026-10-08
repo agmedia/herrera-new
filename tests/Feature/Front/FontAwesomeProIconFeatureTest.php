@@ -3,6 +3,7 @@
 namespace Tests\Feature\Front;
 
 use App\Support\FontAwesomeIcon;
+use DOMDocument;
 use Illuminate\Support\Facades\Blade;
 use Tests\TestCase;
 
@@ -38,6 +39,51 @@ class FontAwesomeProIconFeatureTest extends TestCase
         }
         $this->assertContains('x-twitter', $manifest['brands']);
         $this->assertContains('linkedin-in', $manifest['brands']);
+    }
+
+    public function test_opted_in_icons_embed_the_bundled_geometry_without_an_external_sprite_request(): void
+    {
+        foreach ([['bag-shopping', 'solid'], ['user', 'regular'], ['youtube', 'brands']] as [$name, $style]) {
+            $html = Blade::render('<x-fa-icon :name="$name" :style="$style" :inline="true" class="h-5 w-5" data-icon-test="preserved" />', compact('name', 'style'));
+            $rendered = new DOMDocument;
+            $this->assertTrue($rendered->loadXML(trim($html)));
+            $source = new DOMDocument;
+            $source->load(public_path('vendor/fontawesome-pro-7.3.1/storefront-sprites/'.$style.'.svg'));
+            $symbol = null;
+            foreach ($source->getElementsByTagName('symbol') as $candidate) {
+                if ($candidate->getAttribute('id') === $name) {
+                    $symbol = $candidate;
+                    break;
+                }
+            }
+
+            $this->assertSame($symbol->getAttribute('viewBox'), $rendered->documentElement->getAttribute('viewBox'));
+            $this->assertSame($symbol->getElementsByTagName('path')->length, $rendered->getElementsByTagName('path')->length);
+            foreach ($symbol->getElementsByTagName('path') as $index => $path) {
+                $this->assertSame($path->getAttribute('d'), $rendered->getElementsByTagName('path')->item($index)->getAttribute('d'));
+            }
+            $this->assertSame(0, $rendered->getElementsByTagName('use')->length);
+            $this->assertStringContainsString('data-icon-test="preserved"', $html);
+            $this->assertStringContainsString('h-5 w-5', $html);
+            $this->assertStringContainsString('aria-hidden="true"', $html);
+            $this->assertStringContainsString('focusable="false"', $html);
+            $this->assertStringNotContainsString('storefront-sprites/', $html);
+        }
+    }
+
+    public function test_inline_icons_normalize_inputs_and_keep_the_existing_fallback_for_unbundled_symbols(): void
+    {
+        $this->assertSame(FontAwesomeIcon::inline('heart', 'regular'), FontAwesomeIcon::inline(' HEART ', ' REGULAR '));
+        $this->assertSame(FontAwesomeIcon::inline('heart'), FontAwesomeIcon::inline('heart', '../../brands'));
+        $this->assertNull(FontAwesomeIcon::inline('hand-fingers-crossed', 'duotone'));
+        $html = Blade::render('<x-fa-icon name="hand-fingers-crossed" style="duotone" :inline="true" />');
+        $this->assertStringContainsString(FontAwesomeIcon::url('hand-fingers-crossed', 'duotone'), $html);
+        $this->assertStringContainsString('<use ', $html);
+
+        $html = Blade::render('<x-fa-icon name="../heart?test=1" style="../../brands" :inline="true" />');
+        $this->assertStringContainsString(FontAwesomeIcon::url('circle-question'), $html);
+        $this->assertStringNotContainsString('../', $html);
+        $this->assertStringNotContainsString('test=1', $html);
     }
 
     public function test_every_installed_pro_plus_style_resolves_its_own_real_symbol_without_legacy_fallback(): void

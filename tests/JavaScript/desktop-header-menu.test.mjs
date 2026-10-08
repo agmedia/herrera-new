@@ -8,7 +8,8 @@ const script = readFileSync(new URL('../../public/front-theme/scripts/desktop-he
 function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections), hrefs = [],
     currentPath = '/shop', parents = {}, linkSections = [], categoriesButton = false,
     headerSpacer = false, headerHeight = 176, compactHeaderHeight = 130, scrollY = 0,
-    herreraStorefront = false, mobileViewport = false } = {}) {
+    herreraStorefront = false, mobileViewport = false,
+    deferredCatalogMenu = false, catalogTriggerPresent = true } = {}) {
     const queuedToggles = new Set();
     class Element {
         constructor() {
@@ -58,6 +59,15 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
             if (value !== this.currentOpen) { this.currentOpen = value; queuedToggles.add(this); }
         }
     }
+    class Template extends Element {
+        constructor(id, menu) {
+            super();
+            this.dataset.catalogMegaTemplate = id;
+            this.content = { children: [menu] };
+            this.removed = false;
+        }
+        remove() { this.removed = true; }
+    }
     const root = new Element();
     const header = new Element();
     header.expandedHeight = headerHeight;
@@ -71,6 +81,17 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     const openButton = new Element();
     const panel = new Element();
     const overlay = new Element();
+    const catalogNavGroup = new Element();
+    catalogNavGroup.children = [];
+    catalogNavGroup.append = (fragment) => {
+        catalogNavGroup.children.push(...fragment.children);
+        fragment.children = [];
+    };
+    const catalogMenu = new Element();
+    const catalogTrigger = new Element();
+    catalogTrigger.setAttribute('aria-controls', 'site-main-nav-mega-0');
+    catalogTrigger.closest = (selector) => selector === '.group\\/nav' ? catalogNavGroup : null;
+    const catalogTemplate = deferredCatalogMenu ? new Template('site-main-nav-mega-0', catalogMenu) : null;
     const sections = sectionKeys.map((key) => new Details(key));
     const sectionsByKey = new Map(sections.map((section) => [section.dataset.menuSectionKey, section]));
     sections.forEach((section) => {
@@ -109,7 +130,11 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
         '.site-main-header': header, '[data-mobile-menu-root]': root,
         '[data-site-main-header-spacer]': spacer,
     })[selector] || null;
-    document.querySelectorAll = (selector) => selector === '[data-mobile-menu-open]' ? [openButton] : [];
+    document.querySelectorAll = (selector) => ({
+        '[data-mobile-menu-open]': [openButton],
+        'template[data-catalog-mega-template]': catalogTemplate && !catalogTemplate.removed ? [catalogTemplate] : [],
+        '[data-catalog-mega-trigger]': catalogTriggerPresent ? [catalogTrigger] : [],
+    })[selector] || [];
     const window = new Element();
     window.location = { origin: 'https://shop.example', href: new URL(currentPath, 'https://shop.example').href };
     window.scrollY = scrollY;
@@ -127,9 +152,11 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     };
     vm.runInNewContext(script, {
         document, window, sessionStorage, URL, HTMLElement: Element, HTMLDetailsElement: Details,
+        HTMLTemplateElement: Template,
     });
     return {
         root, header, spacer, window, document, openButton, overlay, sections, storage, links, sectionToggles,
+        catalogTemplate, catalogNavGroup, catalogMenu,
         finishFonts() { fontReadyCallbacks.forEach((callback) => callback()); },
         setMobileViewport(matches) {
             nativeStickyViewport.matches = matches;
@@ -144,6 +171,22 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
         },
     };
 }
+
+test('deferred desktop menu returns to its trigger group once without changing header flow', () => {
+    const page = harness({ deferredCatalogMenu: true, herreraStorefront: true, mobileViewport: true });
+    assert.deepEqual(page.catalogNavGroup.children, [page.catalogMenu]);
+    assert.equal(page.catalogTemplate.removed, true);
+    assert.equal(page.header.measurements, 0);
+    page.window.emit('pageshow', { persisted: true });
+    assert.deepEqual(page.catalogNavGroup.children, [page.catalogMenu]);
+});
+
+test('a deferred menu without its trigger remains inert', () => {
+    const page = harness({ deferredCatalogMenu: true, catalogTriggerPresent: false });
+    assert.deepEqual(page.catalogNavGroup.children, []);
+    assert.equal(page.catalogTemplate.removed, false);
+    assert.deepEqual(page.catalogTemplate.content.children, [page.catalogMenu]);
+});
 
 test('Herrera mobile uses native sticky without header measurements or class changes', () => {
     const page = harness({ herreraStorefront: true, mobileViewport: true, headerSpacer: true, scrollY: 300 });

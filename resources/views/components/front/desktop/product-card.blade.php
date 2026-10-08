@@ -16,6 +16,13 @@
         <a href="{{ $productUrl }}" class="group block">
             @if ($imageUrl)
                 <div class="relative overflow-hidden bg-slate-50 {{ $flat ? '' : 'rounded-xl' }}" data-product-card-image-frame>
+                    <span class="product-card-image-placeholder" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25">
+                            <rect x="3.5" y="3.5" width="17" height="17" rx="3"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <path d="m4 17 5-5 3 3 3-4 5 6" stroke-linecap="round" stroke-linejoin="round"></path>
+                        </svg>
+                    </span>
                     <img
                         src="{{ $imageUrl }}"
                         @if (!empty($imageSrcset)) srcset="{{ $imageSrcset }}" @endif
@@ -27,6 +34,7 @@
                         loading="{{ $priorityImage ? 'eager' : 'lazy' }}"
                         @if ($priorityImage) fetchpriority="high" @endif
                         decoding="async"
+                        data-product-card-image
                     >
                     @if ($hoverImageUrl)
                         <img
@@ -407,6 +415,7 @@
 @once
     @push('scripts')
         @include('front.partials.cart-modal-script')
+        <script defer src="{{ asset('front-theme/scripts/product-card-images.js') }}?v={{ filemtime(public_path('front-theme/scripts/product-card-images.js')) }}"></script>
         <script defer src="{{ asset('front-theme/scripts/product-card-cart-modal.js') }}?v={{ filemtime(public_path('front-theme/scripts/product-card-cart-modal.js')) }}"></script>
     @endpush
 @endonce

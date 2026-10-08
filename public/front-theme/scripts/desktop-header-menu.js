@@ -93,6 +93,26 @@
         }
     };
 
+    const mountDeferredCatalogMegaMenus = () => {
+        document.querySelectorAll('template[data-catalog-mega-template]').forEach((template) => {
+            if (!(template instanceof HTMLTemplateElement)) {
+                return;
+            }
+
+            const trigger = Array.from(document.querySelectorAll('[data-catalog-mega-trigger]'))
+                .find((element) => element.getAttribute('aria-controls') === template.dataset.catalogMegaTemplate);
+            const navGroup = trigger?.closest('.group\\/nav');
+            if (!(navGroup instanceof HTMLElement)) {
+                return;
+            }
+
+            // Keep the large hidden tree after visible content in the response,
+            // then restore its group for the existing hover and keyboard behavior.
+            navGroup.append(template.content);
+            template.remove();
+        });
+    };
+
     const initCatalogMegaMenus = () => {
         document.querySelectorAll('[data-catalog-mega]').forEach((megaMenu) => {
             if (!(megaMenu instanceof HTMLElement) || megaMenu.dataset.catalogMegaInit === '1') {
@@ -360,6 +380,7 @@
     };
 
     const init = () => {
+        mountDeferredCatalogMegaMenus();
         initStickyHeader();
         initCatalogMegaMenus();
 

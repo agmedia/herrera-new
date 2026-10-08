@@ -60,6 +60,41 @@ class HerreraHeaderPresentationFeatureTest extends TestCase
         $this->assertSame('1', $xpath->query('//*[@data-header-search-form]')->item(0)->getAttribute('data-autocomplete-enabled'));
     }
 
+    public function test_hidden_navigation_follows_the_visible_page_without_delaying_header_controls(): void
+    {
+        $this->configure();
+        $category = $this->category('rasvjeta');
+        $this->category('unutarnja-rasvjeta', ['parent_id' => $category->id]);
+        $html = $this->get(route('home'))->assertOk()->getContent();
+        $xpath = $this->xpath($html);
+        $trigger = $xpath->query('//header//*[@data-catalog-mega-trigger]')->item(0);
+        $menuId = $trigger->getAttribute('aria-controls');
+
+        $this->assertSame(route('shop.index'), $trigger->getAttribute('href'));
+        $this->assertSame(0, $xpath->query('//header//*[@data-catalog-mega]')->count());
+        $this->assertSame(1, $xpath->query('//template[@data-catalog-mega-template="'.$menuId.'"]/*[@id="'.$menuId.'"]')->count());
+        $this->assertSame(1, $xpath->query('//header/*[last()][@hidden and @data-header-rendered]')->count());
+        $this->assertLessThan(strpos($html, '<main '), strpos($html, 'data-header-rendered'));
+        $this->assertLessThan(strpos($html, 'data-catalog-mega-tree'), strpos($html, 'data-header-search-toggle'));
+        $this->assertLessThan(strpos($html, '<template data-catalog-mega-template='), strpos($html, '</footer>'));
+        $this->assertLessThan(strpos($html, 'data-mobile-menu-root'), strpos($html, '</footer>'));
+    }
+
+    public function test_header_icons_are_present_in_the_html_without_waiting_for_sprite_downloads(): void
+    {
+        $this->configure();
+        $this->category('rasvjeta');
+        $xpath = $this->xpath($this->get(route('home'))->assertOk()->getContent());
+        $icons = $xpath->query('//header[contains(@class, "site-main-header")]//svg[not(ancestor::*[@data-header-cart-popover])]');
+        $this->assertGreaterThan(10, $icons->count());
+        foreach ($icons as $icon) {
+            $this->assertNotSame('', $icon->getAttribute('viewbox'), $icon->ownerDocument->saveHTML($icon));
+            $this->assertGreaterThan(0, $icon->getElementsByTagName('path')->length);
+            $this->assertSame(0, $icon->getElementsByTagName('use')->length);
+        }
+        $this->assertGreaterThan(0, $xpath->query('//footer//svg/use')->count());
+    }
+
     public function test_header_controls_download_during_html_parsing_and_mobile_height_stays_stable(): void
     {
         $this->configure();
@@ -123,11 +158,15 @@ class HerreraHeaderPresentationFeatureTest extends TestCase
     public function test_other_brands_keep_the_existing_header_and_navigation_layout(): void
     {
         $this->configure('Termol');
+        $this->category('rasvjeta');
         $this->get(route('home'))->assertOk()
             ->assertDontSee('data-herrera-header', false)
+            ->assertDontSee('data-header-rendered', false)
+            ->assertDontSee('data-catalog-mega-template', false)
             ->assertDontSee('data-herrera-primary-navigation', false)
             ->assertDontSee('data-herrera-catalog-navigation', false)
-            ->assertSee('site-main-nav-shell', false)->assertSee('data-header-search-form', false);
+            ->assertSee('site-main-nav-shell', false)->assertSee('data-header-search-form', false)
+            ->assertSee('data-catalog-mega-tree', false);
     }
 
     private function configure(string $brand = 'Herrera'): void

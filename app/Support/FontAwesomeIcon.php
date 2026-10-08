@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use DOMDocument;
+
 class FontAwesomeIcon
 {
     public const VERSION = '7.3.1';
@@ -21,6 +23,66 @@ class FontAwesomeIcon
 
     public static function url(string $name, string $style = 'solid'): string
     {
+        [$name, $style] = self::normalize($name, $style);
+        $basePath = 'vendor/fontawesome-pro-'.self::VERSION;
+        $relativePath = self::optimizedSpritePath($name, $style) ?? $basePath.'/sprites/'.$style.'.svg';
+        $modified = is_file(public_path($relativePath)) ? filemtime(public_path($relativePath)) : 0;
+
+        return asset($relativePath).'?v='.self::VERSION.'-'.(int) $modified.'#'.$name;
+    }
+
+    /** @return array{viewBox: string, content: string}|null */
+    public static function inline(string $name, string $style = 'solid'): ?array
+    {
+        [$name, $style] = self::normalize($name, $style);
+        $relativePath = self::optimizedSpritePath($name, $style);
+        if ($relativePath === null) {
+            return null;
+        }
+
+        static $cachedSymbols = [];
+        $path = public_path($relativePath);
+        $modified = filemtime($path);
+        if (! isset($cachedSymbols[$path]) || $cachedSymbols[$path]['modified'] !== $modified) {
+            $source = @file_get_contents($path);
+            if (! is_string($source)) {
+                return null;
+            }
+
+            $document = new DOMDocument;
+            $previous = libxml_use_internal_errors(true);
+            try {
+                if (! $document->loadXML($source, LIBXML_NONET)) {
+                    return null;
+                }
+            } finally {
+                libxml_clear_errors();
+                libxml_use_internal_errors($previous);
+            }
+
+            $symbols = [];
+            foreach ($document->getElementsByTagName('symbol') as $symbol) {
+                $viewBox = $symbol->getAttribute('viewBox');
+                if ($viewBox === '') {
+                    continue;
+                }
+
+                // Only bundled, manifest-listed SVG files supply raw markup.
+                $content = '';
+                foreach ($symbol->childNodes as $child) {
+                    $content .= $document->saveXML($child);
+                }
+                $symbols[$symbol->getAttribute('id')] = ['viewBox' => $viewBox, 'content' => $content];
+            }
+            $cachedSymbols[$path] = ['modified' => $modified, 'symbols' => $symbols];
+        }
+
+        return $cachedSymbols[$path]['symbols'][$name] ?? null;
+    }
+
+    /** @return array{string, string} */
+    private static function normalize(string $name, string $style): array
+    {
         $name = strtolower(trim($name));
         $style = strtolower(trim($style));
         $style = in_array($style, self::STYLES, true) ? $style : 'solid';
@@ -32,17 +94,20 @@ class FontAwesomeIcon
         }
         $name = $name === 'long-arrow-right' ? 'arrow-right-long' : $name;
 
+        return [$name, $style];
+    }
+
+    private static function optimizedSpritePath(string $name, string $style): ?string
+    {
         $basePath = 'vendor/fontawesome-pro-'.self::VERSION;
         $optimizedPath = $basePath.'/storefront-sprites/'.$style.'.svg';
         $manifest = self::manifest($basePath);
-        $relativePath = isset($manifest[$style]) && is_array($manifest[$style])
+
+        return isset($manifest[$style]) && is_array($manifest[$style])
             && in_array($name, $manifest[$style], true)
             && is_file(public_path($optimizedPath))
                 ? $optimizedPath
-                : $basePath.'/sprites/'.$style.'.svg';
-        $modified = is_file(public_path($relativePath)) ? filemtime(public_path($relativePath)) : 0;
-
-        return asset($relativePath).'?v='.self::VERSION.'-'.(int) $modified.'#'.$name;
+                : null;
     }
 
     /** @return array<string, array<int, string>> */

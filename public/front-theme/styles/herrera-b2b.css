@@ -1,6 +1,10 @@
 /* Compact shopping chrome for Herrera; the other storefront themes keep their layout. */
 body.herrera-storefront { --herrera-action: #007b8b; --herrera-footer: #24353b; }
 .herrera-storefront .site-main-header { position: sticky; top: 0; box-shadow: 0 1px 0 #dfe7e9; }
+/* Paint streamed header markup together, including its actions and shortcuts. */
+@supports selector(:has(*)) {
+ .herrera-storefront .site-main-header:not(:has(> [data-header-rendered])) { visibility: hidden; }
+}
 .herrera-storefront .site-top-bar,
 .herrera-storefront .site-top-bar-shell { background: #f4f7f7; color: #58686e; }
 .herrera-storefront .site-top-bar-shell,

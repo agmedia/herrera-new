@@ -125,7 +125,8 @@ class B2BStorefrontVisibilityTest extends TestCase
 
         $html = Blade::render('<x-front.desktop.product-card :product="$product" :flat="$flat" :lined="$lined" />', compact('product', 'flat', 'lined'));
 
-        $this->assertStringContainsString('data-b2b-price-access', $html);
+        $this->assertStringNotContainsString('data-b2b-price-access', $html);
+        $this->assertStringNotContainsString(__('ui.b2b.pricing.login_required'), $html);
         $this->assertStringNotContainsString('1,234.56', $html);
         $this->assertStringNotContainsString('0.00 €', $html);
         $this->assertStringNotContainsString('data-ga4-item-price', $html);

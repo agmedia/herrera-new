@@ -1,3 +1,4 @@
+@if (empty($compact) || auth()->check())
 <div class="b2b-price-access text-sm leading-relaxed text-slate-700" data-b2b-price-access>
     @auth
         <p>{{ __('ui.b2b.pricing.approval_required') }}</p>
@@ -14,3 +15,4 @@
         @endif
     @endauth
 </div>
+@endif

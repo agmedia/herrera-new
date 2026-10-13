@@ -18,6 +18,7 @@ use App\Services\Front\CheckoutService;
 use App\Services\Pricing\PriceCatalogService;
 use App\Services\Settings\SystemSettingsService;
 use App\Services\User\CustomerImpersonationService;
+use App\Services\User\StaffImpersonationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -129,6 +130,63 @@ class AssignedCustomerOrderingTest extends TestCase
         $this->postJson(route('cart.items.store'), ['product_id' => $this->product->id, 'quantity' => 1])->assertForbidden();
         $this->postJson(route('checkout.store'), $this->checkoutPayload($this->first))->assertForbidden();
         $this->assertSame(0, Order::query()->count());
+    }
+
+    public function test_administrator_can_preview_salesperson_and_order_only_for_their_assigned_customers(): void
+    {
+        $admin = User::factory()->create(['account_type' => 'staff', 'admin_login_enabled' => true]);
+        Bouncer::assign('superadmin')->to($admin);
+        $adminFront = ['cart' => ['items' => ['admin-draft' => ['product_id' => $this->product->id, 'quantity' => 8]]]];
+        $managerFront = ['cart' => ['items' => ['manager-draft' => ['product_id' => $this->product->id, 'quantity' => 3]]]];
+        $this->actingAs($admin)->withSession(['front' => $adminFront])
+            ->post(route('admin.users.staff-impersonation.start', $this->manager))->assertRedirect();
+        $staffStarted = session(StaffImpersonationService::SESSION_KEY.'.started_at');
+        $this->assertAuthenticatedAs($this->manager);
+        $this->post(route('admin.users.impersonate', $this->foreign))->assertForbidden();
+        foreach ([[$this->first, 12.5], [$this->second, 21.75]] as [$customer, $price]) {
+            $this->withSession(['front' => $managerFront])->post(route('admin.users.impersonate', $customer))->assertRedirect(route('shop.index'));
+            $this->assertAuthenticatedAs($customer);
+            $customerStarted = session(CustomerImpersonationService::SESSION_KEY.'.started_at');
+            $this->assertSame([], session('front.cart.items', []));
+            $this->postJson(route('cart.items.store'), ['product_id' => $this->product->id, 'quantity' => 2])->assertOk();
+            $this->get(route('cart.index'))->assertOk()->assertSee('data-cart-staff-stock', false)
+                ->assertSee('Vrati se na komercijalista')
+                ->assertViewHas('lines', fn ($lines): bool => (float) $lines->sole()['unit_price'] === $price);
+            $payload = $this->checkoutPayload($customer) + ['created_by' => $this->foreign->id, 'staff_impersonation' => ['admin_id' => $this->foreign->id]];
+            $this->postJson(route('checkout.store'), $payload)->assertOk()->assertJsonPath('status', 'ok');
+            $order = Order::query()->where('user_id', $customer->id)->sole();
+            $this->assertSame($admin->id, $order->created_by);
+            $this->assertSame($admin->id, $order->updated_by);
+            $this->assertSame($price * 2, (float) $order->grand_total);
+            $this->assertSame(['admin_id' => $this->manager->id, 'customer_id' => $customer->id, 'started_at' => $customerStarted], $order->payload['customer_impersonation']);
+            $this->assertSame(['admin_id' => $admin->id, 'staff_id' => $this->manager->id, 'started_at' => $staffStarted], $order->payload['staff_impersonation']);
+            $this->post(route('front.impersonation.stop'))->assertRedirect(route('admin.users'))
+                ->assertSessionHas('front', $managerFront)->assertSessionHas(StaffImpersonationService::SESSION_KEY)
+                ->assertSessionMissing(CustomerImpersonationService::SESSION_KEY);
+            $this->assertAuthenticatedAs($this->manager);
+            $this->get(route('admin.orders.show', $order))->assertOk()->assertSee($admin->name)->assertSee('U ulozi komercijalista:')->assertSee($this->manager->name);
+        }
+        $this->post(route('admin.staff-impersonation.stop'))->assertRedirect(route('admin.users'))
+            ->assertSessionHas('front', $adminFront)->assertSessionMissing(StaffImpersonationService::SESSION_KEY);
+        $this->assertAuthenticatedAs($admin);
+    }
+
+    public function test_revoked_root_cannot_keep_ordering_through_salesperson_preview(): void
+    {
+        $admin = User::factory()->create(['account_type' => 'staff', 'admin_login_enabled' => true]);
+        Bouncer::assign('superadmin')->to($admin);
+        $this->actingAs($admin)->post(route('admin.users.staff-impersonation.start', $this->manager))->assertRedirect();
+        $this->post(route('admin.users.impersonate', $this->first))->assertRedirect();
+        $this->postJson(route('cart.items.store'), ['product_id' => $this->product->id, 'quantity' => 1])->assertOk();
+        Bouncer::forbid($admin)->to('users.access.manage');
+        Bouncer::refreshFor($admin);
+        $this->get(route('cart.index'))->assertForbidden();
+        $this->postJson(route('checkout.store'), $this->checkoutPayload($this->first))->assertForbidden();
+        $this->assertSame(0, Order::query()->count());
+        $this->assertSame(20, $this->product->fresh()->stock_qty);
+        $this->post(route('front.impersonation.stop'))->assertRedirect(route('login'))
+            ->assertSessionMissing(StaffImpersonationService::SESSION_KEY)->assertSessionMissing(CustomerImpersonationService::SESSION_KEY);
+        $this->assertGuest();
     }
 
     #[DataProvider('revocations')]

@@ -33,17 +33,10 @@ class CartStaffAccess
             return false;
         }
 
-        $staffPreview = $request->session()->get(StaffImpersonationService::SESSION_KEY);
-        if ($staffPreview !== null) {
-            if (! is_array($staffPreview) || (int) ($staffPreview['staff_id'] ?? 0) !== (int) $viewer->id) {
-                return false;
-            }
-
-            $actor = User::query()->find((int) ($staffPreview['admin_id'] ?? 0));
-            if (! $actor || $actor->account_type !== 'staff' || ! $actor->admin_login_enabled
-                || ! ($actor->isA('superadmin') || ($actor->can('admin.access') && $actor->can('users.access.manage')))) {
-                return false;
-            }
+        try {
+            app(StaffImpersonationService::class)->validatedContext($request, $viewer);
+        } catch (AuthorizationException) {
+            return false;
         }
 
         return $this->isSalesStaff($viewer);

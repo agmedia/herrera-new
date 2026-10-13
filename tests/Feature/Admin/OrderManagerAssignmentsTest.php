@@ -196,7 +196,7 @@ class OrderManagerAssignmentsTest extends TestCase
         $this->assertAuthenticatedAs($customer);
     }
 
-    public function test_staff_preview_cannot_nest_a_customer_impersonation(): void
+    public function test_an_invalid_staff_preview_chain_cannot_enter_a_customer_account(): void
     {
         $manager = $this->manager();
         $customer = $this->customer('Preview Buyer');
@@ -204,7 +204,7 @@ class OrderManagerAssignmentsTest extends TestCase
 
         $this->actingAs($manager)->withSession([
             StaffImpersonationService::SESSION_KEY => ['admin_id' => 999, 'staff_id' => $manager->id],
-        ])->post(route('admin.users.impersonate', $customer))->assertStatus(409);
+        ])->post(route('admin.users.impersonate', $customer))->assertForbidden();
 
         $this->assertAuthenticatedAs($manager);
         $this->assertFalse(app(CustomerImpersonationService::class)->canStart($manager, $customer));

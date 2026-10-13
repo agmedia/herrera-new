@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Services\User\CustomerImpersonationService;
+use App\Services\User\StaffImpersonationService;
 use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
@@ -32,6 +33,7 @@ class ValidateCustomerImpersonation
 
         try {
             $this->impersonation->validatedContext($request);
+            app(StaffImpersonationService::class)->validatedContext($request);
         } catch (AuthorizationException $exception) {
             if ($request->expectsJson()) {
                 throw $exception;

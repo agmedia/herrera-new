@@ -677,25 +677,26 @@ Route::redirect('profile', '/admin/profile')
     ->name('profile');
 
 Route::post('logout', function (Request $request) {
-    $staffImpersonation = app(\App\Services\User\StaffImpersonationService::class);
-    if ($staffImpersonation->isActive($request)) {
-        $admin = $staffImpersonation->stop($request);
-
-        return $admin ? redirect()->route('admin.users') : redirect()->route('login');
-    }
-
     $impersonation = app(\App\Services\User\CustomerImpersonationService::class);
     if ($impersonation->isActive($request)) {
         $customerId = (int) $request->session()->get(\App\Services\User\CustomerImpersonationService::SESSION_KEY.'.customer_id');
+        $staffPreview = $request->session()->exists(\App\Services\User\StaffImpersonationService::SESSION_KEY);
         $admin = $impersonation->stop($request);
 
         if (! $admin) {
             return redirect()->route('login');
         }
 
-        return app(\App\Services\Admin\OrderManagerAccess::class)->isRestricted($admin) || ! User::query()->whereKey($customerId)->exists()
+        return $staffPreview || app(\App\Services\Admin\OrderManagerAccess::class)->isRestricted($admin) || ! User::query()->whereKey($customerId)->exists()
             ? redirect()->route('admin.users')
             : redirect()->route('admin.users.show', ['user' => $customerId]);
+    }
+
+    $staffImpersonation = app(\App\Services\User\StaffImpersonationService::class);
+    if ($staffImpersonation->isActive($request)) {
+        $admin = $staffImpersonation->stop($request);
+
+        return $admin ? redirect()->route('admin.users') : redirect()->route('login');
     }
 
     Auth::guard('web')->logout();

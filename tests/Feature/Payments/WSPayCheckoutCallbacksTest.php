@@ -229,11 +229,13 @@ class WSPayCheckoutCallbacksTest extends TestCase
         $this->revokedDelegation('disabled');
         [$order, $product] = $this->order(User::factory()->create());
 
-        $this->get(route('checkout.wspay.cancel', ['orderNumber' => $order->order_number]))
+        // Exercise callback authorization directly, without the HTML error layout
+        // revalidating the revoked delegation while rendering its account banner.
+        $this->getJson(route('checkout.wspay.cancel', ['orderNumber' => $order->order_number]))
             ->assertNotFound()->assertSessionMissing('front.checkout.last_order_id');
         $input = $this->signedCallback($order);
         unset($input['Signature']);
-        $this->get(route('checkout.wspay.return', array_merge(['orderNumber' => $order->order_number], $input)))
+        $this->getJson(route('checkout.wspay.return', array_merge(['orderNumber' => $order->order_number], $input)))
             ->assertNotFound()->assertSessionMissing('front.checkout.last_order_id');
 
         $this->assertSame($this->pending->id, $order->fresh()->status_id);

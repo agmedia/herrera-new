@@ -2140,7 +2140,10 @@
 
                 @if (is_array(session('admin.staff_impersonation')) && (int) session('admin.staff_impersonation.staff_id') === (int) auth()->id() && \Illuminate\Support\Facades\Route::has('admin.staff-impersonation.stop'))
                     <div class="sticky top-16 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 md:px-6" role="status" data-staff-impersonation-banner>
-                        <p class="font-semibold">{{ __('Pregled kao :name', ['name' => auth()->user()->admin_username ?: auth()->user()->name]) }}</p>
+                        <div>
+                            <p class="font-semibold">{{ __('Pregled kao :name', ['name' => auth()->user()->admin_username ?: auth()->user()->name]) }}</p>
+                            <p class="mt-1 text-xs">{{ __('Administratorski pregled komercijalista. Za narudžbu otvorite „Moji kupci” i odaberite „Naruči za kupca”.') }}</p>
+                        </div>
                         <form method="POST" action="{{ route('admin.staff-impersonation.stop') }}">
                             @csrf
                             <button type="submit" class="rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-700">{{ __('Vrati se u svoj admin') }}</button>

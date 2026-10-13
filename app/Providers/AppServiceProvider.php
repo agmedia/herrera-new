@@ -112,6 +112,7 @@ class AppServiceProvider extends ServiceProvider
         Livewire::component('admin.integrations.eprel.catalog-sync-manager', \App\Livewire\Admin\Integrations\Eprel\CatalogSyncManager::class);
 
         Livewire::addPersistentMiddleware([
+            \App\Http\Middleware\EnsureAdminAccess::class,
             \App\Http\Middleware\EnsureAdminAbility::class,
         ]);
 

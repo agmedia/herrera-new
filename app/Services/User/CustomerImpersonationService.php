@@ -14,9 +14,8 @@ class CustomerImpersonationService
 
     public function canStart(?User $admin, User $customer): bool
     {
-        return $admin
+        $allowed = $admin
             && ($admin->account_type !== 'staff' || $admin->admin_login_enabled)
-            && ! session()->has(StaffImpersonationService::SESSION_KEY)
             && $customer->account_type === 'customer'
             && (int) $admin->id !== (int) $customer->id
             && ($admin->isA('superadmin') || (
@@ -27,6 +26,16 @@ class CustomerImpersonationService
             && ! $customer->isA('superadmin', 'super-admin', 'admin', 'editor', 'order_manager')
             && ! $customer->can('admin.access')
             && app(OrderManagerAccess::class)->canAccessCustomer($customer, $admin);
+
+        if (! $allowed || ! session()->exists(StaffImpersonationService::SESSION_KEY)) {
+            return (bool) $allowed;
+        }
+
+        try {
+            return app(StaffImpersonationService::class)->validatedContext(request(), $admin) !== null;
+        } catch (AuthorizationException) {
+            return false;
+        }
     }
 
     public function isActive(Request $request): bool
@@ -35,7 +44,7 @@ class CustomerImpersonationService
     }
 
     /**
-     * @return array{actor: User, customer: User, started_at: string}|null
+     * @return array{actor: User, customer: User, started_at: string, staff_impersonation: array{actor: User, staff: User, started_at: string}|null}|null
      */
     public function validatedContext(Request $request, ?User $customer = null): ?array
     {
@@ -50,8 +59,7 @@ class CustomerImpersonationService
             || (int) ($context['customer_id'] ?? 0) !== (int) $viewer->id
             || ($customer && (int) $customer->id !== (int) $viewer->id)
             || ! is_string($context['started_at'] ?? null)
-            || trim($context['started_at']) === ''
-            || $request->session()->has(StaffImpersonationService::SESSION_KEY)) {
+            || trim($context['started_at']) === '') {
             throw new AuthorizationException;
         }
 
@@ -61,11 +69,13 @@ class CustomerImpersonationService
         if (! $currentCustomer || ! $this->canStart($actor, $currentCustomer)) {
             throw new AuthorizationException;
         }
+        $staffContext = app(StaffImpersonationService::class)->validatedContext($request, $actor);
 
         return [
             'actor' => $actor,
             'customer' => $currentCustomer,
             'started_at' => $context['started_at'],
+            'staff_impersonation' => $staffContext,
         ];
     }
 
@@ -76,7 +86,6 @@ class CustomerImpersonationService
 
     public function start(Request $request, User $customer): void
     {
-        abort_if($request->session()->has(StaffImpersonationService::SESSION_KEY), 409, __('Prvo završite pregled računa voditelja narudžbi.'));
         abort_if($this->isActive($request), 409, __('Već ste prijavljeni kao kupac. Prvo se vratite u admin.'));
         $admin = $request->user();
         abort_unless($this->canStart($admin, $customer), 403);
@@ -116,6 +125,15 @@ class CustomerImpersonationService
 
         $admin = User::query()->find((int) ($context['admin_id'] ?? 0));
         $customer = User::query()->find($customerId);
+
+        $staffImpersonation = app(StaffImpersonationService::class);
+        if ($staffImpersonation->isActive($request)) {
+            try {
+                $staffImpersonation->validatedContext($request, $admin);
+            } catch (AuthorizationException) {
+                return $staffImpersonation->stopFromCustomer($request);
+            }
+        }
 
         Auth::guard('web')->logoutCurrentDevice();
         $request->session()->forget([self::SESSION_KEY, 'front', 'auth.password_confirmed_at', 'url.intended', '_old_input', 'errors']);

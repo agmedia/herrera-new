@@ -5,6 +5,7 @@ namespace Tests\Feature\Admin;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Volt\Volt;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Silber\Bouncer\BouncerFacade as Bouncer;
@@ -95,7 +96,7 @@ class StaffImpersonationFeatureTest extends TestCase
         return [['superadmin'], ['admin'], ['editor'], ['inactive'], ['customer'], ['access_manager'], ['other_staff'], ['self']];
     }
 
-    public function test_nested_staff_and_customer_previews_are_blocked_without_losing_original_identity(): void
+    public function test_staff_preview_blocks_another_manager_and_unassigned_customers_without_losing_original_identity(): void
     {
         $admin = $this->user('superadmin');
         $staff = $this->user('order_manager');
@@ -104,8 +105,132 @@ class StaffImpersonationFeatureTest extends TestCase
         $this->actingAs($admin)->post(route('admin.users.staff-impersonation.start', $staff))->assertRedirect();
 
         $this->post(route('admin.users.staff-impersonation.start', $otherStaff))->assertStatus(409);
-        $this->post(route('admin.users.impersonate', $customer))->assertStatus(409);
+        $this->post(route('admin.users.impersonate', $customer))->assertForbidden();
         $this->assertSame($admin->id, session('admin.staff_impersonation.admin_id'));
+        $this->assertAuthenticatedAs($staff);
+    }
+
+    public function test_assigned_customer_preview_preserves_each_front_snapshot_and_unwinds_one_level_at_a_time(): void
+    {
+        $admin = $this->user('superadmin');
+        $staff = $this->user('order_manager');
+        $customer = $this->user('customer');
+        $this->assignCustomer($staff, $customer);
+        $rootFront = ['cart' => ['items' => ['root-cart']], 'checkout' => ['last_order_id' => 25]];
+        $staffFront = ['cart' => ['items' => ['manager-cart']], 'checkout' => ['last_order_id' => 26]];
+        $this->actingAs($admin)->withSession(['front' => $rootFront])
+            ->post(route('admin.users.staff-impersonation.start', $staff))->assertRedirect();
+        $staffContext = session('admin.staff_impersonation');
+        $this->withSession(['front' => $staffFront])->post(route('admin.users.impersonate', $customer))
+            ->assertRedirect(route('shop.index'))
+            ->assertSessionMissing('front')
+            ->assertSessionHas('admin.staff_impersonation', $staffContext)
+            ->assertSessionHas('admin.customer_impersonation.admin_id', $staff->id)
+            ->assertSessionHas('admin.customer_impersonation.admin_front', $staffFront);
+        $this->assertAuthenticatedAs($customer);
+        $this->post(route('admin.staff-impersonation.stop'))->assertStatus(409);
+
+        $this->withSession(['front.cart' => ['customer-cart']])->post(route('front.impersonation.stop'))
+            ->assertRedirect(route('admin.users'))
+            ->assertSessionMissing('admin.customer_impersonation')
+            ->assertSessionHas('admin.staff_impersonation', $staffContext)
+            ->assertSessionHas('front', $staffFront);
+        $this->assertAuthenticatedAs($staff);
+        $this->post(route('admin.staff-impersonation.stop'))
+            ->assertRedirect(route('admin.users'))
+            ->assertSessionMissing('admin.staff_impersonation')
+            ->assertSessionHas('front', $rootFront);
+        $this->assertAuthenticatedAs($admin);
+    }
+
+    #[DataProvider('invalidNestedOriginals')]
+    public function test_nested_return_does_not_restore_manager_after_root_authority_is_revoked(string $reason): void
+    {
+        $admin = $this->user('superadmin');
+        $staff = $this->user('order_manager');
+        $customer = $this->user('customer');
+        $this->assignCustomer($staff, $customer);
+        $this->actingAs($admin)->post(route('admin.users.staff-impersonation.start', $staff))->assertRedirect();
+        $this->post(route('admin.users.impersonate', $customer))->assertRedirect();
+        if ($reason === 'disabled') {
+            $admin->forceFill(['admin_login_enabled' => false])->save();
+        } else {
+            Bouncer::forbid($admin)->to('users.access.manage');
+            Bouncer::refreshFor($admin);
+        }
+
+        $this->getJson(route('cart.index'))->assertForbidden();
+        $this->post(route('front.impersonation.stop'))
+            ->assertRedirect(route('login'))
+            ->assertSessionMissing('admin.customer_impersonation')
+            ->assertSessionMissing('admin.staff_impersonation')
+            ->assertSessionMissing('front');
+        $this->assertGuest();
+    }
+
+    public static function invalidNestedOriginals(): array
+    {
+        return [['disabled'], ['manage_permission_revoked']];
+    }
+
+    public function test_nested_return_skips_a_disabled_manager_and_restores_only_the_valid_original_admin(): void
+    {
+        $admin = $this->user('superadmin');
+        $staff = $this->user('order_manager');
+        $customer = $this->user('customer');
+        $this->assignCustomer($staff, $customer);
+        $rootFront = ['cart' => ['root-cart']];
+        $this->actingAs($admin)->withSession(['front' => $rootFront])
+            ->post(route('admin.users.staff-impersonation.start', $staff))->assertRedirect();
+        $this->post(route('admin.users.impersonate', $customer))->assertRedirect();
+        $staff->forceFill(['admin_login_enabled' => false])->save();
+
+        $this->getJson(route('cart.index'))->assertForbidden();
+        $this->post(route('front.impersonation.stop'))
+            ->assertRedirect(route('admin.users'))
+            ->assertSessionMissing('admin.customer_impersonation')
+            ->assertSessionMissing('admin.staff_impersonation')
+            ->assertSessionHas('front', $rootFront);
+        $this->assertAuthenticatedAs($admin);
+    }
+
+    public function test_real_livewire_update_rechecks_root_authority_for_an_already_mounted_manager_form(): void
+    {
+        $admin = $this->user('superadmin');
+        $staff = $this->user('order_manager');
+        $customer = $this->user('customer');
+        $this->assignCustomer($staff, $customer);
+        $this->actingAs($admin)->post(route('admin.users.staff-impersonation.start', $staff))->assertRedirect();
+        $html = $this->get(route('admin.users.edit', $customer))->assertOk()->getContent();
+        preg_match_all('/wire:snapshot="([^"]+)"/', $html, $matches);
+        $snapshot = null;
+        foreach ($matches[1] as $encodedSnapshot) {
+            $candidate = html_entity_decode($encodedSnapshot, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            if (data_get(json_decode($candidate, true, 512, JSON_THROW_ON_ERROR), 'memo.name') === 'admin.user.form') {
+                $snapshot = $candidate;
+                break;
+            }
+        }
+        $this->assertNotNull($snapshot, 'The real admin edit page must provide a signed customer form snapshot.');
+        $permitted = $this->postJson('/livewire/update', [
+            'components' => [[
+                'snapshot' => $snapshot,
+                'updates' => ['form.name' => 'Permitted manager edit'],
+                'calls' => [['path' => '', 'method' => 'save', 'params' => []]],
+            ]],
+        ], ['X-Livewire' => 'true'])->assertOk();
+        $this->assertSame('Permitted manager edit', $customer->fresh()->name);
+
+        Bouncer::forbid($admin)->to('users.access.manage');
+        Bouncer::refreshFor($admin);
+        $this->postJson('/livewire/update', [
+            'components' => [[
+                'snapshot' => $permitted->json('components.0.snapshot'),
+                'updates' => ['form.name' => 'Forbidden stale preview edit'],
+                'calls' => [['path' => '', 'method' => 'save', 'params' => []]],
+            ]],
+        ], ['X-Livewire' => 'true'])->assertForbidden();
+        $this->assertSame('Permitted manager edit', $customer->fresh()->name);
         $this->assertAuthenticatedAs($staff);
     }
 
@@ -216,5 +341,13 @@ class StaffImpersonationFeatureTest extends TestCase
         Bouncer::assign($role)->to($user);
 
         return $user;
+    }
+
+    private function assignCustomer(User $staff, User $customer): void
+    {
+        DB::table('admin_customer_assignments')->insert([
+            'admin_user_id' => $staff->id, 'customer_user_id' => $customer->id,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
     }
 }

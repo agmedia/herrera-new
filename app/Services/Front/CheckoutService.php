@@ -22,6 +22,7 @@ use App\Services\Pricing\TaxPricingService;
 use App\Services\Shipping\CroatianIslandDestinationClassifier;
 use App\Services\Shipping\ShippingCalculator;
 use App\Services\User\CustomerImpersonationService;
+use App\Services\User\StaffImpersonationService;
 use App\Support\GlsShipping;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
@@ -122,7 +123,9 @@ class CheckoutService
     {
         $impersonation = app(CustomerImpersonationService::class);
         $delegation = $impersonation->validatedContext(request(), $user);
-        if ($delegation && ! $user) {
+        $staffImpersonation = app(StaffImpersonationService::class);
+        $staffDelegation = $staffImpersonation->validatedContext(request(), $delegation['actor'] ?? $user);
+        if (($delegation || $staffDelegation) && ! $user) {
             throw new AuthorizationException;
         }
         $access = app(B2BAccessService::class);
@@ -253,13 +256,20 @@ class CheckoutService
             $locale,
             $shippingDestination,
             $impersonation,
+            $staffImpersonation,
         ): Order {
             $delegation = $impersonation->validatedContext(request(), $user);
-            $orderActor = $delegation['actor'] ?? $user;
+            $staffDelegation = $staffImpersonation->validatedContext(request(), $delegation['actor'] ?? $user);
+            $orderActor = $staffDelegation['actor'] ?? $delegation['actor'] ?? $user;
             $delegationAudit = $delegation ? [
                 'admin_id' => (int) $delegation['actor']->id,
                 'customer_id' => (int) $delegation['customer']->id,
                 'started_at' => $delegation['started_at'],
+            ] : null;
+            $staffDelegationAudit = $staffDelegation ? [
+                'admin_id' => (int) $staffDelegation['actor']->id,
+                'staff_id' => (int) $staffDelegation['staff']->id,
+                'started_at' => $staffDelegation['started_at'],
             ] : null;
             $customerFirst = (string) ($payload['customer_first_name'] ?? '');
             $customerLast = (string) ($payload['customer_last_name'] ?? '');
@@ -318,6 +328,7 @@ class CheckoutService
                 'customer_note' => (string) ($payload['customer_note'] ?? ''),
                 'payload' => [
                     ...($delegationAudit ? ['customer_impersonation' => $delegationAudit] : []),
+                    ...($staffDelegationAudit ? ['staff_impersonation' => $staffDelegationAudit] : []),
                     'placed_from' => 'frontend_checkout',
                     'coupon_code' => (string) ($summary['coupon_code'] ?? ''),
                     'monetary_precision' => $precision,

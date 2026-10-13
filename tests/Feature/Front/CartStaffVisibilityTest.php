@@ -189,7 +189,7 @@ class CartStaffVisibilityTest extends TestCase
         $this->get(route('cart.index'))->assertOk()->assertSee('data-cart-staff-stock', false);
 
         $admin->forceFill(['admin_login_enabled' => false])->save();
-        $this->assertPrivateStock();
+        $this->get(route('cart.index'))->assertForbidden()->assertDontSee('data-cart-staff-stock', false);
     }
 
     public function test_confirmation_mode_is_server_selected_and_cart_counter_is_unchanged(): void

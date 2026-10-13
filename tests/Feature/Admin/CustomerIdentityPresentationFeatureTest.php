@@ -174,6 +174,70 @@ class CustomerIdentityPresentationFeatureTest extends TestCase
         $this->assertStringNotContainsString('Naruči za kupca', $supportAction);
     }
 
+    public function test_administrator_preview_shows_effective_salesperson_and_customer_and_returns_to_each_level(): void
+    {
+        config(['commerce.b2b_only' => true]);
+        $administrator = User::factory()->create(['name' => 'Preview Administrator', 'account_type' => 'staff']);
+        Bouncer::assign('superadmin')->to($administrator);
+        $salesperson = User::factory()->create(['name' => 'Effective Salesperson', 'account_type' => 'staff']);
+        Bouncer::assign('order_manager')->to($salesperson);
+        $buyer = User::factory()->create(['name' => 'Nested Buyer Contact']);
+        Bouncer::assign('customer')->to($buyer);
+        $group = CustomerGroup::query()->create(['code' => 'nested-preview-ui', 'name' => 'Nested Preview UI', 'is_active' => true]);
+        $buyer->b2bAccount()->create([
+            'company_name' => 'Nested Buyer Company', 'oib' => '11000000001',
+            'status' => 'approved', 'customer_group_id' => $group->id,
+        ]);
+        DB::table('admin_customer_assignments')->insert([
+            'admin_user_id' => $salesperson->id, 'customer_user_id' => $buyer->id,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $this->actingAs($administrator)->post(route('admin.users.staff-impersonation.start', $salesperson))->assertRedirect();
+        $this->get(route('admin.users'))->assertOk()
+            ->assertSee('Pregled kao Effective Salesperson')
+            ->assertSee('Administratorski pregled komercijalista.')
+            ->assertSee('Moji kupci')->assertSee('Naruči za kupca');
+        $this->post(route('admin.users.impersonate', $buyer))->assertRedirect(route('shop.index'));
+        $this->get(route('shop.index'))->assertOk()
+            ->assertSeeInOrder(['Radite za kupca:', 'Nested Buyer Company', 'Kontakt: Nested Buyer Contact'])
+            ->assertSee('Administrator: Preview Administrator')
+            ->assertSee('Komercijalist: Effective Salesperson')
+            ->assertSee('Vrati se na komercijalista')
+            ->assertDontSee('Vrati se u admin');
+        $this->post(route('front.impersonation.stop'))->assertRedirect(route('admin.users'));
+        $this->assertAuthenticatedAs($salesperson);
+        $this->get(route('admin.users'))->assertOk()
+            ->assertSee('Pregled kao Effective Salesperson')->assertSee('Vrati se u svoj admin');
+        $this->post(route('admin.staff-impersonation.stop'))->assertRedirect(route('admin.users'));
+        $this->assertAuthenticatedAs($administrator);
+    }
+
+    public function test_expired_preview_page_posts_to_the_return_action_for_its_current_level(): void
+    {
+        $viewer = User::factory()->create();
+        $this->actingAs($viewer);
+        $cases = [
+            [true, false, 'front.impersonation.stop', 'Vrati se u admin'],
+            [true, true, 'front.impersonation.stop', 'Vrati se na komercijalista'],
+            [false, true, 'admin.staff-impersonation.stop', 'Vrati se u svoj admin'],
+        ];
+        foreach ($cases as [$customerPreview, $staffPreview, $returnRoute, $returnLabel]) {
+            session()->forget(['admin.customer_impersonation', 'admin.staff_impersonation']);
+            $context = ['admin_id' => 999999, 'started_at' => now()->toIso8601String()];
+            if ($customerPreview) {
+                session()->put('admin.customer_impersonation', $context + ['customer_id' => $viewer->id]);
+            }
+            if ($staffPreview) {
+                session()->put('admin.staff_impersonation', $context + ['staff_id' => $viewer->id]);
+            }
+            $this->get(route('shop.index'))->assertForbidden()
+                ->assertSee('data-customer-impersonation-expired', false)
+                ->assertSee('action="'.route($returnRoute).'"', false)
+                ->assertSee($returnLabel);
+        }
+    }
+
     private function admin(): User
     {
         $admin = User::factory()->create();

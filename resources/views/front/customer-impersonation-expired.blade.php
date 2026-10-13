@@ -14,12 +14,20 @@
     </style>
 </head>
 <body>
+    @php
+        $hasCustomerPreview = app(\App\Services\User\CustomerImpersonationService::class)->isActive(request());
+        $hasStaffPreview = app(\App\Services\User\StaffImpersonationService::class)->isActive(request());
+        $returnRoute = $hasCustomerPreview ? 'front.impersonation.stop' : 'admin.staff-impersonation.stop';
+        $returnLabel = $hasCustomerPreview
+            ? ($hasStaffPreview ? __('Vrati se na komercijalista') : __('Vrati se u admin'))
+            : __('Vrati se u svoj admin');
+    @endphp
     <main data-customer-impersonation-expired>
         <h1>{{ __('Pristup kupcu više nije dostupan') }}</h1>
         <p>{{ __('Dodjela kupca ili vaše ovlasti promijenjene su tijekom rada. Vratite se u administraciju i odaberite dostupnog kupca.') }}</p>
-        <form method="POST" action="{{ route('front.impersonation.stop') }}">
+        <form method="POST" action="{{ route($returnRoute) }}">
             @csrf
-            <button type="submit">{{ __('Vrati se u admin') }}</button>
+            <button type="submit">{{ $returnLabel }}</button>
         </form>
     </main>
 </body>

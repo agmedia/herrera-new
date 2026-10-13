@@ -272,10 +272,11 @@
                 <p><strong>{{ __('Placed:') }}</strong> {{ optional($order->placed_at ?: $order->created_at)->format('Y-m-d H:i') }}</p>
                 <p class="mt-1"><strong>{{ __('Paid At:') }}</strong> {{ optional($order->paid_at)->format('Y-m-d H:i') ?: '-' }}</p>
                 <p class="mt-1"><strong>{{ __('Source:') }}</strong> {{ $order->source }}</p>
-                @if ((int) data_get($order->payload, 'customer_impersonation.admin_id') === (int) $order->created_by
-                    && (int) data_get($order->payload, 'customer_impersonation.customer_id') === (int) $order->user_id
-                    && $order->created_by && $order->created_by !== $order->user_id)
+                @if ($delegatedOrder)
                     <p class="mt-1" data-order-salesperson><strong>{{ __('Narudžbu unio:') }}</strong> {{ $order->creator?->name ?: __('Djelatnik').' #'.$order->created_by }}</p>
+                    @if ($previewSalesperson)
+                        <p class="mt-1" data-order-preview-salesperson><strong>{{ __('U ulozi komercijalista:') }}</strong> {{ $previewSalesperson->name }}</p>
+                    @endif
                 @endif
                 @if ($loyaltyEnabled)
                     <p class="mt-1">

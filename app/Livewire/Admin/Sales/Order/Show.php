@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Sales\Order;
 
 use App\Models\Sales\Order\Order;
 use App\Models\Settings\Local\OrderStatus;
+use App\Models\User;
 use App\Services\Admin\OrderManagerAccess;
 use App\Services\Loyalty\LoyaltyService;
 use App\Services\Payments\BankTransferUpiService;
@@ -241,8 +242,18 @@ class Show extends Component
             $maxRedeemablePoints = min($availableLoyaltyPoints, $maxByOrder);
         }
 
+        $salespersonId = (int) data_get($order->payload, 'customer_impersonation.admin_id');
+        $nestedAuthor = (int) data_get($order->payload, 'staff_impersonation.admin_id') === (int) $order->created_by
+            && (int) data_get($order->payload, 'staff_impersonation.staff_id') === $salespersonId;
+        $delegatedOrder = $salespersonId > 0
+            && (int) data_get($order->payload, 'customer_impersonation.customer_id') === (int) $order->user_id
+            && $order->created_by && $order->created_by !== $order->user_id
+            && ($salespersonId === (int) $order->created_by || $nestedAuthor);
+
         return view('livewire.admin.sales.order.show', [
             'order' => $order,
+            'delegatedOrder' => $delegatedOrder,
+            'previewSalesperson' => $delegatedOrder && $nestedAuthor ? User::query()->find($salespersonId, ['id', 'name']) : null,
             'statuses' => $statuses,
             'quickStatuses' => $quickStatuses,
             'internalTags' => $this->extractInternalTags($order),

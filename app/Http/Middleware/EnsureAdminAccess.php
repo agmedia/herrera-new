@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Services\User\StaffImpersonationService;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,7 @@ class EnsureAdminAccess
         }
 
         abort_if($user->account_type === 'staff' && ! $user->admin_login_enabled, 403, 'Admin login is disabled.');
+        app(StaffImpersonationService::class)->validatedContext($request);
 
         if (Bouncer::is($user)->an('superadmin') || $user->can('admin.access')) {
             return $next($request);

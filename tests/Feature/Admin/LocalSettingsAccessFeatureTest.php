@@ -166,7 +166,10 @@ class LocalSettingsAccessFeatureTest extends TestCase
             Route::getRoutes()->refreshNameLookups();
         }
         $operator = $this->operator(['settings.currencies.manage']);
-        $admin = User::factory()->create();
+        $operator->forceFill(['account_type' => 'staff', 'admin_login_enabled' => true])->save();
+        Bouncer::assign('order_manager')->to($operator);
+        $admin = User::factory()->create(['account_type' => 'staff', 'admin_login_enabled' => true]);
+        Bouncer::assign('superadmin')->to($admin);
         $html = $this->actingAs($operator)->withSession(['admin.staff_impersonation' => [
             'admin_id' => $admin->id,
             'staff_id' => $operator->id,

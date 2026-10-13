@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\Import\HerreraBlogRefreshService;
+use App\Services\Import\HerreraBlogRelatedProductsService;
 use App\Services\Import\HerreraHomeBlogCarouselService;
 use App\Services\Import\HerreraQuickFixConfigurationService;
 use Illuminate\Console\Command;
@@ -14,8 +15,12 @@ class HerreraApplyQuickFixes extends Command
 
     protected $description = 'Apply the agreed October Herrera B2B settings once, preserving subsequent admin edits';
 
-    public function handle(HerreraQuickFixConfigurationService $configuration, HerreraBlogRefreshService $blog, HerreraHomeBlogCarouselService $carousel): int
-    {
+    public function handle(
+        HerreraQuickFixConfigurationService $configuration,
+        HerreraBlogRefreshService $blog,
+        HerreraHomeBlogCarouselService $carousel,
+        HerreraBlogRelatedProductsService $relatedProducts,
+    ): int {
         $database = DB::connection()->getDatabaseName();
         $localPreview = app()->environment('local') && $database === 'herrera_new_migration';
         $staging = app()->environment('staging') && $database === 'herrera_redesign'
@@ -33,6 +38,7 @@ class HerreraApplyQuickFixes extends Command
         $configuration->applyFilterDefaults();
         $this->info('Blog articles refreshed: '.$blog->apply());
         $carousel->apply();
+        $this->info('Blog product selections added: '.$relatedProducts->apply());
 
         return self::SUCCESS;
     }

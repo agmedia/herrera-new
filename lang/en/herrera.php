@@ -48,6 +48,7 @@ return [
         'login' => 'B2B sign in',
     ],
     'blog' => [
+        'eyebrow' => 'From our blog',
         'subtitle' => 'Herrera news, advice and inspiration for your projects.',
         'illustration' => 'Illustrative view of lighting in an interior.',
     ],

@@ -9,6 +9,7 @@ use App\Models\Catalog\Product\Product;
 use App\Models\Content\Blog\BlogPost;
 use App\Services\Catalog\CatalogFeatureService;
 use App\Services\Content\ContentBlockResolver;
+use App\Services\Pricing\PriceCatalogResolver;
 use App\Services\Pricing\ProductPricePresentationService;
 use App\Services\Settings\SystemSettingsService;
 use App\Support\Media\MediaUrl;
@@ -113,7 +114,8 @@ class BlogController extends Controller
 
         $relatedProductIds = collect($post->payload['related_product_ids'] ?? [])
             ->map(fn ($id) => (int) $id)
-            ->filter()
+            ->filter(fn (int $id): bool => $id > 0)
+            ->unique()
             ->values()
             ->all();
 
@@ -122,19 +124,28 @@ class BlogController extends Controller
             $relatedProducts = Product::query()
                 ->withStorefrontEnergyData()
                 ->visibleOnStorefront($this->catalogFeatures->hideOutOfStockProducts())
+                ->withApprovedCommentSummary([$locale, $fallbackLocale])
                 ->whereIn('id', $relatedProductIds)
+                ->whereHas('translations', fn ($query) => $query->whereIn('locale', [$locale, $fallbackLocale])
+                    ->whereRaw("TRIM(COALESCE(slug, '')) <> ''"))
                 ->with([
+                    'taxRate:id,rate,rate_type,is_active',
                     'translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale]),
-                    'media',
-                    'optionValues.optionValue.translations',
-                    'optionValues.parentOptionValue.translations',
-                    'manufacturer.translations',
+                    'media' => fn ($query) => $query->whereIn('collection_name', ['product_main', 'product_gallery'])->orderBy('order_column')->orderBy('id'),
+                    'optionValues' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order')->orderBy('id')
+                        ->with([
+                            'optionValue.option', 'parentOptionValue.option',
+                            'optionValue.translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale]),
+                            'parentOptionValue.translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale]),
+                        ]),
+                    'manufacturer.translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale]),
                     'categories.translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale]),
                     'attributes' => ProductMaterialLabel::eagerLoadAttributes($locale, $fallbackLocale),
                 ])
                 ->get()
                 ->sortBy(fn ($row) => array_search((int) $row->id, $relatedProductIds, true))
                 ->values();
+            app(PriceCatalogResolver::class)->preloadProducts($relatedProducts, $request->user());
         }
 
         $hotspotProductIds = collect($post->media)

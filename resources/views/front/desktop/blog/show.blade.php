@@ -45,6 +45,7 @@
     $hotspotProductsById = collect($hotspotProducts ?? [])->mapWithKeys(
         fn ($row, $id) => [(int) $id => (array) $row]
     );
+    $isHerreraBlog = str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? '')), 'herrera');
 @endphp
 
 @section('title', $translation?->title ?? __('ui.blog.page_title'))
@@ -273,6 +274,17 @@
     @endif
 
     @if (($relatedProducts ?? collect())->isNotEmpty())
+        @if ($isHerreraBlog)
+            <div data-blog-related-products>
+                @include('front.partials.herrera-product-carousel', [
+                    'products' => $relatedProducts,
+                    'carouselId' => 'blog-related-products-carousel-'.$post->id,
+                    'title' => __('ui.product.related'),
+                    'kind' => 'related',
+                    'useSharedCarouselInit' => true,
+                ])
+            </div>
+        @else
         <section class="mt-16" data-blog-related-products>
             <div class="w-full px-4 sm:px-6 lg:px-8">
                 <x-storefront-section-heading class="mb-7">
@@ -385,6 +397,7 @@
                 </div>
             </div>
         </section>
+        @endif
     @endif
 
 @endsection

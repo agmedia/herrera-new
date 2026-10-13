@@ -1,0 +1,74 @@
+.herrera-storefront .herrera-home-blog-widget {
+    min-width: 0;
+    max-width: 100%;
+    margin: 0 0 44px;
+}
+
+.herrera-storefront .herrera-home-blog-carousel {
+    min-width: 0;
+    max-width: 100%;
+    visibility: visible;
+}
+
+.herrera-storefront .herrera-home-blog-carousel .splide__track {
+    overflow: hidden;
+    overflow: clip;
+    max-width: 100%;
+    padding: 0 !important;
+}
+
+.herrera-storefront .herrera-home-blog-carousel .splide__list {
+    display: flex;
+    gap: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+    list-style: none;
+}
+
+.herrera-storefront .herrera-home-blog-carousel:not(.is-active) .splide__list { display: flex; gap: 20px; }
+.herrera-storefront .herrera-home-blog-carousel .splide__slide {
+    flex: 0 0 auto;
+    min-width: 0;
+    width: calc((100% - (var(--blog-columns, 3) - 1) * 20px) / var(--blog-columns, 3));
+    height: auto;
+}
+
+.herrera-storefront .herrera-home-blog-carousel .splide__arrows { display: flex; align-items: center; gap: 8px; }
+.herrera-storefront .herrera-home-blog-carousel:not(.is-active) .splide__arrows { display: none; }
+.herrera-storefront .herrera-home-blog-carousel .splide__arrow {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid #dce6e9;
+    border-radius: 6px;
+    background: #fff;
+    color: #34474f;
+    opacity: 1;
+    transform: none;
+    cursor: pointer;
+}
+.herrera-storefront .herrera-home-blog-carousel .splide__arrow:hover:not(:disabled) { border-color: #007c8d; color: #007c8d; }
+.herrera-storefront .herrera-home-blog-carousel .splide__arrow:disabled { opacity: .35; cursor: default; }
+.herrera-storefront .herrera-home-blog-carousel .splide__arrow svg { width: 12px; height: 12px; fill: currentColor; }
+.herrera-storefront .herrera-home-blog-carousel .splide__arrow--prev svg { transform: rotate(180deg); }
+.herrera-storefront .herrera-home-blog-carousel a:focus-visible,
+.herrera-storefront .herrera-home-blog-carousel button:focus-visible { outline: 2px solid #007c8d; outline-offset: 4px; }
+
+.herrera-blog-card, .herrera-blog-card > a { display: block; width: 100%; min-width: 0; text-align: left; }
+.herrera-blog-card-image { display: flex; align-items: center; justify-content: center; aspect-ratio: 3 / 2; overflow: hidden; background: #f3f7f8; }
+.herrera-blog-card-image img { display: block; width: 100%; max-width: 100%; height: 100%; object-fit: cover; }
+.herrera-blog-card-image > span { padding: 20px; color: #637179; font-size: 12px; }
+.herrera-blog-card-copy { padding: 16px 0 0; }
+.herrera-blog-card-copy :is(h2, h3) { margin: 0; color: #283236; font-size: 20px; font-weight: 600; line-height: 1.4; overflow-wrap: anywhere; }
+.herrera-blog-card-copy p { margin: 8px 0 0; color: #57666d; font-size: 14px; line-height: 1.6; }
+
+@media (max-width: 1023px) {
+    .herrera-storefront .herrera-home-blog-carousel .splide__slide { width: calc((100% - (var(--blog-tablet-columns, 2) - 1) * 20px) / var(--blog-tablet-columns, 2)); }
+}
+@media (max-width: 767px) {
+    .herrera-storefront .herrera-home-blog-carousel .splide__slide { width: 100%; }
+    .herrera-blog-card-copy :is(h2, h3) { font-size: 17px; }
+}

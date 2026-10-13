@@ -4,6 +4,11 @@
 @section('main_class', 'mx-auto w-full max-w-7xl px-6 pt-0 pb-0')
 
 @section('content')
+    @once
+        @push('styles')
+            <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-home-blog.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-home-blog.css')) }}">
+        @endpush
+    @endonce
     <section class="mb-8 px-1">
         <div class="front-soft-hero px-6 py-4 text-center sm:px-8 sm:py-5">
             <nav aria-label="Breadcrumb" class="mb-2">
@@ -27,37 +32,7 @@
     @else
         <section class="grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
             @foreach ($posts as $post)
-                @php
-                    $translation = $post->translations->firstWhere('locale', $locale)
-                        ?? $post->translations->firstWhere('locale', $fallbackLocale);
-                    $postImageUrl = \App\Support\Media\HerreraBlogImage::first($post);
-                @endphp
-
-                <article>
-                    <a href="{{ route('blog.show', ['slug' => $translation?->slug ?? $post->id]) }}" class="group block">
-                        <div class="aspect-[3/2] overflow-hidden bg-slate-200">
-                            @if ($postImageUrl)
-                                <img
-                                    src="{{ $postImageUrl }}"
-                                    alt="{{ $translation?->title ?? $post->code }}"
-                                    class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
-                                    loading="lazy"
-                                    decoding="async"
-                                >
-                            @else
-                                <div class="flex h-full w-full items-center justify-center text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.product.no_image') }}</div>
-                            @endif
-                        </div>
-
-                        <h2 class="mt-4 text-center text-lg font-semibold leading-snug text-slate-800 lg:text-xl">
-                            {{ $translation?->title ?? $post->code }}
-                        </h2>
-
-                        <p class="mx-auto mt-4 max-w-[30ch] text-center text-sm leading-relaxed text-slate-700">
-                            {{ $translation?->excerpt ?: __('ui.blog.excerpt_fallback') }}
-                        </p>
-                    </a>
-                </article>
+                @include('front.partials.herrera-blog-card', ['blogCardPost' => $post, 'blogCardLocale' => $locale, 'blogCardFallbackLocale' => $fallbackLocale, 'blogCardInList' => true])
             @endforeach
         </section>
 

@@ -40,7 +40,7 @@
     <div
         id="{{ $carouselId }}"
         class="splide herrera-product-carousel"
-        data-related-products-splide
+        @if ($useSharedCarouselInit ?? false) data-herrera-home-carousel @else data-related-products-splide @endif
         data-continuous-card-carousel
         data-desktop-cols="6"
         data-mobile-cols="2"
@@ -76,3 +76,6 @@
         </div>
     </div>
 </section>
+@if ($useSharedCarouselInit ?? false)
+    @include('front.partials.herrera-home-carousel-script')
+@endif

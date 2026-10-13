@@ -48,6 +48,7 @@ return [
         'login' => 'B2B prijava',
     ],
     'blog' => [
+        'eyebrow' => 'Iz našeg bloga',
         'subtitle' => 'Novosti iz Herrere, savjeti i inspiracija za vaše projekte.',
         'illustration' => 'Ilustrativni prikaz rasvjete u prostoru.',
     ],

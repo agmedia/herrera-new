@@ -82,7 +82,8 @@ class Manager extends Component
             ->with([
                 'roles:id,name,title',
                 'customerGroups:id,name,is_active',
-                'b2bAccount:id,user_id,company_name,oib',
+                'b2bAccount:id,user_id,company_name,oib,status,customer_group_id,contract_starts_at,contract_ends_at',
+                'b2bAccount.customerGroup:id,is_active',
                 'profile:id,user_id,company,oib',
                 'addresses' => fn ($query) => $query->where('type', 'billing'),
             ])

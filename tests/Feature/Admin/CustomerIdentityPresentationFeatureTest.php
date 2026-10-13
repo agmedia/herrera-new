@@ -146,12 +146,25 @@ class CustomerIdentityPresentationFeatureTest extends TestCase
         $unassigned = User::factory()->create();
         $unassigned->profile()->create(['company' => 'Unassigned Hidden Company']);
 
-        $this->actingAs($salesperson)->get(route('admin.users'))->assertOk()
+        $response = $this->actingAs($salesperson)->get(route('admin.users'))->assertOk()
             ->assertSee('Moji kupci')
             ->assertSee('Prikazani su samo kupci koji su vam dodijeljeni.')
             ->assertSee('Orderable Company')->assertSee('Pending Support Company')
             ->assertDontSee('Unassigned Hidden Company')
             ->assertSee('Naruči za kupca')->assertSee('Prijavi se kao kupac');
+
+        $dom = new \DOMDocument;
+        $previous = libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+        $xpath = new \DOMXPath($dom);
+        foreach (['approved' => 'Naruči za kupca', 'pending' => 'Prijavi se kao kupac'] as $status => $label) {
+            $action = route('admin.users.impersonate', $customers[$status]);
+            $buttons = $xpath->query('//form[@action="'.$action.'"]//button');
+            $this->assertSame(1, $buttons->count());
+            $this->assertSame($label, trim($buttons->item(0)->textContent));
+        }
 
         $orderAction = view('admin.users.partials.impersonate-button', ['customer' => $customers['approved']])->render();
         $supportAction = view('admin.users.partials.impersonate-button', ['customer' => $customers['pending']])->render();

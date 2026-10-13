@@ -181,6 +181,40 @@ class HerreraCatalogStockPriorityTest extends TestCase
         }
     }
 
+    public function test_unavailable_active_product_keeps_its_direct_url_while_lists_and_search_follow_stock(): void
+    {
+        // Exercise live stock queries independently of the search aggregate's bounded TTL.
+        config(['storefront-search.count_cache_seconds' => 0]);
+        app(SystemSettingsService::class)->put('store_search_autocomplete_enabled', true);
+        $product = $this->product('url-stock-empty', 20, 0, 0);
+        $this->variant($product, 0, true);
+        $inactive = $this->product('inactive-direct-url', 20, 5, 0);
+        $inactive->update(['is_active' => false]);
+
+        $this->get(route('products.show', ['slug' => $product->code]))->assertOk()
+            ->assertViewHas('product', fn (Product $shown): bool => $shown->id === $product->id)
+            ->assertSee('product-detail-cart-button-disabled', false)->assertSee(__('ui.product.unavailable'));
+        $this->postJson(route('cart.items.store'), ['product_id' => $product->id, 'quantity' => 1])
+            ->assertStatus(422)->assertJsonPath('ok', false);
+        $this->get(route('products.show', ['slug' => $inactive->code]))->assertNotFound();
+
+        $urls = [...$this->catalogUrls(), ...$this->catalogUrls(['q' => $product->code])];
+        foreach ($urls as $url) {
+            $this->get($url)->assertOk()->assertViewHas('products', fn ($page): bool => ! $page->pluck('id')->contains($product->id));
+        }
+        $this->getJson(route('search.autocomplete', ['q' => $product->code]))->assertOk()->assertJsonPath('total', 0);
+
+        $product->update(['supplier_stock_qty' => 4]);
+        foreach ($urls as $url) {
+            $page = $this->get($url)->assertOk()->viewData('products');
+            $this->assertContains($product->id, $page->pluck('id')->all(), $url);
+        }
+        $this->getJson(route('search.autocomplete', ['q' => $product->code]))->assertOk()
+            ->assertJsonPath('total', 1)->assertJsonPath('items.0.id', $product->id);
+        $this->get(route('products.show', ['slug' => $product->code]))->assertOk();
+        $this->get(route('products.show', ['slug' => $inactive->code]))->assertNotFound();
+    }
+
     private function product(string $code, float $price, int $local, int $supplier, ?string $name = null): Product
     {
         $product = Product::query()->create([

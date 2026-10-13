@@ -160,7 +160,8 @@ backups are retained in `/home/herrera/.herrera-staging-backups`.
 Deployment does not run database migrations, re-import the catalog/orders or modify production.
 It applies the agreed October B2B settings once through `herrera:apply-quick-fixes`:
 the Herrera social profiles, blog navigation, structured specification filters and
-hiding unavailable products. A saved marker preserves later administrator edits.
+hiding unavailable products from catalog lists and search. Active product detail
+URLs remain accessible regardless of stock. A saved marker preserves later administrator edits.
 The command is restricted to the isolated local preview and staging databases.
 It also collapses non-category filters by default, refreshes the three existing
 Croatian blog articles from `resources/content/herrera-blog` and adds the CMS blog

@@ -247,6 +247,13 @@ class StoreSettingsService
                 'facebook' => [
                     'url' => trim((string) $this->settings->get('store_social_facebook_url', '')),
                     'enabled' => (bool) $this->settings->get('store_footer_social_facebook_enabled', true),
+                    'label' => trim((string) $this->settings->get('store_social_facebook_slovenia_url', '')) !== '' ? 'Facebook Hrvatska' : 'Facebook',
+                ],
+                'facebook_slovenia' => [
+                    'network' => 'facebook',
+                    'label' => 'Facebook Slovenija',
+                    'url' => trim((string) $this->settings->get('store_social_facebook_slovenia_url', '')),
+                    'enabled' => (bool) $this->settings->get('store_footer_social_facebook_slovenia_enabled', true),
                 ],
                 'instagram' => [
                     'url' => trim((string) $this->settings->get('store_social_instagram_url', '')),

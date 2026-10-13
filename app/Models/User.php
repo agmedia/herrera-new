@@ -109,6 +109,35 @@ class User extends Authenticatable implements HasMedia
         return $this->hasOne(\App\Models\User\B2BAccount::class);
     }
 
+    public function companyName(): ?string
+    {
+        if ($this->account_type !== 'customer') {
+            return null;
+        }
+
+        $company = trim((string) $this->b2bAccount?->company_name);
+        if ($company !== '') {
+            return $company;
+        }
+        $company = trim((string) $this->profile?->company);
+        if ($company !== '') {
+            return $company;
+        }
+
+        $billing = $this->relationLoaded('addresses')
+            ? $this->addresses->firstWhere('type', 'billing')
+            : $this->addresses()->where('type', 'billing')->first();
+
+        return trim((string) $billing?->company) ?: null;
+    }
+
+    public function customerDisplayName(): string
+    {
+        return $this->companyName() ?? ($this->account_type === 'customer' && config('commerce.b2b_only')
+            ? __('Tvrtka bez naziva')
+            : (string) $this->name);
+    }
+
     public function trackingEvents(): HasMany
     {
         return $this->hasMany(\App\Models\User\UserTrackingEvent::class);

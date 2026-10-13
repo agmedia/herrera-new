@@ -96,7 +96,7 @@ class AccountController extends Controller
             ->where('order_number', $orderNumber)
             ->with([
                 'status:id,name,color,sort_order,is_cancelled',
-                'items.product:id,code,is_active',
+                'items.product:id,code,is_active,payload',
                 'items.product.media' => static function ($query): void {
                     $query->whereIn('collection_name', ['product_main', 'product_gallery'])
                         ->orderBy('order_column')

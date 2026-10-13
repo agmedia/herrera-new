@@ -5,6 +5,7 @@
             <div>
                 <h1 class="text-xl font-semibold tracking-tight">{{ __('User Groups') }}</h1>
                 <p class="mt-1 text-sm text-slate-600">{{ __('Manage segmentation groups for audience rules, pricing, and campaigns.') }}</p>
+                <p class="mt-2 text-sm text-slate-600">{{ __('Djelatnosti i divizije dodaju se kupcu kao dodatni segmenti za ciljane akcije. Cjenovna grupa kupca ostaje zasebna.') }}</p>
                 <p class="mt-2 text-xs text-slate-500">{{ __('Items per page:') }} <span class="admin-chip">{{ $perPage }}</span></p>
             </div>
             <div class="flex w-full items-end gap-3 sm:w-auto">
@@ -75,6 +76,14 @@
                         </div>
                     </div>
                     <div style="grid-column: span 12;">
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Vrsta grupe') }}</label>
+                        <select wire:model.live="form.classification_type" class="admin-select w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                            @foreach ($classificationOptions as $type => $label)<option value="{{ $type }}">{{ __($label) }}</option>@endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-slate-500">{{ __('Djelatnost ili diviziju dodijelite u segmentima kupca, zatim je odaberite kao publiku akcije. Ne zamjenjuje ugovorenu cjenovnu grupu.') }}</p>
+                        @error('form.classification_type') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                    </div>
+                    <div style="grid-column: span 12;">
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Description') }}</label>
                         <textarea wire:model="form.description" rows="3" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"></textarea>
                     </div>
@@ -125,6 +134,7 @@
                                 <td class="px-3 py-2 text-slate-800">{{ $row->code }}</td>
                                 <td class="px-3 py-2 text-slate-800">
                                     <div>{{ $row->name }}</div>
+                                    @if ($row->isBusinessSegment())<div class="mt-1 text-xs font-semibold text-cyan-700">{{ __($classificationOptions[$row->classificationType()]) }}</div>@endif
                                     @if ($row->description)
                                         <div class="text-xs text-slate-500">{{ $row->description }}</div>
                                     @endif
@@ -141,7 +151,7 @@
                                 </td>
                                 <td class="px-3 py-2 text-right">
                                     <div class="inline-flex items-center gap-1">
-                                        @if (!$row->is_default)
+                                        @if (!$row->is_default && !$row->isBusinessSegment())
                                             <button type="button" wire:click="makeDefault({{ $row->id }})" class="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100">{{ __('Default') }}</button>
                                         @endif
                                         <a href="{{ route('admin.users.groups.edit', array_filter([

@@ -183,7 +183,7 @@ class B2BPriceRuleForm extends Component
     public function getCustomerOptionsProperty(): Collection
     {
         return User::query()
-            ->select(['users.id', 'users.name', 'users.email'])
+            ->select(['users.id', 'users.name', 'users.email', 'users.account_type'])
             ->whereHas('b2bAccount', function ($query): void {
                 $query->where('status', B2BAccount::STATUS_APPROVED);
 

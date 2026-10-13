@@ -610,6 +610,8 @@ class CatalogController extends Controller
 
         $this->applyBasePriceFilter($query, $priceMin, $priceMax);
 
+        $this->prioritizeLocalStock($query);
+
         if ($search !== '' && $sort === 'relevance') {
             app(StorefrontProductSearch::class)->orderByRelevance($query, $search);
         }
@@ -941,6 +943,8 @@ class CatalogController extends Controller
                                 ->whereIn('locale', [$locale, $fallbackLocale]),
                         ]),
                 ]);
+
+            $this->prioritizeLocalStock($productsQuery);
 
             if ($search !== '' && $sort === 'relevance') {
                 app(StorefrontProductSearch::class)->orderByRelevance($productsQuery, $search);
@@ -2385,6 +2389,22 @@ class CatalogController extends Controller
         }
     }
 
+    private function prioritizeLocalStock(Builder $query): void
+    {
+        if (! config('commerce.b2b_only')
+            || ! str_contains(strtolower((string) app(SystemSettingsService::class)->get('store_brand_name', config('app.name', 'AG Shop'))), 'herrera')) {
+            return;
+        }
+
+        // Keep the selected sort inside each group; supplier-only products
+        // remain available but follow products ready at our own warehouse.
+        $query->orderByRaw('CASE WHEN products.stock_qty > 0 OR EXISTS ('
+            .'SELECT 1 FROM catalog_product_option_values AS local_stock_options '
+            .'WHERE local_stock_options.product_id = products.id '
+            .'AND local_stock_options.is_active = 1 AND local_stock_options.stock_qty > 0'
+            .') THEN 0 ELSE 1 END ASC');
+    }
+
     private function applyPriceSort(Builder $query, string $direction = 'asc'): void
     {
         $audiencePrice = app(PriceCatalogQuery::class)->displayedPrice($query, auth()->user());
@@ -2395,13 +2415,13 @@ class CatalogController extends Controller
         }
         $defaultRate = $this->defaultCatalogTaxRate();
         if ($this->usesStoredPriceColumn($defaultRate)) {
-            $query->orderBy('products.base_price', $direction === 'desc' ? 'desc' : 'asc');
+            $query->orderBy('products.base_price', $direction === 'desc' ? 'desc' : 'asc')->orderBy('products.id');
 
             return;
         }
 
         $expression = $this->displayedPriceSqlExpression($query);
-        $query->orderByRaw($expression.' '.($direction === 'desc' ? 'DESC' : 'ASC'));
+        $query->orderByRaw($expression.' '.($direction === 'desc' ? 'DESC' : 'ASC'))->orderBy('products.id');
     }
 
     /**

@@ -93,6 +93,13 @@ class Order extends Model
         return $query->whereDoesntHave('status', fn (Builder $status) => OrderStatusClassification::applyCancelledQuery($status));
     }
 
+    public function customerDisplayName(): string
+    {
+        return trim((string) $this->billing_company) ?: (config('commerce.b2b_only')
+            ? __('Tvrtka bez naziva')
+            : (string) $this->customer_name);
+    }
+
     public function status(): BelongsTo
     {
         return $this->belongsTo(OrderStatus::class, 'status_id');

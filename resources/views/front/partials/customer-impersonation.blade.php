@@ -2,7 +2,8 @@
     <div role="status" class="border-b border-amber-300 bg-amber-50 text-amber-950" style="position:relative;z-index:50;background:#fffbeb;color:#78350f;border-bottom:1px solid #fcd34d;">
         <div class="container mx-auto flex flex-wrap items-center justify-between gap-3 px-4 py-3" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:12px 24px;">
             <div>
-                <strong>{{ __('Prijavljeni ste kao kupac:') }} {{ auth()->user()?->name }}</strong>
+                <strong>{{ __('Prijavljeni ste kao kupac:') }} {{ auth()->user()?->customerDisplayName() }}</strong>
+                @if (auth()->user()?->customerDisplayName() !== auth()->user()?->name)<span class="ml-2 text-sm">{{ __('Kontakt') }}: {{ auth()->user()?->name }}</span>@endif
                 <span class="ml-2 text-sm">{{ __('Pregledavate njegov račun, cijene i narudžbe.') }}</span>
             </div>
             <form method="POST" action="{{ route('front.impersonation.stop') }}">

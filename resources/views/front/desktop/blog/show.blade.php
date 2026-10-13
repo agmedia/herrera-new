@@ -12,8 +12,10 @@
         : collect();
     $preferWebp = (bool) ($storeSettings['images']['use_webp'] ?? false);
     $coverImage = $mediaItems->firstWhere('collection_name', 'blog_cover') ?? $post->getFirstMedia('blog_cover');
-    $coverImageUrl = $coverImage?->getUrl() ?: \App\Support\Media\LegacyCatalogImage::first($post);
-    $coverImagePath = $coverImage?->getPath();
+    $coverImageUrl = \App\Support\Media\HerreraBlogImage::first($post);
+    $editorialCoverPath = \App\Support\Media\HerreraBlogImage::localPath($post);
+    $isEditorialCover = $editorialCoverPath && $coverImageUrl === asset('assets/blog/herrera/'.basename($editorialCoverPath));
+    $coverImagePath = $isEditorialCover ? $editorialCoverPath : $coverImage?->getPath();
     $coverImageDimensions = $coverImagePath && is_file($coverImagePath) ? @getimagesize($coverImagePath) : false;
     $coverImageWidth = is_array($coverImageDimensions) ? (int) $coverImageDimensions[0] : 1200;
     $coverImageHeight = is_array($coverImageDimensions) ? (int) $coverImageDimensions[1] : 800;
@@ -143,9 +145,6 @@
                 </ol>
             </nav>
             <h1 class="mx-auto mt-1 max-w-4xl text-[1.7rem] font-semibold leading-[1.12] tracking-[-0.01em] text-slate-900 md:text-[2.2rem]">{{ $translation?->title ?? $post->code }}</h1>
-            @if (!empty($translation?->excerpt))
-                <p class="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-slate-600">{{ $translation->excerpt }}</p>
-            @endif
         </div>
     </section>
 
@@ -174,6 +173,9 @@
                         loading="eager"
                         decoding="async"
                     >
+                    @if ($isEditorialCover)
+                        <figcaption class="mt-2 text-xs text-slate-500">{{ __('herrera.blog.illustration') }}</figcaption>
+                    @endif
                 </figure>
             @endif
 

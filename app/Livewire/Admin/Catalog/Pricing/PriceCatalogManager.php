@@ -308,6 +308,33 @@ class PriceCatalogManager extends Component
         $this->rulePreview = null;
     }
 
+    public function adjustRulePercent(int $direction): void
+    {
+        $this->ensureDraft();
+        abort_unless(in_array($direction, [-1, 1], true), 422);
+
+        $percent = str_replace(',', '.', trim((string) ($this->ruleForm['percent'] ?? '')));
+        if ($percent === '') {
+            $percent = '0';
+        }
+        if (! preg_match('/^\d{1,3}(\.\d{1,4})?$/', $percent) || (float) $percent > 100) {
+            $this->addError('percent', __('Unesite popust veći od 0 i najviše 100 %.'));
+
+            return;
+        }
+
+        $adjusted = round((float) $percent + $direction, 4);
+        if ($adjusted <= 0 || $adjusted > 100) {
+            $this->addError('percent', __('Popust mora biti veći od 0 i najviše 100 %.'));
+
+            return;
+        }
+
+        $this->ruleForm['percent'] = rtrim(rtrim(number_format($adjusted, 4, '.', ''), '0'), '.');
+        $this->rulePreview = null;
+        $this->resetValidation('percent');
+    }
+
     public function previewRule(): void
     {
         $this->ensureDraft();

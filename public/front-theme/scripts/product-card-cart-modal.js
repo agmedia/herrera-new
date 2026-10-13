@@ -124,7 +124,7 @@
                 }
 
                 document.dispatchEvent(new CustomEvent('product-card-overlay:close-all'));
-                window.TermolCartModal?.show(form, optionLabel, quantity);
+                window.TermolCartModal?.confirm(form, optionLabel, quantity, payload);
             } catch (error) {
                 // Keep the card stable if the request fails.
             } finally {

@@ -73,6 +73,9 @@
                                     @if (!empty($line['option_label']))
                                         <p class="mt-1 text-xs text-slate-500">{{ $line['option_label'] }}</p>
                                     @endif
+                                    @isset($staffStockByLine[$line['key']])
+                                        @include('front.partials.cart-staff-stock', ['staffStock' => $staffStockByLine[$line['key']]])
+                                    @endisset
                                 </div>
                             </div>
 
@@ -205,6 +208,9 @@
                                         @if (!empty($line['option_label']))
                                             <p class="mt-1 text-xs text-slate-500">{{ $line['option_label'] }}</p>
                                         @endif
+                                        @isset($staffStockByLine[$line['key']])
+                                            @include('front.partials.cart-staff-stock', ['staffStock' => $staffStockByLine[$line['key']]])
+                                        @endisset
                                     </div>
                                 </div>
                             </td>

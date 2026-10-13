@@ -214,7 +214,9 @@ class B2BAccountService
         ];
         if ($merged['status'] === B2BAccount::STATUS_APPROVED || array_key_exists('customer_group_id', $data)) {
             $rules['customer_group_id'][] = Rule::exists('customer_groups', 'id')
-                ->where(fn ($query) => $query->where('is_active', true));
+                ->where(fn ($query) => $query->where('is_active', true)->where(fn ($query) => $query
+                    ->whereNull('payload->classification_type')
+                    ->orWhereNotIn('payload->classification_type', [CustomerGroup::CLASSIFICATION_INDUSTRY, CustomerGroup::CLASSIFICATION_DIVISION])));
         }
         $editableRules = [
             'company_name' => ['required', 'string', 'max:191'],

@@ -6,6 +6,8 @@
     let refs = null;
     let previouslyFocusedElement = null;
     let focusFrame = 0;
+    let notice = null;
+    let noticeTimer = 0;
 
     const modalMarkup = [
         '<div class="product-cart-modal-backdrop" data-cart-modal-backdrop></div>',
@@ -165,8 +167,33 @@
         });
     };
 
+    const confirm = function (form, optionText, quantity, payload) {
+        if (payload?.confirmation !== 'notice') {
+            show(form, optionText, quantity);
+            return;
+        }
+
+        if (!notice) {
+            notice = document.createElement('div');
+            notice.className = 'product-cart-notice';
+            notice.setAttribute('role', 'status');
+            notice.setAttribute('aria-live', 'polite');
+            notice.setAttribute('aria-atomic', 'true');
+            notice.hidden = true;
+            document.body.appendChild(notice);
+        }
+
+        window.clearTimeout(noticeTimer);
+        notice.textContent = String(payload.message || form.dataset.modalTitle || 'Added to cart');
+        notice.hidden = false;
+        noticeTimer = window.setTimeout(function () {
+            notice.hidden = true;
+        }, 3000);
+    };
+
     window.TermolCartModal = Object.freeze({
         close: close,
         show: show,
+        confirm: confirm,
     });
 })();

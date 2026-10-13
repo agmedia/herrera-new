@@ -64,7 +64,8 @@
             <div class="mt-4 grid gap-3" style="grid-template-columns: repeat(12, minmax(0, 1fr));">
                 <div style="grid-column: span 4;">
                     <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Customer') }}</p>
-                    <p class="mt-1 text-sm font-semibold text-slate-900">{{ $order->customer_name }}</p>
+                    <p class="mt-1 text-sm font-semibold text-slate-900">{{ $order->customerDisplayName() }}</p>
+                            @if ($order->customerDisplayName() !== $order->customer_name)<p class="text-xs text-slate-500">{{ __('Kontakt') }}: {{ $order->customer_name }}</p>@endif
                     <p class="text-xs text-slate-600">{{ $order->customer_email }}</p>
                     @if ($order->customer_phone)
                         <p class="text-xs text-slate-600">{{ $order->customer_phone }}</p>

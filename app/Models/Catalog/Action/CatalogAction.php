@@ -210,9 +210,17 @@ class CatalogAction extends Model
 
                 $access = app(B2BAccessService::class);
                 $account = $access->requiresApprovedAccount() ? $access->approvedAccount($user) : null;
-                $groupIds = $access->requiresApprovedAccount()
-                    ? ($account ? [(int) $account->customer_group_id] : [])
-                    : $user->customerGroups()->pluck('customer_groups.id')->map(fn ($id) => (int) $id)->all();
+                if ($access->requiresApprovedAccount()) {
+                    $groupIds = $account
+                        ? array_values(array_unique([
+                            (int) $account->customer_group_id,
+                            ...$user->customerGroups()->businessSegments()->where('customer_groups.is_active', true)
+                                ->pluck('customer_groups.id')->map(fn ($id) => (int) $id)->all(),
+                        ]))
+                        : [];
+                } else {
+                    $groupIds = $user->customerGroups()->pluck('customer_groups.id')->map(fn ($id) => (int) $id)->all();
+                }
                 if ($groupIds !== []) {
                     $audienceQuery->orWhere(function (Builder $q) use ($groupIds): void {
                         $q->where('audience_type', self::AUDIENCE_USER_GROUP)

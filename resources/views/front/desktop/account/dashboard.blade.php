@@ -49,7 +49,8 @@
             <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 <article class="border border-slate-200 bg-white p-5">
                     <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.dashboard.cards.user') }}</p>
-                    <h2 class="mt-2 text-xl font-bold text-slate-900">{{ $user->name }}</h2>
+                    <h2 class="mt-2 text-xl font-bold text-slate-900">{{ $user->customerDisplayName() }}</h2>
+                    @if ($user->customerDisplayName() !== $user->name)<p class="mt-1 text-sm text-slate-600">{{ __('Kontakt') }}: {{ $user->name }}</p>@endif
                     <p class="mt-1 text-sm text-slate-600">{{ $user->email }}</p>
                     <a href="{{ route('account.profile') }}" class="store-text-link mt-3 inline-flex border-b border-current text-sm font-semibold">{{ __('ui.account.nav.edit_account') }}</a>
                 </article>

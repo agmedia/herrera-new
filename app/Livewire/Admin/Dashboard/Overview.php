@@ -213,6 +213,7 @@ class Overview extends Component
                 'order_number',
                 'status_id',
                 'customer_name',
+                'billing_company',
                 'grand_total',
                 'currency_code',
                 'placed_at',

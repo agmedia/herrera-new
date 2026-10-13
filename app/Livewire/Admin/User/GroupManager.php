@@ -34,6 +34,7 @@ class GroupManager extends Component
         'code' => '',
         'name' => '',
         'description' => '',
+        'classification_type' => CustomerGroup::CLASSIFICATION_GENERAL,
         'is_active' => true,
         'is_default' => false,
         'sort_order' => 0,
@@ -65,14 +66,30 @@ class GroupManager extends Component
 
     public function save()
     {
+        $this->authorizeAccess();
         $validated = $this->validate($this->rules());
         $payload = $validated['form'];
+
+        if ($payload['classification_type'] !== CustomerGroup::CLASSIFICATION_GENERAL) {
+            if ($payload['is_default'] || ($this->editingId && CustomerGroup::query()->whereKey($this->editingId)->where('is_default', true)->exists())) {
+                $this->addError('form.classification_type', __('Djelatnost ili divizija ne može biti zadana cjenovna grupa.'));
+
+                return null;
+            }
+            if ($this->editingId && \App\Models\User\B2BAccount::query()->where('customer_group_id', $this->editingId)->exists()) {
+                $this->addError('form.classification_type', __('Ova grupa je cjenovna grupa B2B kupca. Za djelatnost ili diviziju izradite zasebnu grupu.'));
+
+                return null;
+            }
+        }
 
         DB::transaction(function () use ($payload): void {
             if ((bool) $payload['is_default']) {
                 CustomerGroup::query()->update(['is_default' => false]);
             }
 
+            $metadata = $this->editingId ? (CustomerGroup::query()->findOrFail($this->editingId)->payload ?? []) : [];
+            $metadata['classification_type'] = $payload['classification_type'];
             $group = CustomerGroup::query()->updateOrCreate(
                 ['id' => $this->editingId],
                 [
@@ -82,10 +99,11 @@ class GroupManager extends Component
                     'is_active' => (bool) $payload['is_active'],
                     'is_default' => (bool) $payload['is_default'],
                     'sort_order' => (int) $payload['sort_order'],
+                    'payload' => $metadata,
                 ]
             );
 
-            if (! CustomerGroup::query()->where('is_default', true)->exists()) {
+            if (! $group->isBusinessSegment() && ! CustomerGroup::query()->where('is_default', true)->exists()) {
                 $group->update(['is_default' => true]);
             }
 
@@ -99,6 +117,7 @@ class GroupManager extends Component
                     'name' => $group->name,
                     'is_active' => $group->is_active,
                     'is_default' => $group->is_default,
+                    'classification_type' => $group->classificationType(),
                 ])
                 ->log($this->editingId ? 'Customer group updated' : 'Customer group created');
         });
@@ -127,6 +146,7 @@ class GroupManager extends Component
             'code' => (string) $group->code,
             'name' => (string) $group->name,
             'description' => (string) ($group->description ?? ''),
+            'classification_type' => $group->classificationType(),
             'is_active' => (bool) $group->is_active,
             'is_default' => (bool) $group->is_default,
             'sort_order' => (int) $group->sort_order,
@@ -147,6 +167,7 @@ class GroupManager extends Component
 
         if ($wasDefault) {
             CustomerGroup::query()
+                ->pricingGroups()
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->limit(1)
@@ -180,6 +201,13 @@ class GroupManager extends Component
 
     public function makeDefault(int $groupId): void
     {
+        $this->authorizeAccess();
+        $group = CustomerGroup::query()->findOrFail($groupId);
+        if ($group->isBusinessSegment()) {
+            $this->addError('form.classification_type', __('Djelatnost ili divizija ne može biti zadana cjenovna grupa.'));
+
+            return;
+        }
         DB::transaction(function () use ($groupId): void {
             CustomerGroup::query()->update(['is_default' => false]);
             CustomerGroup::query()->whereKey($groupId)->update(['is_default' => true]);
@@ -213,6 +241,7 @@ class GroupManager extends Component
         return view('livewire.admin.user.group-manager', [
             'rows' => $rows,
             'perPage' => $perPage,
+            'classificationOptions' => CustomerGroup::classificationOptions(),
         ]);
     }
 
@@ -225,6 +254,7 @@ class GroupManager extends Component
             'form.code' => ['required', 'string', 'max:80', Rule::unique('customer_groups', 'code')->ignore($this->editingId)],
             'form.name' => ['required', 'string', 'max:120'],
             'form.description' => ['nullable', 'string'],
+            'form.classification_type' => ['required', Rule::in(array_keys(CustomerGroup::classificationOptions()))],
             'form.is_active' => ['boolean'],
             'form.is_default' => ['boolean'],
             'form.sort_order' => ['nullable', 'integer', 'min:0', 'max:999999'],
@@ -238,6 +268,7 @@ class GroupManager extends Component
             'code' => '',
             'name' => '',
             'description' => '',
+            'classification_type' => CustomerGroup::CLASSIFICATION_GENERAL,
             'is_active' => true,
             'is_default' => false,
             'sort_order' => 0,

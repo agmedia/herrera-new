@@ -120,12 +120,27 @@ class CustomerPurchaseStatistics
     {
         $email = 'CASE WHEN orders.user_id IS NULL THEN LOWER(TRIM(orders.customer_email)) ELSE NULL END';
         $anonymous = "CASE WHEN orders.user_id IS NULL AND TRIM(orders.customer_email) = '' THEN orders.id ELSE NULL END";
+        $billingCompanies = DB::table('user_addresses as billing_candidates')
+            ->select('billing_candidates.user_id', 'billing_candidates.company')
+            ->where('billing_candidates.type', 'billing')
+            ->whereNotExists(fn (Builder $preferred) => $preferred->selectRaw('1')
+                ->from('user_addresses as preferred_billing')
+                ->whereColumn('preferred_billing.user_id', 'billing_candidates.user_id')
+                ->where('preferred_billing.type', 'billing')
+                ->where(fn (Builder $preference) => $preference
+                    ->whereColumn('preferred_billing.is_default', '>', 'billing_candidates.is_default')
+                    ->orWhere(fn (Builder $tie) => $tie
+                        ->whereColumn('preferred_billing.is_default', 'billing_candidates.is_default')
+                        ->whereColumn('preferred_billing.id', '<', 'billing_candidates.id'))));
 
         return $this->eligibleOrders($filters)
             ->leftJoin('users', 'users.id', '=', 'orders.user_id')
+            ->leftJoin('b2b_accounts as purchase_accounts', 'purchase_accounts.user_id', '=', 'orders.user_id')
+            ->leftJoin('user_profiles as purchase_profiles', 'purchase_profiles.user_id', '=', 'orders.user_id')
+            ->leftJoinSub($billingCompanies, 'purchase_billing', 'purchase_billing.user_id', '=', 'orders.user_id')
             ->select('orders.user_id')
             ->selectRaw($email.' AS guest_email, '.$anonymous.' AS anonymous_order_id')
-            ->selectRaw("MAX(COALESCE(NULLIF(users.name, ''), orders.customer_name)) AS name, MAX(COALESCE(NULLIF(users.email, ''), orders.customer_email)) AS email, MAX(orders.billing_company) AS company")
+            ->selectRaw("MAX(COALESCE(NULLIF(users.name, ''), orders.customer_name)) AS name, MAX(COALESCE(NULLIF(users.email, ''), orders.customer_email)) AS email, MAX(COALESCE(NULLIF(TRIM(purchase_accounts.company_name), ''), NULLIF(TRIM(purchase_profiles.company), ''), NULLIF(TRIM(purchase_billing.company), ''), NULLIF(TRIM(orders.billing_company), ''))) AS company")
             ->selectRaw('COUNT(*) AS order_count, SUM(orders.grand_total) AS order_value, AVG(orders.grand_total) AS average_order, SUM(orders.item_qty) AS items_sold')
             ->selectRaw('MIN(COALESCE(orders.placed_at, orders.created_at)) AS first_order_at, MAX(COALESCE(orders.placed_at, orders.created_at)) AS last_order_at')
             ->groupBy('orders.user_id')
@@ -177,7 +192,16 @@ class CustomerPurchaseStatistics
                     ->whereColumn('purchase_customers.id', 'orders.user_id')
                     ->where(fn (Builder $identity) => $identity
                         ->whereRaw("purchase_customers.name LIKE ? ESCAPE '!'", [$search])
-                        ->orWhereRaw("purchase_customers.email LIKE ? ESCAPE '!'", [$search]))));
+                        ->orWhereRaw("purchase_customers.email LIKE ? ESCAPE '!'", [$search])))
+                ->orWhereExists(fn (Builder $accounts) => $accounts->selectRaw('1')
+                    ->from('b2b_accounts as search_accounts')->whereColumn('search_accounts.user_id', 'orders.user_id')
+                    ->whereRaw("search_accounts.company_name LIKE ? ESCAPE '!'", [$search]))
+                ->orWhereExists(fn (Builder $profiles) => $profiles->selectRaw('1')
+                    ->from('user_profiles as search_profiles')->whereColumn('search_profiles.user_id', 'orders.user_id')
+                    ->whereRaw("search_profiles.company LIKE ? ESCAPE '!'", [$search]))
+                ->orWhereExists(fn (Builder $billing) => $billing->selectRaw('1')
+                    ->from('user_addresses as search_billing')->whereColumn('search_billing.user_id', 'orders.user_id')
+                    ->where('search_billing.type', 'billing')->whereRaw("search_billing.company LIKE ? ESCAPE '!'", [$search])));
         }
 
         return $query;

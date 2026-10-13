@@ -826,9 +826,9 @@ document.addEventListener('DOMContentLoaded', function () {
         return Math.min(99, Math.max(1, value));
     };
 
-    const showModal = function (form) {
+    const confirmAdded = function (form, payload) {
         if (window.TermolCartModal) {
-            window.TermolCartModal.show(form, selectedOptionLabel(form), currentQty(form));
+            window.TermolCartModal.confirm(form, selectedOptionLabel(form), currentQty(form), payload);
         }
     };
 
@@ -902,7 +902,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     window.ShopAnalytics.trackAddToCartFromForm(form, currentQty(form), selectedOptionLabel(form));
                 }
 
-                showModal(form);
+                confirmAdded(form, payload);
             } catch (error) {
                 // Keep UI stable on network errors.
             }

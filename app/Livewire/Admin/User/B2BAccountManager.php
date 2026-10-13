@@ -108,7 +108,9 @@ class B2BAccountManager extends Component
                 Rule::requiredIf(($this->form['status'] ?? '') === B2BAccount::STATUS_APPROVED),
                 'nullable',
                 'integer',
-                Rule::exists('customer_groups', 'id')->where(fn ($query) => $query->where('is_active', true)),
+                Rule::exists('customer_groups', 'id')->where(fn ($query) => $query->where('is_active', true)->where(fn ($query) => $query
+                    ->whereNull('payload->classification_type')
+                    ->orWhereNotIn('payload->classification_type', [CustomerGroup::CLASSIFICATION_INDUSTRY, CustomerGroup::CLASSIFICATION_DIVISION]))),
             ],
             'form.erp_customer_id' => ['nullable', 'string', 'max:120'],
             'form.erp_company_code' => ['nullable', 'string', 'max:80'],
@@ -211,6 +213,7 @@ class B2BAccountManager extends Component
             'perPage' => $perPage,
             'statusOptions' => B2BAccount::statusOptions(),
             'customerGroups' => CustomerGroup::query()
+                ->pricingGroups()
                 ->where('is_active', true)
                 ->orderBy('sort_order')
                 ->orderBy('name')

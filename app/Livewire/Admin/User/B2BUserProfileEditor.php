@@ -96,7 +96,7 @@ class B2BUserProfileEditor extends Component
             'saveAvailable' => method_exists(B2BAccountService::class, 'saveForUser'),
             'account' => $target->b2bAccount,
             'accessAvailable' => app(B2BAccessService::class)->approvedAccount($target) !== null,
-            'customerGroups' => CustomerGroup::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'code']),
+            'customerGroups' => CustomerGroup::query()->pricingGroups()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get(['id', 'name', 'code']),
             'statusOptions' => B2BAccount::statusOptions(),
         ]);
     }
@@ -106,7 +106,7 @@ class B2BUserProfileEditor extends Component
         $user = User::query()->with(['profile', 'addresses', 'customerGroups', 'b2bAccount'])->findOrFail($this->userId);
         $account = $user->b2bAccount;
         $billing = $user->addresses->where('type', UserAddress::TYPE_BILLING)->sortByDesc('is_default')->first();
-        $activeGroups = $user->customerGroups->where('is_active', true);
+        $activeGroups = $user->customerGroups->where('is_active', true)->reject(fn (CustomerGroup $group) => $group->isBusinessSegment());
         $this->accountId = $account?->id;
         $this->b2b = [
             'status' => $account?->status ?? B2BAccount::STATUS_PENDING,

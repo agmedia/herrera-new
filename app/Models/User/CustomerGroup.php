@@ -4,12 +4,50 @@ namespace App\Models\User;
 
 use App\Models\Catalog\Pricing\B2BPriceRule;
 use App\Models\Catalog\Product\ProductGroupPrice;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CustomerGroup extends Model
 {
+    public const CLASSIFICATION_GENERAL = 'general';
+
+    public const CLASSIFICATION_INDUSTRY = 'industry';
+
+    public const CLASSIFICATION_DIVISION = 'division';
+
+    public static function classificationOptions(): array
+    {
+        return [
+            self::CLASSIFICATION_GENERAL => 'Cjenovna / opća grupa',
+            self::CLASSIFICATION_INDUSTRY => 'Djelatnost',
+            self::CLASSIFICATION_DIVISION => 'Divizija',
+        ];
+    }
+
+    public function classificationType(): string
+    {
+        return $this->payload['classification_type'] ?? self::CLASSIFICATION_GENERAL;
+    }
+
+    public function isBusinessSegment(): bool
+    {
+        return in_array($this->classificationType(), [self::CLASSIFICATION_INDUSTRY, self::CLASSIFICATION_DIVISION], true);
+    }
+
+    public function scopeBusinessSegments(Builder $query): Builder
+    {
+        return $query->whereIn('payload->classification_type', [self::CLASSIFICATION_INDUSTRY, self::CLASSIFICATION_DIVISION]);
+    }
+
+    public function scopePricingGroups(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $query) => $query
+            ->whereNull('payload->classification_type')
+            ->orWhereNotIn('payload->classification_type', [self::CLASSIFICATION_INDUSTRY, self::CLASSIFICATION_DIVISION]));
+    }
+
     protected $fillable = [
         'code',
         'name',

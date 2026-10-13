@@ -58,6 +58,27 @@ body.termol-storefront textarea {
     }
 }
 
+.product-cart-notice {
+    position: fixed;
+    right: max(1rem, env(safe-area-inset-right));
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    z-index: 70;
+    max-width: min(24rem, calc(100vw - 2rem));
+    padding: .875rem 1.25rem;
+    border: 1px solid #b6d8c7;
+    border-radius: .25rem;
+    background: #f0fdf4;
+    color: #166534;
+    box-shadow: 0 4px 18px rgb(0 0 0 / 12%);
+    font-size: .875rem;
+    font-weight: 600;
+    pointer-events: none;
+}
+
+.product-cart-notice[hidden] {
+    display: none;
+}
+
 .product-cart-modal {
     --product-cart-modal-brand: var(--store-announcement-background-color, #0057c8);
     --product-cart-modal-accent: var(--navigation-background-color, #e65100);

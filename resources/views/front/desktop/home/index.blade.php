@@ -123,14 +123,14 @@
         @include('front.partials.herrera-popular-products')
     @endif
 
+    @if ($isHerreraHome && ! $hasHomeBrandsBlock)
+        @include('front.partials.herrera-popular-products')
+    @endif
+
     @if ($homeBottomBlocks->isNotEmpty())
         <section class="{{ $homeBottomIsInstagramOnly ? 'mt-0' : 'mt-8' }}">
             @include('front.partials.herrera-home-placement', ['items' => $homeBottomBlocks])
         </section>
-    @endif
-
-    @if ($isHerreraHome && ! $hasHomeBrandsBlock)
-        @include('front.partials.herrera-popular-products')
     @endif
 
     @if (

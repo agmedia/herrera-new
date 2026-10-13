@@ -157,6 +157,16 @@ autoload/configuration/routes/views. Changed Composer locks install their exact
 dependencies without development packages. Errors trigger a rollback attempt;
 backups are retained in `/home/herrera/.herrera-staging-backups`.
 
-Deployment does not run database migrations, import data or modify production.
+Deployment does not run database migrations, re-import the catalog/orders or modify production.
+It applies the agreed October B2B settings once through `herrera:apply-quick-fixes`:
+the Herrera social profiles, blog navigation, structured specification filters and
+hiding unavailable products. A saved marker preserves later administrator edits.
+The command is restricted to the isolated local preview and staging databases.
+It also collapses non-category filters by default, refreshes the three existing
+Croatian blog articles from `resources/content/herrera-blog` and adds the CMS blog
+carousel at `home.bottom`, before the newsletter. Each article keeps its original
+slug/status/publication date and a recoverable copy of its former text and payload;
+per-article markers preserve later admin edits. Versioned illustrative covers and
+their ImageGen prompts are stored in `public/assets/blog/herrera`.
 See the [cPanel deployment guide](https://docs.cpanel.net/knowledge-base/web-services/guide-to-git-deployment/)
 for the two-button pull workflow.

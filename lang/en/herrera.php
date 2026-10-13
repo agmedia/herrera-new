@@ -47,6 +47,10 @@ return [
         'offers' => 'Current offers',
         'login' => 'B2B sign in',
     ],
+    'blog' => [
+        'subtitle' => 'Herrera news, advice and inspiration for your projects.',
+        'illustration' => 'Illustrative view of lighting in an interior.',
+    ],
     'footer' => [
         'newsletter_eyebrow' => 'Herrera news',
         'newsletter_title' => 'Offers worth following.',

@@ -220,7 +220,7 @@ class Form extends Component
                 ->where('is_active', true)
                 ->orderBy('sort_order')
                 ->orderBy('name')
-                ->get(['id', 'name']),
+                ->get(['id', 'name', 'payload']),
         ]);
     }
 

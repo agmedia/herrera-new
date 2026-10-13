@@ -14,7 +14,7 @@
                 </ol>
             </nav>
             <h1 class="text-2xl font-extrabold uppercase tracking-tight text-slate-900">{{ ($blogCategoryTranslation?->name ?? null) ?: __('ui.blog.title') }}</h1>
-            <p class="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">{{ __('ui.blog.subtitle') }}</p>
+            <p class="mt-1 text-xs font-medium uppercase tracking-wide text-slate-500">{{ str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? '')), 'herrera') ? __('herrera.blog.subtitle') : __('ui.blog.subtitle') }}</p>
         </div>
     </section>
 
@@ -30,8 +30,7 @@
                 @php
                     $translation = $post->translations->firstWhere('locale', $locale)
                         ?? $post->translations->firstWhere('locale', $fallbackLocale);
-                    $postImage = $post->getFirstMedia('blog_cover');
-                    $postImageUrl = $postImage?->getUrl() ?: \App\Support\Media\LegacyCatalogImage::first($post);
+                    $postImageUrl = \App\Support\Media\HerreraBlogImage::first($post);
                 @endphp
 
                 <article>

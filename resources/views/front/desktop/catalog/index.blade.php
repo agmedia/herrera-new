@@ -80,13 +80,13 @@
     $filterPanelSettings = is_array($storeSettings['product']['filter_panel_settings'] ?? null)
         ? $storeSettings['product']['filter_panel_settings']
         : [];
-    $resolveFilterPanel = static function (string $key) use ($filterPanelSettings): array {
+    $resolveFilterPanel = static function (string $key) use ($filterPanelSettings, $isHerreraCatalog): array {
         $settings = is_array($filterPanelSettings[$key] ?? null) ? $filterPanelSettings[$key] : [];
         $maxHeight = (int) ($settings['max_height'] ?? 286);
 
         return [
             'visible' => array_key_exists('visible', $settings) ? (bool) $settings['visible'] : true,
-            'default_open' => array_key_exists('default_open', $settings) ? (bool) $settings['default_open'] : true,
+            'default_open' => array_key_exists('default_open', $settings) ? (bool) $settings['default_open'] : (! $isHerreraCatalog || $key === 'category'),
             'max_height' => in_array($maxHeight, [160, 220, 286, 360], true) ? $maxHeight : 286,
         ];
     };
@@ -343,7 +343,7 @@
                             </details>
                         @endif
                         @if ($showManufacturers && $manufacturerFilterPanel['visible'])
-                            <details class="catalog-mobile-filter-section" @if ($manufacturerFilterPanel['default_open'] || trim((string) ($filters['manufacturer'] ?? '')) !== '') open @endif>
+                            <details class="catalog-mobile-filter-section" @if ($manufacturerFilterPanel['default_open'] || (! $isHerreraCatalog && trim((string) ($filters['manufacturer'] ?? '')) !== '')) open @endif>
                                 <summary class="catalog-mobile-filter-section-heading">
                                     <span>{{ __('ui.shop.filters.manufacturer') }}</span>
                                     <x-fa-icon name="chevron-down" class="catalog-mobile-filter-section-chevron" />
@@ -378,7 +378,7 @@
                                 $mobileFilterPanel = $resolveFilterPanel((string) ($filterOption['query_key'] ?? ''));
                                 $mobileFilterHasSelection = trim((string) ($filterOption['selected'] ?? '')) !== '';
                             @endphp
-                            <details class="catalog-mobile-filter-section" @if ($mobileFilterPanel['default_open'] || $mobileFilterHasSelection) open @endif>
+                            <details class="catalog-mobile-filter-section" @if ($mobileFilterPanel['default_open'] || (! $isHerreraCatalog && $mobileFilterHasSelection)) open @endif>
                                 <summary class="catalog-mobile-filter-section-heading">
                                     <span>{{ $filterOption['label'] }}</span>
                                     <x-fa-icon name="chevron-down" class="catalog-mobile-filter-section-chevron" />
@@ -417,7 +417,7 @@
                         </div>
                         @endif
                         @if ($priceFilterPanel['visible'])
-                            <details class="catalog-mobile-filter-section" @if ($priceFilterPanel['default_open'] || $hasPricePanelFilter) open @endif>
+                            <details class="catalog-mobile-filter-section" @if ($priceFilterPanel['default_open'] || (! $isHerreraCatalog && $hasPricePanelFilter)) open @endif>
                                 <summary class="catalog-mobile-filter-section-heading">
                                     <span>{{ __('ui.shop.filters.price') }}</span>
                                     <x-fa-icon name="chevron-down" class="catalog-mobile-filter-section-chevron" />
@@ -660,7 +660,7 @@
                                 <input type="hidden" name="cols" value="{{ $currentCols }}">
 
                                 @if ($showManufacturers && $manufacturerFilterPanel['visible'])
-                                    <details class="catalog-sidebar-section" @if ($manufacturerFilterPanel['default_open'] || trim((string) ($filters['manufacturer'] ?? '')) !== '') open @endif>
+                                    <details class="catalog-sidebar-section" @if ($manufacturerFilterPanel['default_open'] || (! $isHerreraCatalog && trim((string) ($filters['manufacturer'] ?? '')) !== '')) open @endif>
                                         <summary class="catalog-sidebar-heading">
                                             <span>{{ __('ui.shop.filters.manufacturer') }}</span>
                                             <x-fa-icon name="chevron-down" class="catalog-sidebar-chevron" />
@@ -692,7 +692,7 @@
                                 @endif
 
                                 @if ($priceFilterPanel['visible'])
-                                <details class="catalog-sidebar-section" data-price-filter-root @if ($priceFilterPanel['default_open'] || $hasPricePanelFilter) open @endif>
+                                <details class="catalog-sidebar-section" data-price-filter-root @if ($priceFilterPanel['default_open'] || (! $isHerreraCatalog && $hasPricePanelFilter)) open @endif>
                                     <summary class="catalog-sidebar-heading">
                                         <span>{{ __('ui.shop.filters.price') }}</span>
                                         <x-fa-icon name="chevron-down" class="catalog-sidebar-chevron" />
@@ -734,7 +734,7 @@
                                         $filterPanel = $resolveFilterPanel((string) ($filterOption['query_key'] ?? ''));
                                         $filterHasSelection = trim((string) ($filterOption['selected'] ?? '')) !== '';
                                     @endphp
-                                    <details class="catalog-sidebar-section" @if ($filterPanel['default_open'] || $filterHasSelection) open @endif>
+                                    <details class="catalog-sidebar-section" @if ($filterPanel['default_open'] || (! $isHerreraCatalog && $filterHasSelection)) open @endif>
                                         <summary class="catalog-sidebar-heading">
                                             <span>{{ $filterOption['label'] }}</span>
                                             <x-fa-icon name="chevron-down" class="catalog-sidebar-chevron" />

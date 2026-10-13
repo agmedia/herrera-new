@@ -12,7 +12,7 @@
             <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Admin / Users') }}</p>
-                    <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{{ __('User Overview') }}</h1>
+                    <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{{ $user->customerDisplayName() }}</h1>
                     <p class="mt-2 text-sm text-slate-600">{{ __('Read-only account view with profile, addresses and recent activity.') }}</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
@@ -64,7 +64,7 @@
                     @endif
                 </div>
                 <div style="grid-column: span 4;">
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Name') }}</label>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ $user->companyName() ? __('Kontakt') : __('Name') }}</label>
                     <div class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">{{ $user->name }}</div>
                 </div>
                 <div style="grid-column: span 4;">

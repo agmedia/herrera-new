@@ -64,6 +64,37 @@ class B2BGroupDiscountUiTest extends TestCase
         $this->assertSame(0, $catalog->discountRules()->count());
     }
 
+    public function test_discount_buttons_change_one_percentage_point_preserve_decimals_and_invalidate_preview(): void
+    {
+        [$admin, $catalog, , $group] = $this->fixture();
+        Livewire::actingAs($admin)->test(PriceCatalogManager::class)->call('newRule')
+            ->assertSee('Smanji popust za 1 postotni bod')
+            ->assertSee('Povećaj popust za 1 postotni bod')
+            ->set('ruleForm.name', 'Decimalni popust')
+            ->set('ruleForm.customer_group_ids', [$group->id])
+            ->set('ruleForm.percent', '12,3456')
+            ->call('previewRule')->assertHasNoErrors()
+            ->call('adjustRulePercent', 1)->assertSet('ruleForm.percent', '13.3456')->assertSet('rulePreview', null)
+            ->call('adjustRulePercent', -1)->assertSet('ruleForm.percent', '12.3456')
+            ->call('saveRule')->assertHasNoErrors();
+
+        $this->assertSame('12.3456', $catalog->discountRules()->sole()->percent);
+        $this->assertSame('draft', $catalog->fresh()->status);
+    }
+
+    public function test_discount_buttons_reject_out_of_range_or_invalid_values_without_saving(): void
+    {
+        [$admin, $catalog] = $this->fixture();
+        $component = Livewire::actingAs($admin)->test(PriceCatalogManager::class)->call('newRule');
+        foreach ([['100', 1], ['0.5', -1], ['invalid', 1], ['120', -1]] as [$value, $direction]) {
+            $component->set('ruleForm.percent', $value)->call('adjustRulePercent', $direction)
+                ->assertHasErrors('percent')->assertSet('ruleForm.percent', $value);
+        }
+        $component->set('ruleForm.percent', '')->call('adjustRulePercent', 1)
+            ->assertHasNoErrors('percent')->assertSet('ruleForm.percent', '1');
+        $this->assertSame(0, $catalog->discountRules()->count());
+    }
+
     public function test_per_product_grid_prefills_prices_and_saves_decimal_comma(): void
     {
         [$admin, $catalog, $product, $first, $second] = $this->fixture();

@@ -72,6 +72,7 @@
 
                 <table class="meta" width="100%" cellspacing="0" cellpadding="0">
                     <tr><td class="label">{{ __('mail.orders.customer') }}</td><td>{{ $customer_name }}</td></tr>
+                    @if (!empty($customer_contact))<tr><td class="label">{{ __('Kontakt') }}</td><td>{{ $customer_contact }}</td></tr>@endif
                     <tr><td class="label">{{ __('mail.orders.email') }}</td><td><a href="mailto:{{ $customer_email }}" style="color:#0f172a !important; text-decoration:none !important;">{{ $customer_email }}</a></td></tr>
                     <tr><td class="label">{{ __('mail.orders.phone') }}</td><td>{{ $customer_phone }}</td></tr>
                     <tr><td class="label">{{ __('mail.orders.placed_at') }}</td><td>{{ $placed_at }}</td></tr>

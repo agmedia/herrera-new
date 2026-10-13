@@ -47,6 +47,10 @@ return [
         'offers' => 'Aktualna ponuda',
         'login' => 'B2B prijava',
     ],
+    'blog' => [
+        'subtitle' => 'Novosti iz Herrere, savjeti i inspiracija za vaše projekte.',
+        'illustration' => 'Ilustrativni prikaz rasvjete u prostoru.',
+    ],
     'footer' => [
         'newsletter_eyebrow' => 'Herrera novosti',
         'newsletter_title' => 'Ponuda koju vrijedi pratiti.',

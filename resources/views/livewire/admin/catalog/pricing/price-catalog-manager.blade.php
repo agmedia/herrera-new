@@ -81,7 +81,7 @@
                         <label class="text-sm">{{ __('Kupac') }}
                             <select wire:model="form.user_id" class="admin-search-input admin-select mt-1 w-full rounded-lg px-3 py-2">
                                 <option value="">{{ __('Odaberite kupca iz pretrage') }}</option>
-                                @foreach ($customers as $customer)<option value="{{ $customer->id }}">{{ $customer->b2bAccount?->company_name ?? $customer->name }} — {{ $customer->email }}</option>@endforeach
+                                @foreach ($customers as $customer)<option value="{{ $customer->id }}">{{ $customer->customerDisplayName() }} — {{ $customer->email }}</option>@endforeach
                             </select>
                         </label>
                     @elseif ($form['kind'] !== 'base')
@@ -109,7 +109,7 @@
             <p class="mt-1 text-xs text-slate-500">{{ __('Provjera koristi odabranu verziju, grupu iz važećeg odobrenog računa, količinu i odabrani datum cijene. Ne objavljuje izmjene.') }}</p>
             <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <select aria-label="Proizvod za provjeru" wire:model="simulation.product_id" class="admin-search-input admin-select rounded-lg px-3 py-2"><option value="">{{ __('Proizvod iz pretrage') }}</option>@foreach ($products as $product)<option value="{{ $product->id }}">{{ $product->sku ?? $product->code }}</option>@endforeach</select>
-                <select aria-label="Kupac za provjeru" wire:model="simulation.user_id" class="admin-search-input admin-select rounded-lg px-3 py-2"><option value="">{{ __('Kupac iz pretrage') }}</option>@foreach ($customers as $customer)<option value="{{ $customer->id }}">{{ $customer->b2bAccount?->company_name ?? $customer->name }} — {{ $customer->email }}</option>@endforeach</select>
+                <select aria-label="Kupac za provjeru" wire:model="simulation.user_id" class="admin-search-input admin-select rounded-lg px-3 py-2"><option value="">{{ __('Kupac iz pretrage') }}</option>@foreach ($customers as $customer)<option value="{{ $customer->id }}">{{ $customer->customerDisplayName() }} — {{ $customer->email }}</option>@endforeach</select>
                 <input aria-label="Količina za provjeru" type="number" min="1" wire:model="simulation.quantity" class="admin-search-input rounded-lg px-3 py-2">
                 <input aria-label="Datum za provjeru" type="datetime-local" wire:model="simulation.at" class="admin-search-input rounded-lg px-3 py-2">
             </div>
@@ -129,7 +129,7 @@
                     <thead><tr><th class="p-3 text-left">{{ __('Proizvod') }}</th><th class="p-3 text-left">{{ __('Cijena / publika') }}</th><th class="p-3 text-left">{{ __('Uvjeti') }}</th><th class="p-3 text-left">{{ __('Izvor') }}</th>@if ($catalog->status === 'draft')<th class="p-3 text-right">{{ __('Akcije') }}</th>@endif</tr></thead>
                     <tbody>@forelse ($rows as $row)<tr class="border-t border-slate-100" wire:key="price-entry-{{ $row->id }}">
                         <td class="p-3"><strong>{{ $row->product?->sku ?? $row->product?->code }}</strong><p class="text-xs text-slate-500">{{ $row->product?->translations->firstWhere('locale', app()->getLocale())?->name }}</p></td>
-                        <td class="p-3"><strong>{{ $row->price }} EUR</strong><p>{{ $kinds[$row->kind] ?? $row->kind }}</p><p class="text-xs text-slate-500">{{ $row->user?->b2bAccount?->company_name ?? $row->user?->email ?? $row->customerGroup?->name ?? 'Svi kupci' }}</p></td>
+                        <td class="p-3"><strong>{{ $row->price }} EUR</strong><p>{{ $kinds[$row->kind] ?? $row->kind }}</p><p class="text-xs text-slate-500">{{ $row->user?->customerDisplayName() ?? $row->customerGroup?->name ?? 'Svi kupci' }}</p></td>
                         <td class="p-3"><p>{{ __('Od') }} {{ $row->minimum_quantity }} {{ __('kom.') }} · P{{ $row->priority }} · {{ $row->is_active ? 'Aktivno' : 'Neaktivno' }}</p><p class="text-xs text-slate-500">{{ $row->starts_at?->format('d.m.Y. H:i') ?? 'Bez početka' }} → {{ $row->ends_at?->format('d.m.Y. H:i') ?? 'Bez kraja' }}</p></td>
                         <td class="p-3 font-mono text-xs">{{ $row->source_key }}</td>
                         @if ($catalog->status === 'draft')<td class="p-3 text-right">@if ($row->discount_rule_id)<span class="text-xs text-slate-500">{{ __('Uredite pripadajuće pravilo popusta.') }}</span>@else @if ($canEditPricing)<button type="button" wire:click="editEntry({{ $row->id }})" class="text-cyan-700">{{ __('Uredi') }}</button>@endif @if ($canDeletePricing)<button type="button" wire:click="deleteEntry({{ $row->id }})" wire:confirm="Ukloniti ovu stavku iz radne verzije?" class="ml-2 text-red-700">{{ __('Ukloni') }}</button>@endif @endif</td>@endif

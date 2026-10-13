@@ -40,7 +40,7 @@
                                 <select wire:model="form.user_id" class="admin-select w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
                                     <option value="">{{ __('Odaberite odobrenog kupca') }}</option>
                                     @foreach ($this->customerOptions as $customer)
-                                        <option value="{{ $customer->id }}">{{ $customer->b2bAccount?->company_name }} — {{ $customer->name }} ({{ $customer->email }})</option>
+                                        <option value="{{ $customer->id }}">{{ $customer->customerDisplayName() }} — {{ $customer->name }} ({{ $customer->email }})</option>
                                     @endforeach
                                 </select>
                                 @error('form.user_id') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror

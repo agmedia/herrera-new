@@ -246,24 +246,25 @@
                         <select wire:model="form.customer_group_id" data-tom-select class="admin-select w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
                             <option value="">{{ __('Select user group') }}</option>
                             @foreach ($this->customerGroupOptions as $group)
-                                <option value="{{ $group->id }}">{{ $group->name }}</option>
+                                <option value="{{ $group->id }}">{{ $group->name }}{{ $group->isBusinessSegment() ? ' — '.__($group->classificationOptions()[$group->classificationType()]) : '' }}</option>
                             @endforeach
                         </select>
                         @error('form.customer_group_id') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                        <p class="mt-2 text-xs leading-5 text-slate-500">{{ __('Djelatnosti i divizije biraju se prema segmentima dodijeljenima kupcu. Kod aktivnog B2B cjenika cijene i akcije artikala određuje B2B cjenik; ova akcija ne mijenja te cijene.') }}</p>
                     </div>
                 @endif
 
                 @if ($form['audience_type'] === \App\Models\Catalog\Action\CatalogAction::AUDIENCE_USER)
                     <div class="mt-3">
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('User Search') }}</label>
-                        <input type="text" wire:model.live.debounce.300ms="userSearch" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" placeholder="{{ __('Name or email...') }}" />
+                        <input type="text" wire:model.live.debounce.300ms="userSearch" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" placeholder="{{ __('Tvrtka, kontakt ili e-mail...') }}" />
                     </div>
                     <div class="mt-3">
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('User') }}</label>
                         <select wire:model="form.user_id" data-tom-select class="admin-select w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
                             <option value="">{{ __('Select user') }}</option>
                             @foreach ($this->userOptions as $user)
-                                <option value="{{ $user->id }}">{{ $user->name }} ({{ $user->email }})</option>
+                                <option value="{{ $user->id }}">{{ $user->customerDisplayName() }} ({{ $user->email }})</option>
                             @endforeach
                         </select>
                         @error('form.user_id') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror

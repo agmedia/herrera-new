@@ -147,6 +147,7 @@ class Manager extends Component
                 $query->where(function (Builder $q) use ($needle): void {
                     $q->where('order_number', 'like', $needle)
                         ->orWhere('customer_name', 'like', $needle)
+                        ->orWhere('billing_company', 'like', $needle)
                         ->orWhere('customer_email', 'like', $needle)
                         ->orWhere('customer_phone', 'like', $needle)
                         ->orWhere('id', 'like', $needle);
@@ -158,7 +159,9 @@ class Manager extends Component
             ->when($this->dateTo !== '', function (Builder $query): void {
                 $query->whereDate('placed_at', '<=', $this->dateTo);
             })
-            ->orderBy($this->sortBy, $this->sortDir)
+            ->when($this->sortBy === 'customer_name',
+                fn (Builder $query) => $query->orderByRaw("COALESCE(NULLIF(TRIM(billing_company), ''), customer_name) ".$this->sortDir),
+                fn (Builder $query) => $query->orderBy($this->sortBy, $this->sortDir))
             ->orderByDesc('id')
             ->paginate($perPage, ['*'], self::PAGE_NAME);
 

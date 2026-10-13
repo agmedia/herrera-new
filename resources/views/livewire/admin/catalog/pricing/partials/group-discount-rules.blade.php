@@ -21,9 +21,16 @@
                 <label class="text-sm md:col-span-2">{{ __('Naziv pravila') }}
                     <input type="text" wire:model="ruleForm.name" maxlength="191" required placeholder="Npr. Portwest – B2B45, B2B50 i B2B55" class="admin-search-input mt-1 w-full rounded-lg px-3 py-2">
                 </label>
-                <label class="text-sm">{{ __('Popust (%)') }}
-                    <input type="text" inputmode="decimal" wire:model="ruleForm.percent" required placeholder="Npr. 60" class="admin-search-input mt-1 w-full rounded-lg px-3 py-2">
-                </label>
+                <div class="text-sm">
+                    <label for="group-discount-percent">{{ __('Popust (%)') }}</label>
+                    <div class="mt-1 flex items-center gap-1">
+                        <button type="button" wire:click="adjustRulePercent(-1)" wire:loading.attr="disabled" aria-label="{{ __('Smanji popust za 1 postotni bod') }}" class="admin-btn-secondary px-3">−</button>
+                        <input id="group-discount-percent" type="text" inputmode="decimal" wire:model.blur="ruleForm.percent" required placeholder="Npr. 60" aria-describedby="group-discount-percent-help" class="admin-search-input min-w-0 w-full rounded-lg px-3 py-2">
+                        <button type="button" wire:click="adjustRulePercent(1)" wire:loading.attr="disabled" aria-label="{{ __('Povećaj popust za 1 postotni bod') }}" class="admin-btn-secondary px-3">+</button>
+                    </div>
+                    <p id="group-discount-percent-help" class="mt-1 text-xs text-slate-500">{{ __('Korak je 1 postotni bod. Možete upisati i decimalni postotak do 100 %.') }}</p>
+                    @error('percent') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                </div>
             </div>
             <fieldset>
                 <legend class="mb-2 text-sm font-semibold">{{ __('Grupe kupaca') }}</legend>

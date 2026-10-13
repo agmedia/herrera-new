@@ -441,8 +441,7 @@
         $blogImage = (string) ($og['blog_image_url'] ?? '');
         $blogImageMedia = null;
         if ($blogImage === '' && method_exists($post, 'getFirstMedia')) {
-            $blogImageMedia = $post->getFirstMedia('blog_main') ?: $post->getFirstMedia();
-            $blogImage = (string) ($blogImageMedia?->getUrl() ?? '');
+            $blogImage = (string) \App\Support\Media\HerreraBlogImage::first($post);
         }
         if ($blogImage === '' && $defaultImage !== '') {
             $blogImage = $defaultImage;

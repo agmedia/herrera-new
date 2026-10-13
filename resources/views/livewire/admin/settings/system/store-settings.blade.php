@@ -238,6 +238,14 @@
                             </label>
                         </div>
                         <div>
+                            <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Facebook Slovenija URL') }}</label>
+                            <input type="url" wire:model="form.store_social_facebook_slovenia_url" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+                            <label class="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-700">
+                                <input type="checkbox" wire:model="form.store_footer_social_facebook_slovenia_enabled" class="rounded border-slate-300 text-cyan-700 focus:ring-cyan-500" />
+                                {{ __('Show in footer') }}
+                            </label>
+                        </div>
+                        <div>
                             <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Instagram URL') }}</label>
                             <input type="url" wire:model="form.store_social_instagram_url" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
                             <label class="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-slate-700">

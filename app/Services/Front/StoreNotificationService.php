@@ -229,7 +229,8 @@ class StoreNotificationService
             'placed_at' => optional($order->placed_at)->format('d.m.Y H:i') ?: '',
             'payment_method' => (string) ($order->payment_method_name ?? ''),
             'shipping_method' => (string) ($order->shipping_method_name ?? ''),
-            'customer_name' => (string) ($order->customer_name ?? ''),
+            'customer_name' => $order->customerDisplayName(),
+            'customer_contact' => $order->customerDisplayName() !== $order->customer_name ? (string) $order->customer_name : '',
             'customer_email' => (string) ($order->customer_email ?? ''),
             'customer_phone' => (string) ($order->customer_phone ?? ''),
             'billing_address' => trim(implode(', ', array_filter([

@@ -4,6 +4,8 @@ namespace Tests\Feature\Front;
 
 use App\Models\Catalog\Category\Category;
 use App\Models\Catalog\Product\Product;
+use App\Models\Sales\Order\Order;
+use App\Models\User;
 use App\Services\Settings\SystemSettingsService;
 use App\Support\Media\LegacyCatalogImage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -113,6 +115,26 @@ class LegacyCatalogImageFeatureTest extends TestCase
         $this->get(route('shop.index'))->assertOk()->assertSee($main, false)->assertDontSee('9999.11', false);
         $this->getJson(route('search.autocomplete', ['q' => 'Legacy image']))
             ->assertOk()->assertJsonPath('groups.products.items.0.image_url', $main);
+        Http::assertNothingSent();
+    }
+
+    public function test_order_details_keep_legacy_images_for_active_and_archived_products(): void
+    {
+        $customer = User::factory()->create();
+        $product = $this->product();
+        $order = Order::query()->create([
+            'user_id' => $customer->id, 'order_number' => 'LEGACY-PHOTO-ORDER',
+            'source' => 'web', 'locale' => 'hr', 'currency_code' => 'EUR', 'currency_rate' => 1,
+            'customer_name' => $customer->name, 'customer_email' => $customer->email, 'grand_total' => 20,
+        ]);
+        $order->items()->create(['product_id' => $product->id, 'name' => 'Previously ordered product', 'quantity' => 1, 'unit_price' => 20, 'line_total' => 20]);
+        $this->actingAs($customer);
+
+        $url = route('account.orders.show', $order->order_number);
+        $image = 'https://www.herrera.hr/image/catalog/products/00023.jpg';
+        $this->get($url)->assertOk()->assertSee($image, false);
+        $product->update(['is_active' => false]);
+        $this->get($url)->assertOk()->assertSee($image, false);
         Http::assertNothingSent();
     }
 

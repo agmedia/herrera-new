@@ -47,10 +47,11 @@
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Segments') }}</label>
                     <select wire:model="form.customer_groups" multiple data-tom-select data-tom-placeholder="{{ __('Select groups...') }}" class="admin-select w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
                         @foreach ($customerGroups as $group)
-                            <option value="{{ $group->id }}" @selected(in_array((string) $group->id, array_map('strval', (array) ($form['customer_groups'] ?? [])), true))>{{ $group->name }}</option>
+                            <option value="{{ $group->id }}" @selected(in_array((string) $group->id, array_map('strval', (array) ($form['customer_groups'] ?? [])), true))>{{ $group->name }}{{ $group->isBusinessSegment() ? ' — '.__($group->classificationOptions()[$group->classificationType()]) : '' }}</option>
                         @endforeach
                     </select>
                     @error('form.customer_groups.*') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                    <p class="mt-1 text-xs text-slate-500">{{ __('Djelatnost i divizija su dodatni segmenti; cjenovnu grupu odaberite u B2B postavkama.') }}</p>
                 </div>
             </div>
 

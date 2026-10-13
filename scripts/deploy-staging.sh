@@ -144,6 +144,7 @@ fi
 "$php_bin" artisan config:cache
 "$php_bin" artisan route:cache
 "$php_bin" artisan view:cache
+"$php_bin" artisan herrera:apply-quick-fixes
 "$php_bin" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); app(App\Services\Front\GuestStorefrontCache::class)->invalidate();'
 "$php_bin" artisan up
 printf '%s\n' "$revision" > "$target_root/.herrera-deploy-revision"

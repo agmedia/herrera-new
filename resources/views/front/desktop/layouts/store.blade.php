@@ -149,9 +149,12 @@
                                 class="site-top-bar-social-link"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                aria-label="{{ match ($social['network']) { 'linkedin' => 'LinkedIn', 'twitter' => 'X / Twitter', default => ucfirst($social['network']) } }}"
+                                aria-label="{{ ($social['label'] ?? '') ?: match ($social['network']) { 'linkedin' => 'LinkedIn', 'twitter' => 'X / Twitter', 'tiktok' => 'TikTok', default => ucfirst($social['network']) } }}"
                             >
                                 @switch($social['network'])
+                                    @case('tiktok')
+                                        <x-fa-icon :inline="$herreraStorefront" name="tiktok" style="brands" />
+                                        @break
                                     @case('youtube')
                                         <x-fa-icon :inline="$herreraStorefront" name="youtube" style="brands" />
                                         @break
@@ -168,7 +171,7 @@
                                         <x-fa-icon :inline="$herreraStorefront" name="facebook-f" style="brands" />
                                 @endswitch
                                 @if ($herreraStorefront)
-                                    <span class="site-top-bar-social-label" aria-hidden="true">{{ match ($social['network']) { 'linkedin' => 'LinkedIn', 'twitter' => 'X', default => ucfirst($social['network']) } }}</span>
+                                    <span class="site-top-bar-social-label" aria-hidden="true">{{ ($social['label'] ?? '') ?: match ($social['network']) { 'linkedin' => 'LinkedIn', 'twitter' => 'X', 'tiktok' => 'TikTok', default => ucfirst($social['network']) } }}</span>
                                 @endif
                             </a>
                         @endforeach

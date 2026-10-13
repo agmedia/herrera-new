@@ -180,6 +180,7 @@
                                     <option value="facebook">Facebook</option>
                                     <option value="youtube">YouTube</option>
                                     <option value="instagram">Instagram</option>
+                                    <option value="tiktok">TikTok</option>
                                     <option value="linkedin">LinkedIn</option>
                                     <option value="twitter">X / Twitter</option>
                                 </select>
@@ -195,6 +196,10 @@
                             <button type="button" wire:click="removeSocialLink({{ $index }})" class="rounded-lg border border-rose-200 px-2.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50">
                                 {{ __('admin.content.navigation.remove') }}
                             </button>
+                            <div class="sm:col-span-4">
+                                <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Naziv profila (opcionalno)') }}</label>
+                                <input type="text" wire:model="form.top_bar.socials.{{ $index }}.label" maxlength="120" placeholder="Facebook Hrvatska" class="admin-search-input w-full rounded-xl border px-3 py-2 text-sm" />
+                            </div>
                             <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-700 sm:col-span-4">
                                 <input type="checkbox" wire:model="form.top_bar.socials.{{ $index }}.is_active" class="rounded border-slate-300 text-cyan-700 focus:ring-cyan-500" />
                                 {{ __('admin.content.navigation.is_active') }}

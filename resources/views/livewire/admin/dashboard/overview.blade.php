@@ -438,7 +438,7 @@
                                     <a href="{{ route('admin.orders.show', ['order' => $order->id]) }}" class="font-semibold text-cyan-700 hover:text-cyan-900">{{ $order->order_number }}</a>
                                     <span class="mt-1 block whitespace-nowrap text-[11px] text-slate-500">{{ ($order->placed_at ?? $order->created_at)?->format('d.m.Y. H:i') }}</span>
                                 </td>
-                                <td class="max-w-52 truncate px-4 py-3 text-slate-700">{{ $order->customer_name }}</td>
+                                <td class="max-w-52 truncate px-4 py-3 text-slate-700">{{ $order->customerDisplayName() }}@if ($order->customerDisplayName() !== $order->customer_name)<span class="mt-1 block text-xs text-slate-500">{{ __('Kontakt') }}: {{ $order->customer_name }}</span>@endif</td>
                                 <td class="px-4 py-3">
                                     <span class="inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold {{ $orderStatusClass }}">{{ $order->status?->name ?? __('Unknown') }}</span>
                                 </td>

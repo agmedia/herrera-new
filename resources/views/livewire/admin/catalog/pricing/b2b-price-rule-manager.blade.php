@@ -83,7 +83,7 @@
                             </td>
                             <td class="px-4 py-3 text-slate-700">
                                 @if ($row->user_id)
-                                    <div class="font-medium">{{ $row->user?->b2bAccount?->company_name ?? $row->user?->name }}</div>
+                                    <div class="font-medium">{{ $row->user?->customerDisplayName() }}</div>
                                     <div class="text-xs text-slate-500">{{ $row->user?->email }}</div>
                                 @else
                                     <div class="font-medium">{{ $row->customerGroup?->name ?? '—' }}</div>

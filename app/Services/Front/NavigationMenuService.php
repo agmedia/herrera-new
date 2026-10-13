@@ -371,14 +371,16 @@ class NavigationMenuService
             ->values()
             ->all();
 
-        $allowedSocialNetworks = ['facebook', 'youtube', 'instagram', 'linkedin', 'twitter'];
+        $allowedSocialNetworks = ['facebook', 'youtube', 'instagram', 'linkedin', 'twitter', 'tiktok'];
         $socials = collect(is_array($raw['socials'] ?? null) ? $raw['socials'] : [])
             ->filter(fn ($item): bool => is_array($item))
             ->map(function (array $item, int $index) use ($allowedSocialNetworks): array {
                 $network = strtolower(trim((string) ($item['network'] ?? '')));
+                $label = trim((string) ($item['label'] ?? ''));
 
                 return [
                     'network' => in_array($network, $allowedSocialNetworks, true) ? $network : 'facebook',
+                    ...($label !== '' ? ['label' => $label] : []),
                     'url' => trim((string) ($item['url'] ?? '')),
                     'is_active' => (bool) ($item['is_active'] ?? true),
                     'sort_order' => (int) ($item['sort_order'] ?? $index),

@@ -108,10 +108,12 @@ class StoreSettings extends Component
         'store_footer_bottom_link_page_ids' => [],
         'store_footer_bottom_copyright_text' => '',
         'store_social_facebook_url' => '',
+        'store_social_facebook_slovenia_url' => '',
         'store_social_instagram_url' => '',
         'store_social_tiktok_url' => '',
         'store_social_youtube_url' => '',
         'store_footer_social_facebook_enabled' => true,
+        'store_footer_social_facebook_slovenia_enabled' => true,
         'store_footer_social_instagram_enabled' => true,
         'store_footer_social_tiktok_enabled' => true,
         'store_footer_social_youtube_enabled' => true,
@@ -397,10 +399,12 @@ class StoreSettings extends Component
             'form.store_footer_bottom_link_page_ids.*' => ['integer', 'exists:content_info_pages,id'],
             'form.store_footer_bottom_copyright_text' => ['nullable', 'string', 'max:255'],
             'form.store_social_facebook_url' => ['nullable', 'url', 'max:2048'],
+            'form.store_social_facebook_slovenia_url' => ['nullable', 'url', 'max:2048'],
             'form.store_social_instagram_url' => ['nullable', 'url', 'max:2048'],
             'form.store_social_tiktok_url' => ['nullable', 'url', 'max:2048'],
             'form.store_social_youtube_url' => ['nullable', 'url', 'max:2048'],
             'form.store_footer_social_facebook_enabled' => ['required', 'boolean'],
+            'form.store_footer_social_facebook_slovenia_enabled' => ['required', 'boolean'],
             'form.store_footer_social_instagram_enabled' => ['required', 'boolean'],
             'form.store_footer_social_tiktok_enabled' => ['required', 'boolean'],
             'form.store_footer_social_youtube_enabled' => ['required', 'boolean'],
@@ -1245,8 +1249,9 @@ class StoreSettings extends Component
             ? $values['store_product_filter_panel_settings']
             : [];
         $allowedHeights = [160, 220, 286, 360];
+        $isHerreraStore = str_contains(strtolower((string) ($values['store_brand_name'] ?? '')), 'herrera');
         $values['store_product_filter_panel_settings'] = $allowedFilterPanelKeys
-            ->mapWithKeys(function (string $panelKey) use ($rawFilterPanelSettings, $allowedHeights): array {
+            ->mapWithKeys(function (string $panelKey) use ($rawFilterPanelSettings, $allowedHeights, $isHerreraStore): array {
                 $raw = is_array($rawFilterPanelSettings[$panelKey] ?? null)
                     ? $rawFilterPanelSettings[$panelKey]
                     : [];
@@ -1255,7 +1260,7 @@ class StoreSettings extends Component
                 return [
                     $panelKey => [
                         'visible' => array_key_exists('visible', $raw) ? (bool) $raw['visible'] : true,
-                        'default_open' => array_key_exists('default_open', $raw) ? (bool) $raw['default_open'] : true,
+                        'default_open' => array_key_exists('default_open', $raw) ? (bool) $raw['default_open'] : (! $isHerreraStore || $panelKey === 'category'),
                         'max_height' => in_array($height, $allowedHeights, true) ? $height : 286,
                     ],
                 ];

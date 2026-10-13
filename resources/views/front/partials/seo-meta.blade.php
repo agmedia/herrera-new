@@ -110,7 +110,7 @@
             if ($canonicalPolicy === 'self') { $canonicalUrl = route('blog.index', ['category' => $blogCategoryTranslation->slug]); }
         }
 
-        if (isset($post)) {
+        if (request()->routeIs('blog.show') && isset($post)) {
             $postTranslation = $post->translations->firstWhere('locale', $locale)
                 ?? $post->translations->firstWhere('locale', $fallbackLocale);
             $title = $cleanupText($postTranslation?->meta_title ?: $postTranslation?->title ?: $title, 191);
@@ -119,7 +119,7 @@
             if (trim((string) ($ogSettings['blog_image_url'] ?? '')) !== '') {
                 $ogImage = (string) $ogSettings['blog_image_url'];
             } elseif (method_exists($post, 'getFirstMediaUrl')) {
-                $postImage = (string) \App\Support\Media\LegacyCatalogImage::first($post);
+                $postImage = (string) \App\Support\Media\HerreraBlogImage::first($post);
                 if ($postImage !== '') {
                     $ogImage = $postImage;
                 }

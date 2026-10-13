@@ -127,7 +127,7 @@
                                     $postCoverUrl520 = $postCover
                                         ? \App\Support\Media\MediaUrl::conversionOrNull($postCover, 'cover_520x700', $preferWebp)
                                         : null;
-                                    $postCoverUrl = $postCoverUrl1600 ?? $postCoverUrl1200 ?? $postCoverUrl900 ?? $postCoverUrl680 ?? $postCoverUrl520 ?? ($postCover?->getUrl());
+                                    $postCoverUrl = \App\Support\Media\HerreraBlogImage::first($post, ['cover_1600x2133', 'cover_1200x1600', 'cover_900x1200', 'cover_680x900', 'cover_520x700'], $preferWebp);
                                     $postCoverSrcset = collect([
                                         $postCoverUrl520 ? $postCoverUrl520.' 520w' : null,
                                         $postCoverUrl680 ? $postCoverUrl680.' 680w' : null,
@@ -135,8 +135,8 @@
                                         $postCoverUrl1200 ? $postCoverUrl1200.' 1200w' : null,
                                         $postCoverUrl1600 ? $postCoverUrl1600.' 1600w' : null,
                                     ])->filter()->unique()->implode(', ');
-                                    $postCoverWidth = max(1, (int) ($postCover?->width ?? 900));
-                                    $postCoverHeight = max(1, (int) ($postCover?->height ?? 1200));
+                                    $postCoverWidth = max(1, (int) ($postCover?->width ?? 1600));
+                                    $postCoverHeight = max(1, (int) ($postCover?->height ?? 1067));
                                 @endphp
                                 <div class="splide__slide">
                                     <article class="group h-full bg-white">

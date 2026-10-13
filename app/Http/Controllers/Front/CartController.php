@@ -7,6 +7,8 @@ use App\Http\Controllers\Front\Concerns\ResolvesFrontendView;
 use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Product\ProductOptionValue;
 use App\Services\Front\CartService;
+use App\Services\Front\CartStaffAccess;
+use App\Services\Pricing\B2BAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,9 +25,12 @@ class CartController extends Controller
 
     public function index(Request $request): View
     {
+        $lines = $this->cart->lines();
+
         return view($this->frontendView($request, 'cart.index'), [
-            'lines' => $this->cart->lines(),
+            'lines' => $lines,
             'summary' => $this->cart->summary(),
+            'staffStockByLine' => app(CartStaffAccess::class)->stockForLines($request, $lines),
         ]);
     }
 
@@ -116,6 +121,7 @@ class CartController extends Controller
                 'ok' => $ok,
                 'message' => $message,
                 'summary' => $this->cart->summary(),
+                'confirmation' => app(B2BAccessService::class)->requiresApprovedAccount() ? 'notice' : 'modal',
             ], $ok ? 200 : 422);
         }
 

@@ -3,21 +3,27 @@
         ->filter(fn ($social) => is_array($social));
     $herreraConfiguredFooterSocials = $herreraFooterSocialSettings
         ->filter(fn ($social) => (bool) ($social['enabled'] ?? true) && trim((string) ($social['url'] ?? '')) !== '')
-        ->map(fn ($social, $network) => ['network' => $network, 'url' => trim((string) $social['url'])]);
+        ->map(fn ($social, $network) => [
+            'network' => $social['network'] ?? $network,
+            'label' => $social['label'] ?? '',
+            'url' => trim((string) $social['url']),
+        ]);
+    $herreraConfiguredNetworks = $herreraConfiguredFooterSocials->pluck('network');
     $herreraTopBarSocialFallbacks = collect($topBar['socials'] ?? [])
         ->filter(fn ($social) => is_array($social) && !empty($social['is_active']) && trim((string) ($social['url'] ?? '')) !== '')
-        ->filter(fn ($social) => (bool) ($herreraFooterSocialSettings->get($social['network'])['enabled'] ?? true));
+        ->filter(fn ($social) => (bool) ($herreraFooterSocialSettings->get($social['network'])['enabled'] ?? true))
+        ->reject(fn ($social) => $herreraConfiguredNetworks->contains($social['network']));
     // Configured footer URLs take precedence, and disabled footer networks stay disabled.
     $herreraFooterSocials = $herreraConfiguredFooterSocials->values()
         ->concat($herreraTopBarSocialFallbacks)
-        ->unique('network')
+        ->unique('url')
         ->values();
 @endphp
 @if ($herreraFooterSocials->isNotEmpty())
     <div class="herrera-footer-socials" aria-label="{{ __('Društvene mreže') }}">
         @foreach ($herreraFooterSocials as $social)
             @php
-                $socialName = match ($social['network']) { 'linkedin' => 'LinkedIn', 'twitter' => 'X / Twitter', 'tiktok' => 'TikTok', 'youtube' => 'YouTube', default => ucfirst($social['network']) };
+                $socialName = trim((string) ($social['label'] ?? '')) ?: match ($social['network']) { 'linkedin' => 'LinkedIn', 'twitter' => 'X / Twitter', 'tiktok' => 'TikTok', 'youtube' => 'YouTube', default => ucfirst($social['network']) };
                 $socialIcon = match ($social['network']) { 'linkedin' => 'linkedin-in', 'twitter' => 'x-twitter', 'facebook' => 'facebook-f', default => $social['network'] };
             @endphp
             <a href="{{ $social['url'] }}" aria-label="{{ $socialName }}" target="_blank" rel="noopener noreferrer">

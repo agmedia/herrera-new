@@ -6,6 +6,8 @@ use App\Livewire\Actions\Logout;
 use App\Models\Sales\Order\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Volt\Volt;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Silber\Bouncer\BouncerFacade as Bouncer;
@@ -27,7 +29,7 @@ class CustomerImpersonationFeatureTest extends TestCase
 
         $this->actingAs($admin)
             ->post(route('admin.users.impersonate', $customer))
-            ->assertRedirect(route('account.dashboard'))
+            ->assertRedirect(route('shop.index'))
             ->assertSessionHas('admin.customer_impersonation.admin_id', $admin->id)
             ->assertSessionHas('admin.customer_impersonation.customer_id', $customer->id);
 
@@ -251,9 +253,11 @@ class CustomerImpersonationFeatureTest extends TestCase
         $this->actingAs($admin)->post(route('admin.users.impersonate', $customer))->assertRedirect();
         if ($reason === 'deleted') {
             $admin->delete();
-        } else {
+        } elseif ($reason === 'access_revoked') {
             Bouncer::forbid($admin)->to('admin.access');
             Bouncer::refreshFor($admin);
+        } else {
+            $admin->forceFill(['account_type' => 'staff', 'admin_login_enabled' => false])->save();
         }
 
         $this->post(route('front.impersonation.stop'))
@@ -271,6 +275,54 @@ class CustomerImpersonationFeatureTest extends TestCase
         $this->actingAs($customer)->post(route('front.impersonation.stop'))->assertStatus(409);
 
         $this->assertAuthenticatedAs($customer);
+    }
+
+    #[DataProvider('deletedCustomerReturnRoles')]
+    public function test_return_stays_available_when_the_customer_is_deleted(string $role): void
+    {
+        $admin = $this->user($role);
+        $customer = $this->user('customer');
+        if ($role === 'order_manager') {
+            $admin->forceFill(['account_type' => 'staff', 'admin_login_enabled' => true])->save();
+            DB::table('admin_customer_assignments')->insert([
+                'admin_user_id' => $admin->id, 'customer_user_id' => $customer->id,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+        $adminFront = ['cart' => ['items' => []], 'checkout' => ['last_order_id' => 51]];
+        $this->actingAs($admin)->withSession(['front' => $adminFront])
+            ->post(route('admin.users.impersonate', $customer))->assertRedirect();
+        $customer->delete();
+        Auth::forgetGuards();
+
+        $this->post(route('front.impersonation.stop'))
+            ->assertRedirect(route('admin.users'))
+            ->assertSessionMissing('admin.customer_impersonation')
+            ->assertSessionHas('front', $adminFront);
+        $this->assertAuthenticatedAs($admin);
+        $event = Activity::query()->where('event', 'customer_impersonation.stopped')->firstOrFail();
+        $this->assertSame($admin->id, $event->causer_id);
+        $this->assertSame($customer->id, $event->properties->get('customer_id'));
+    }
+
+    #[DataProvider('forgedGuestLoginIds')]
+    public function test_guest_context_without_a_matching_server_login_cannot_restore_an_administrator(?int $loginId): void
+    {
+        $admin = $this->user('admin');
+        $customer = $this->user('customer');
+        $sessionData = ['admin.customer_impersonation' => [
+            'admin_id' => $admin->id, 'customer_id' => $customer->id,
+            'started_at' => now()->toIso8601String(),
+        ]];
+        if ($loginId !== null) {
+            $sessionData[Auth::guard('web')->getName()] = $loginId;
+        }
+        Auth::forgetGuards();
+
+        $this->withSession($sessionData)->post(route('front.impersonation.stop'))
+            ->assertForbidden()
+            ->assertSessionHas('admin.customer_impersonation.admin_id', $admin->id);
+        $this->assertGuest();
     }
 
     public function test_start_and_stop_are_audited_as_the_administrator_acting_on_the_customer(): void
@@ -325,7 +377,17 @@ class CustomerImpersonationFeatureTest extends TestCase
 
     public static function unavailableAdministrators(): array
     {
-        return [['deleted'], ['access_revoked']];
+        return [['deleted'], ['access_revoked'], ['staff_login_disabled']];
+    }
+
+    public static function deletedCustomerReturnRoles(): array
+    {
+        return [['admin'], ['order_manager']];
+    }
+
+    public static function forgedGuestLoginIds(): array
+    {
+        return [[null], [987654]];
     }
 
     private function user(string $role): User

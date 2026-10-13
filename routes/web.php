@@ -74,7 +74,6 @@ Route::get('feeds/nabava.xml', NabavaNetFeedController::class)
     ->name('feeds.nabava');
 
 Route::post('account/impersonation/stop', [CustomerImpersonationController::class, 'stop'])
-    ->middleware('auth')
     ->name('front.impersonation.stop');
 
 Route::post('admin/users/{user}/staff-impersonation', [\App\Http\Controllers\Admin\StaffImpersonationController::class, 'start'])
@@ -85,7 +84,7 @@ Route::post('admin/users/{user}/staff-impersonation', [\App\Http\Controllers\Adm
 Route::post('admin/staff-impersonation/stop', [\App\Http\Controllers\Admin\StaffImpersonationController::class, 'stop'])
     ->name('admin.staff-impersonation.stop');
 
-Route::middleware(['front.locale', 'front.device', 'front.search', 'front.b2b', 'front.cache'])
+Route::middleware(['front.customer-impersonation', 'front.locale', 'front.device', 'front.search', 'front.b2b', 'front.cache'])
     ->group(function (): void {
         Route::get('locale/{code}', function (string $code, Request $request) {
             $fallback = strtolower((string) config('app.locale', 'en'));
@@ -690,9 +689,13 @@ Route::post('logout', function (Request $request) {
         $customerId = (int) $request->session()->get(\App\Services\User\CustomerImpersonationService::SESSION_KEY.'.customer_id');
         $admin = $impersonation->stop($request);
 
-        return $admin
-            ? redirect()->route('admin.users.show', ['user' => $customerId])
-            : redirect()->route('login');
+        if (! $admin) {
+            return redirect()->route('login');
+        }
+
+        return app(\App\Services\Admin\OrderManagerAccess::class)->isRestricted($admin) || ! User::query()->whereKey($customerId)->exists()
+            ? redirect()->route('admin.users')
+            : redirect()->route('admin.users.show', ['user' => $customerId]);
     }
 
     Auth::guard('web')->logout();

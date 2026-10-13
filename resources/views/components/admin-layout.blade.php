@@ -1275,6 +1275,7 @@
                         (bool) config('user_features.flags.user_loyalty_enabled', false)
                     );
                     $canViewUsersList = auth()->user() && (auth()->user()->isA('superadmin') || auth()->user()->can('users.list.view'));
+                    $isAssignedCustomerView = app(\App\Services\Admin\OrderManagerAccess::class)->isRestricted();
                     $canManageUserGroups = auth()->user() && (auth()->user()->isA('superadmin') || auth()->user()->can('users.groups.manage'));
                     $canViewUserActivity = auth()->user() && (auth()->user()->isA('superadmin') || auth()->user()->can('users.activity.view'));
                     $canViewNewsletterSignups = auth()->user() && (auth()->user()->isA('superadmin') || auth()->user()->can('users.newsletter.view'));
@@ -1918,7 +1919,7 @@
                                     >
                                         <span class="flex items-center gap-2">
                                             <span class="sidebar-dot"></span>
-                                            <span>{{ __('admin.layout.menu.users_list') }}</span>
+                                            <span>{{ $isAssignedCustomerView ? __('Moji kupci') : __('admin.layout.menu.users_list') }}</span>
                                         </span>
                                     </a>
                                     <a

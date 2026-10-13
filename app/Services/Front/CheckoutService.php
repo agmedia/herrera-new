@@ -21,7 +21,9 @@ use App\Services\Pricing\B2BAccessService;
 use App\Services\Pricing\TaxPricingService;
 use App\Services\Shipping\CroatianIslandDestinationClassifier;
 use App\Services\Shipping\ShippingCalculator;
+use App\Services\User\CustomerImpersonationService;
 use App\Support\GlsShipping;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -118,6 +120,11 @@ class CheckoutService
      */
     public function placeOrder(array $payload, ?User $user = null): Order
     {
+        $impersonation = app(CustomerImpersonationService::class);
+        $delegation = $impersonation->validatedContext(request(), $user);
+        if ($delegation && ! $user) {
+            throw new AuthorizationException;
+        }
         $access = app(B2BAccessService::class);
         $access->ensureCanPurchase($user);
         if ($access->requiresApprovedAccount() && (int) auth()->id() !== (int) $user?->id) {
@@ -245,7 +252,15 @@ class CheckoutService
             $status,
             $locale,
             $shippingDestination,
+            $impersonation,
         ): Order {
+            $delegation = $impersonation->validatedContext(request(), $user);
+            $orderActor = $delegation['actor'] ?? $user;
+            $delegationAudit = $delegation ? [
+                'admin_id' => (int) $delegation['actor']->id,
+                'customer_id' => (int) $delegation['customer']->id,
+                'started_at' => $delegation['started_at'],
+            ] : null;
             $customerFirst = (string) ($payload['customer_first_name'] ?? '');
             $customerLast = (string) ($payload['customer_last_name'] ?? '');
             $customerName = trim($customerFirst.' '.$customerLast);
@@ -302,6 +317,7 @@ class CheckoutService
 
                 'customer_note' => (string) ($payload['customer_note'] ?? ''),
                 'payload' => [
+                    ...($delegationAudit ? ['customer_impersonation' => $delegationAudit] : []),
                     'placed_from' => 'frontend_checkout',
                     'coupon_code' => (string) ($summary['coupon_code'] ?? ''),
                     'monetary_precision' => $precision,
@@ -336,8 +352,8 @@ class CheckoutService
                     ],
                 ],
                 'placed_at' => now(),
-                'created_by' => $user?->id,
-                'updated_by' => $user?->id,
+                'created_by' => $orderActor?->id,
+                'updated_by' => $orderActor?->id,
             ]);
 
             $index = 0;

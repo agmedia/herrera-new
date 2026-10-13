@@ -1,9 +1,12 @@
 <div class="space-y-6">
+    @php
+        $isAssignedCustomerView = app(\App\Services\Admin\OrderManagerAccess::class)->isRestricted();
+    @endphp
     <div class="admin-panel admin-search-panel p-6">
         <div class="flex items-end justify-between gap-4">
             <div>
-                <h1 class="text-xl font-semibold tracking-tight">{{ __('Users') }}</h1>
-                <p class="mt-1 text-sm text-slate-600">{{ __('User administration with role-based access and account controls.') }}</p>
+                <h1 class="text-xl font-semibold tracking-tight">{{ $isAssignedCustomerView ? __('Moji kupci') : __('Users') }}</h1>
+                <p class="mt-1 text-sm text-slate-600">{{ $isAssignedCustomerView ? __('Prikazani su samo kupci koji su vam dodijeljeni. Za izradu narudžbe odaberite „Naruči za kupca”.') : __('User administration with role-based access and account controls.') }}</p>
                 <p class="mt-2 text-xs text-slate-500">{{ __('Items per page') }}: <span class="admin-chip">{{ $perPage }}</span></p>
             </div>
 
@@ -157,7 +160,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ $loyaltyEnabled ? 9 : 8 }}" class="px-3 py-8 text-center text-sm text-slate-500">{{ __('No users found.') }}</td>
+                            <td colspan="{{ $loyaltyEnabled ? 9 : 8 }}" class="px-3 py-8 text-center text-sm text-slate-500">{{ $isAssignedCustomerView ? __('Nema dodijeljenih kupaca koji odgovaraju pretrazi.') : __('No users found.') }}</td>
                         </tr>
                     @endforelse
                 </tbody>

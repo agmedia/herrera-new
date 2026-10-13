@@ -190,6 +190,7 @@ class Show extends Component
             ->with([
                 'status:id,code,name,color,is_paid,is_cancelled',
                 'user:id,name,email',
+                'creator:id,name',
                 'items',
                 'totals',
                 'history.fromStatus:id,name,color',

@@ -16,7 +16,10 @@ new class extends Component
 
         $destination = '/';
         if (auth()->check()) {
-            $destination = $staffPreview ? route('admin.users')
+            $returnToCustomerList = $staffPreview || ($customerId > 0
+                && (app(\App\Services\Admin\OrderManagerAccess::class)->isRestricted(auth()->user())
+                    || ! \App\Models\User::query()->whereKey($customerId)->exists()));
+            $destination = $returnToCustomerList ? route('admin.users')
                 : ($customerId > 0 ? route('admin.users.show', ['user' => $customerId]) : '/');
         }
         $this->redirect($destination, navigate: true);

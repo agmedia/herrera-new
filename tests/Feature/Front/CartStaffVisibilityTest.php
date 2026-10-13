@@ -8,6 +8,7 @@ use App\Models\Catalog\Product\Product;
 use App\Models\User;
 use App\Models\User\B2BAccount;
 use App\Models\User\CustomerGroup;
+use App\Services\Front\CartStaffAccess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -80,7 +81,7 @@ class CartStaffVisibilityTest extends TestCase
         $this->assertPrivateStock();
     }
 
-    public function test_assigned_salesperson_keeps_stock_visibility_while_impersonating_customer_and_loses_it_when_unassigned(): void
+    public function test_assigned_salesperson_keeps_stock_visibility_while_impersonating_customer_and_storefront_access_is_revoked_when_unassigned(): void
     {
         $manager = $this->staff('order_manager');
         $customer = User::factory()->create();
@@ -94,7 +95,9 @@ class CartStaffVisibilityTest extends TestCase
 
         $this->get(route('cart.index'))->assertOk()->assertSee('data-cart-staff-stock', false);
         DB::table('admin_customer_assignments')->where('admin_user_id', $manager->id)->delete();
-        $this->assertPrivateStock();
+        $this->get(route('cart.index'))->assertForbidden()->assertDontSee('data-cart-staff-stock', false);
+        $this->post(route('front.impersonation.stop'))->assertRedirect(route('admin.users'));
+        $this->assertAuthenticatedAs($manager);
     }
 
     public function test_real_b2b_cart_exposes_stock_only_during_authorized_salesperson_customer_preview(): void
@@ -147,7 +150,7 @@ class CartStaffVisibilityTest extends TestCase
 
         Bouncer::forbid($admin)->to('users.profile.update');
         Bouncer::refreshFor($admin);
-        $this->assertPrivateStock();
+        $this->get(route('cart.index'))->assertForbidden()->assertDontSee('data-cart-staff-stock', false);
     }
 
     public function test_mismatched_impersonation_context_cannot_expose_stock(): void
@@ -158,7 +161,23 @@ class CartStaffVisibilityTest extends TestCase
         $this->actingAs($customer)->withSession(['admin.customer_impersonation' => [
             'admin_id' => $admin->id, 'customer_id' => $customer->id + 1,
         ]]);
+        $this->get(route('cart.index'))->assertForbidden()->assertDontSee('data-cart-staff-stock', false);
+    }
+
+    public function test_b2b_sales_stock_requires_a_customer_delegation_even_if_staff_has_an_approved_account(): void
+    {
+        config(['commerce.b2b_only' => true]);
+        $staff = $this->staff('order_manager');
+        $group = CustomerGroup::query()->create(['code' => 'staff-b2b', 'name' => 'Staff B2B', 'is_active' => true]);
+        B2BAccount::query()->create([
+            'user_id' => $staff->id, 'company_name' => 'Staff account', 'oib' => '12345678901',
+            'status' => B2BAccount::STATUS_APPROVED, 'customer_group_id' => $group->id,
+        ]);
+        $this->actingAs($staff);
+        $this->add($this->product());
+
         $this->assertPrivateStock();
+        $this->assertFalse(app(CartStaffAccess::class)->canViewStock(request()));
     }
 
     public function test_staff_preview_uses_salespersons_role_and_rechecks_the_original_admin(): void

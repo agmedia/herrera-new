@@ -17,6 +17,7 @@ use App\Services\Payments\CorvusPayFormService;
 use App\Services\Payments\KeksPayService;
 use App\Services\Payments\WSPayFormService;
 use App\Services\Pricing\B2BAccessService;
+use App\Services\User\CustomerImpersonationService;
 use App\Services\User\DefaultCustomerGroupAssigner;
 use App\Support\Currency;
 use App\Support\GlsShipping;
@@ -51,6 +52,7 @@ class CheckoutController extends Controller
 
         $user = $request->user();
         $user?->loadMissing(['profile', 'addresses']);
+        $b2bAccount = app(B2BAccessService::class)->approvedAccount($user);
 
         $billing = $user?->addresses?->firstWhere('type', UserAddress::TYPE_BILLING);
         $shipping = $user?->addresses?->firstWhere('type', UserAddress::TYPE_SHIPPING);
@@ -115,8 +117,8 @@ class CheckoutController extends Controller
                 'billing' => [
                     'first_name' => (string) ($billing?->first_name ?? ''),
                     'last_name' => (string) ($billing?->last_name ?? ''),
-                    'company' => (string) ($billing?->company ?? ''),
-                    'oib' => (string) ($billing?->oib ?? ''),
+                    'company' => (string) ($billing?->company ?: $b2bAccount?->company_name ?: ''),
+                    'oib' => (string) ($billing?->oib ?: $b2bAccount?->oib ?: ''),
                     'vat_id' => (string) ($billing?->vat_id ?? ''),
                     'address_line_1' => (string) ($billing?->address_line_1 ?? ''),
                     'address_line_2' => (string) ($billing?->address_line_2 ?? ''),
@@ -640,10 +642,13 @@ class CheckoutController extends Controller
             return;
         }
 
-        $user->forceFill([
+        $userData = [
             'name' => trim(((string) $validated['customer_first_name']).' '.((string) $validated['customer_last_name'])),
-            'email' => (string) $validated['customer_email'],
-        ])->save();
+        ];
+        if (! app(CustomerImpersonationService::class)->isActive($request)) {
+            $userData['email'] = (string) $validated['customer_email'];
+        }
+        $user->forceFill($userData)->save();
 
         UserProfile::query()->updateOrCreate(
             ['user_id' => $user->id],

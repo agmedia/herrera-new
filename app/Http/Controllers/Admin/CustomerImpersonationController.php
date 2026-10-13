@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Admin\OrderManagerAccess;
 use App\Services\User\CustomerImpersonationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,7 @@ class CustomerImpersonationController extends Controller
     {
         $impersonation->start($request, $user);
 
-        return redirect()->route('account.dashboard');
+        return redirect()->route('shop.index');
     }
 
     public function stop(Request $request, CustomerImpersonationService $impersonation): RedirectResponse
@@ -26,7 +27,11 @@ class CustomerImpersonationController extends Controller
             return redirect()->route('login');
         }
 
-        return redirect()->route('admin.users.show', ['user' => $customerId])
+        $destination = app(OrderManagerAccess::class)->isRestricted($admin) || ! User::query()->whereKey($customerId)->exists()
+            ? route('admin.users')
+            : route('admin.users.show', ['user' => $customerId]);
+
+        return redirect($destination)
             ->with('status', __('Vratili ste se u administratorski račun.'));
     }
 }

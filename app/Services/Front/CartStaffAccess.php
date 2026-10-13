@@ -4,8 +4,10 @@ namespace App\Services\Front;
 
 use App\Models\Catalog\Product\ProductOptionValue;
 use App\Models\User;
+use App\Services\Pricing\B2BAccessService;
 use App\Services\User\CustomerImpersonationService;
 use App\Services\User\StaffImpersonationService;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
@@ -18,17 +20,17 @@ class CartStaffAccess
             return false;
         }
 
-        $customerPreview = $request->session()->get(CustomerImpersonationService::SESSION_KEY);
-        if ($customerPreview !== null) {
-            if (! is_array($customerPreview) || (int) ($customerPreview['customer_id'] ?? 0) !== (int) $viewer->id) {
+        $impersonation = app(CustomerImpersonationService::class);
+        if ($impersonation->isActive($request)) {
+            try {
+                return $this->isSalesStaff($impersonation->validatedActor($request));
+            } catch (AuthorizationException) {
                 return false;
             }
+        }
 
-            $actor = User::query()->find((int) ($customerPreview['admin_id'] ?? 0));
-
-            // Recheck current privileges and assigned-customer access after entering a preview.
-            return $this->isSalesStaff($actor)
-                && app(CustomerImpersonationService::class)->canStart($actor, $viewer);
+        if (app(B2BAccessService::class)->requiresApprovedAccount()) {
+            return false;
         }
 
         $staffPreview = $request->session()->get(StaffImpersonationService::SESSION_KEY);

@@ -70,6 +70,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin.maintenance-bypass' => \App\Http\Middleware\IssueMaintenanceBypassForPrivilegedAdmin::class,
             'front.locale' => \App\Http\Middleware\SetFrontendLocale::class,
             'front.device' => \App\Http\Middleware\DetectFrontendVariant::class,
+            'front.customer-impersonation' => \App\Http\Middleware\ValidateCustomerImpersonation::class,
             'front.b2b' => \App\Http\Middleware\ProtectB2BStorefront::class,
             'front.search' => \App\Http\Middleware\GuardStorefrontSearch::class,
             'front.cache' => \App\Http\Middleware\CacheGuestStorefront::class,

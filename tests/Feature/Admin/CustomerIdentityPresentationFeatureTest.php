@@ -5,8 +5,10 @@ namespace Tests\Feature\Admin;
 use App\Livewire\Admin\Sales\Order\Manager as OrderManager;
 use App\Models\Sales\Order\Order;
 use App\Models\User;
+use App\Models\User\CustomerGroup;
 use App\Services\Analytics\CustomerPurchaseStatistics;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Silber\Bouncer\BouncerFacade as Bouncer;
 use Tests\TestCase;
@@ -114,7 +116,49 @@ class CustomerIdentityPresentationFeatureTest extends TestCase
         $buyer->profile()->create(['company' => 'Preview Company']);
         $this->actingAs($admin)->post(route('admin.users.impersonate', $buyer))->assertRedirect();
         $this->get(route('account.dashboard'))->assertOk()
-            ->assertSeeInOrder(['Prijavljeni ste kao kupac:', 'Preview Company', 'Kontakt: Preview Contact']);
+            ->assertSeeInOrder(['Radite za kupca:', 'Preview Company', 'Kontakt: Preview Contact'])
+            ->assertSee('Koriste se cijene odabranog kupca, a narudžbe se spremaju na njegov račun.')
+            ->assertSee('Dodaj artikle')
+            ->assertSee(route('shop.index'), false)
+            ->assertSee('Vrati se u admin');
+    }
+
+    public function test_salesperson_sees_assigned_customer_instructions_and_ordering_or_support_actions(): void
+    {
+        config(['commerce.b2b_only' => true]);
+        $salesperson = User::factory()->create(['account_type' => 'staff']);
+        Bouncer::assign('order_manager')->to($salesperson);
+        $group = CustomerGroup::query()->create(['code' => 'ordering-ui', 'name' => 'Ordering UI', 'is_active' => true]);
+        $customers = [];
+        foreach (['approved' => 'Orderable Company', 'pending' => 'Pending Support Company'] as $status => $company) {
+            $customer = User::factory()->create();
+            Bouncer::assign('customer')->to($customer);
+            $customer->b2bAccount()->create([
+                'company_name' => $company, 'oib' => str_pad((string) $customer->id, 11, '0', STR_PAD_LEFT),
+                'status' => $status, 'customer_group_id' => $group->id,
+            ]);
+            DB::table('admin_customer_assignments')->insert([
+                'admin_user_id' => $salesperson->id, 'customer_user_id' => $customer->id,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $customers[$status] = $customer;
+        }
+        $unassigned = User::factory()->create();
+        $unassigned->profile()->create(['company' => 'Unassigned Hidden Company']);
+
+        $this->actingAs($salesperson)->get(route('admin.users'))->assertOk()
+            ->assertSee('Moji kupci')
+            ->assertSee('Prikazani su samo kupci koji su vam dodijeljeni.')
+            ->assertSee('Orderable Company')->assertSee('Pending Support Company')
+            ->assertDontSee('Unassigned Hidden Company')
+            ->assertSee('Naruči za kupca')->assertSee('Prijavi se kao kupac');
+
+        $orderAction = view('admin.users.partials.impersonate-button', ['customer' => $customers['approved']])->render();
+        $supportAction = view('admin.users.partials.impersonate-button', ['customer' => $customers['pending']])->render();
+        $this->assertStringContainsString('Naruči za kupca', $orderAction);
+        $this->assertStringNotContainsString('Prijavi se kao kupac', $orderAction);
+        $this->assertStringContainsString('Prijavi se kao kupac', $supportAction);
+        $this->assertStringNotContainsString('Naruči za kupca', $supportAction);
     }
 
     private function admin(): User

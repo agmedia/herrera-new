@@ -191,7 +191,7 @@ class OrderManagerAssignmentsTest extends TestCase
         $this->assign($manager, $customer);
 
         $this->actingAs($manager)->post(route('admin.users.impersonate', $customer))
-            ->assertRedirect(route('account.dashboard'))
+            ->assertRedirect(route('shop.index'))
             ->assertSessionHas(CustomerImpersonationService::SESSION_KEY.'.admin_id', $manager->id);
         $this->assertAuthenticatedAs($customer);
     }

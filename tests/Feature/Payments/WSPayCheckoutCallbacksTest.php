@@ -7,12 +7,16 @@ use App\Models\Sales\Order\Order;
 use App\Models\Settings\Local\OrderStatus;
 use App\Models\Settings\Local\PaymentMethod;
 use App\Models\User;
+use App\Models\User\B2BAccount;
+use App\Models\User\CustomerGroup;
 use App\Services\Front\StoreNotificationService;
 use App\Services\Payments\WSPayFormService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Silber\Bouncer\BouncerFacade as Bouncer;
 use Tests\TestCase;
 
 class WSPayCheckoutCallbacksTest extends TestCase
@@ -165,6 +169,112 @@ class WSPayCheckoutCallbacksTest extends TestCase
         $this->assertNull($order->fresh()->paid_at);
         $this->assertFalse($this->method->fresh()->is_active);
         Http::assertNothingSent();
+    }
+
+    #[DataProvider('delegationRevocations')]
+    public function test_signed_payment_settles_an_existing_order_after_the_original_salespersons_access_is_revoked(string $reason): void
+    {
+        $customer = $this->revokedDelegation($reason);
+        [$order, $product] = $this->order($customer);
+        $this->mock(StoreNotificationService::class, function (MockInterface $mock) use ($order): void {
+            $mock->shouldReceive('sendOrderNotification')->once()
+                ->withArgs(fn (Order $notified): bool => $notified->id === $order->id)->andReturnNull();
+        });
+        $url = route('checkout.wspay.return', array_merge(['orderNumber' => $order->order_number], $this->signedCallback($order)));
+
+        $this->get($url)->assertRedirect(route('checkout.success', ['orderNumber' => $order->order_number]))
+            ->assertSessionHas('front.checkout.last_order_id', $order->id);
+        $this->assertSame($this->paid->id, $order->fresh()->status_id);
+        $this->assertNotNull($order->fresh()->paid_at);
+        $this->assertSame(1, $product->fresh()->stock_qty);
+        $this->assertDatabaseHas('order_transactions', ['order_id' => $order->id, 'provider' => 'wspay', 'status' => 'approved']);
+        $this->assertDatabaseCount('order_transactions', 1);
+        $this->assertDatabaseCount('order_history', 1);
+
+        // Replayed signed callbacks stay idempotent despite the invalid delegation.
+        $this->get($url)->assertRedirect();
+        $this->assertDatabaseCount('order_transactions', 1);
+        $this->assertDatabaseCount('order_history', 1);
+        $this->get(route('shop.index'))->assertForbidden();
+        Http::assertNothingSent();
+    }
+
+    #[DataProvider('delegationRevocations')]
+    public function test_signed_cancellation_releases_an_existing_orders_stock_once_after_delegation_revocation(string $reason): void
+    {
+        $customer = $this->revokedDelegation($reason);
+        [$order, $product] = $this->order($customer);
+        $input = $this->signedCallback($order, ['Success' => '0', 'ApprovalCode' => '']);
+        $url = route('checkout.wspay.cancel', array_merge(['orderNumber' => $order->order_number], $input));
+
+        $this->get($url)->assertRedirect(route('cart.index'));
+        $this->assertSame($this->cancelled->id, $order->fresh()->status_id);
+        $this->assertNull($order->fresh()->paid_at);
+        $this->assertSame(3, $product->fresh()->stock_qty);
+        $this->assertNotEmpty(data_get($order->fresh()->payload, 'wspay.cancel_restocked_at'));
+        $this->assertDatabaseHas('order_transactions', ['order_id' => $order->id, 'provider' => 'wspay', 'status' => 'cancelled']);
+        $this->assertDatabaseCount('order_transactions', 1);
+        $this->assertDatabaseCount('order_history', 1);
+
+        $this->get($url)->assertRedirect(route('cart.index'));
+        $this->assertSame(3, $product->fresh()->stock_qty);
+        $this->assertDatabaseCount('order_transactions', 1);
+        $this->assertDatabaseCount('order_history', 1);
+        $this->get(route('cart.index'))->assertForbidden();
+        Http::assertNothingSent();
+    }
+
+    public function test_callback_exemption_does_not_authorize_unsigned_forged_changes_to_an_unrelated_order(): void
+    {
+        $this->revokedDelegation('disabled');
+        [$order, $product] = $this->order(User::factory()->create());
+
+        $this->get(route('checkout.wspay.cancel', ['orderNumber' => $order->order_number]))
+            ->assertNotFound()->assertSessionMissing('front.checkout.last_order_id');
+        $input = $this->signedCallback($order);
+        unset($input['Signature']);
+        $this->get(route('checkout.wspay.return', array_merge(['orderNumber' => $order->order_number], $input)))
+            ->assertNotFound()->assertSessionMissing('front.checkout.last_order_id');
+
+        $this->assertSame($this->pending->id, $order->fresh()->status_id);
+        $this->assertNull($order->fresh()->paid_at);
+        $this->assertNull($order->fresh()->payload);
+        $this->assertSame(1, $product->fresh()->stock_qty);
+        $this->assertDatabaseCount('order_transactions', 0);
+        $this->assertDatabaseCount('order_history', 0);
+        Http::assertNothingSent();
+    }
+
+    public static function delegationRevocations(): array
+    {
+        return ['disabled original staff' => ['disabled'], 'revoked assignment' => ['assignment'], 'deleted original staff' => ['deleted']];
+    }
+
+    private function revokedDelegation(string $reason): User
+    {
+        config(['commerce.b2b_only' => true]);
+        $manager = User::factory()->create(['account_type' => 'staff', 'admin_login_enabled' => true]);
+        Bouncer::assign('order_manager')->to($manager);
+        $customer = User::factory()->create();
+        $group = CustomerGroup::query()->create(['code' => 'payment-callback-buyer', 'name' => 'Callback buyer', 'is_active' => true]);
+        B2BAccount::query()->create([
+            'user_id' => $customer->id, 'company_name' => 'Callback buyer', 'oib' => '12345678901',
+            'status' => B2BAccount::STATUS_APPROVED, 'customer_group_id' => $group->id,
+        ]);
+        DB::table('admin_customer_assignments')->insert([
+            'admin_user_id' => $manager->id, 'customer_user_id' => $customer->id,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->actingAs($manager)->post(route('admin.users.impersonate', $customer))->assertRedirect();
+        $this->assertAuthenticatedAs($customer);
+
+        match ($reason) {
+            'disabled' => $manager->forceFill(['admin_login_enabled' => false])->save(),
+            'assignment' => DB::table('admin_customer_assignments')->where('admin_user_id', $manager->id)->delete(),
+            'deleted' => $manager->delete(),
+        };
+
+        return $customer;
     }
 
     private function authorize(Order $order, bool $useAuthenticatedOwner): void

@@ -12,6 +12,7 @@ use App\Models\User\UserProfile;
 use App\Services\Front\AddressDirectoryService;
 use App\Services\Loyalty\LoyaltyService;
 use App\Services\Settings\SystemSettingsService;
+use App\Services\User\CustomerImpersonationService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -187,6 +188,7 @@ class AccountController extends Controller
     public function updateProfile(Request $request): RedirectResponse
     {
         $user = $request->user();
+        $delegation = app(CustomerImpersonationService::class)->validatedContext($request, $user);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:191'],
@@ -199,6 +201,8 @@ class AccountController extends Controller
             'birthday' => ['nullable', 'date'],
             'gender' => ['nullable', Rule::in(['male', 'female'])],
         ]);
+
+        abort_if($delegation && $validated['email'] !== $user->email, 403, __('Prijavu kupca nije moguće promijeniti tijekom naručivanja u njegovo ime.'));
 
         $user->forceFill([
             'name' => $validated['name'],

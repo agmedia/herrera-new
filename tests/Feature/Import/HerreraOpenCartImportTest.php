@@ -6,6 +6,7 @@ use App\Models\Catalog\Pricing\PriceCatalog;
 use App\Models\User;
 use App\Models\User\B2BAccount;
 use App\Models\User\LegacyCredential;
+use App\Services\Import\HerreraFinalSyncOwnership;
 use App\Services\Import\HerreraOpenCartImportService;
 use App\Services\Pricing\PriceCatalogResolver;
 use Illuminate\Database\Schema\Blueprint;
@@ -450,6 +451,124 @@ class HerreraOpenCartImportTest extends TestCase
         $this->assertDatabaseHas('herrera_import_issues', ['entity' => 'edge_customer_group_user', 'code' => 'final_sync_unverified_edge_addition']);
     }
 
+    public function test_interrupted_new_customer_backfills_a_proven_historical_null_order_parent_without_replacing_native_notes(): void
+    {
+        $orderId = $this->unlinkedHistoricalOrderWithoutBaseline();
+        DB::table('orders')->where('id', $orderId)->update(['customer_note' => 'Native historical note']);
+        $this->interruptNewCustomerCreation();
+        $baseline = json_decode(DB::table('herrera_source_records')->where('source_table', 'final_sync_fields')->where('source_key', 'like', 'order:%')->value('payload'), true);
+        $this->assertSame(['user_id' => null], $baseline['fields']);
+        $this->assertDatabaseCount('user_legacy_credentials', 0);
+
+        $retry = app(HerreraOpenCartImportService::class)->import('herrera_test_source', 'oc_', false, ['customers', 'orders'], finalSync: true);
+
+        $customerId = (int) DB::table('herrera_import_maps')->where('entity', 'customer')->where('source_id', '7')->value('target_id');
+        $this->assertSame(0, $retry['final_sync_conflicts']);
+        $this->assertDatabaseHas('orders', ['id' => $orderId, 'user_id' => $customerId, 'customer_note' => 'Native historical note', 'grand_total' => '46.2960']);
+        $baseline = json_decode(DB::table('herrera_source_records')->where('source_table', 'final_sync_fields')->where('source_key', 'like', 'order:%')->value('payload'), true);
+        $this->assertSame($customerId, $baseline['fields']['user_id']);
+    }
+
+    public function test_new_customer_order_backfill_does_not_override_a_native_parent_reassignment_after_interruption(): void
+    {
+        $orderId = $this->unlinkedHistoricalOrderWithoutBaseline();
+        $this->interruptNewCustomerCreation();
+        $nativeCustomer = User::factory()->create();
+        DB::table('orders')->where('id', $orderId)->update(['user_id' => $nativeCustomer->id]);
+
+        $retry = app(HerreraOpenCartImportService::class)->import('herrera_test_source', 'oc_', false, ['customers', 'orders'], finalSync: true);
+
+        $this->assertSame(1, $retry['final_sync_conflicts']);
+        $this->assertDatabaseHas('orders', ['id' => $orderId, 'user_id' => $nativeCustomer->id]);
+        $this->assertDatabaseHas('herrera_import_issues', ['entity' => 'order', 'source_id' => '500', 'code' => 'final_sync_field_conflict']);
+    }
+
+    public function test_repeating_completed_backfill_preserves_a_subsequent_native_order_unlink(): void
+    {
+        $orderId = $this->unlinkedHistoricalOrderWithoutBaseline();
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['customers', 'orders'], finalSync: true);
+        $this->assertNotNull(DB::table('orders')->where('id', $orderId)->value('user_id'));
+        DB::table('orders')->where('id', $orderId)->update(['user_id' => null]);
+
+        $importer->import('herrera_test_source', 'oc_', false, ['customers', 'orders'], finalSync: true);
+
+        $this->assertDatabaseHas('orders', ['id' => $orderId, 'user_id' => null]);
+    }
+
+    public function test_new_customer_does_not_prime_order_backfill_from_mismatched_historical_provenance(): void
+    {
+        $orderId = $this->unlinkedHistoricalOrderWithoutBaseline();
+        $payload = json_decode(DB::table('orders')->where('id', $orderId)->value('payload'), true);
+        $payload['opencart']['customer_id'] = 999;
+        DB::table('orders')->where('id', $orderId)->update(['payload' => json_encode($payload)]);
+
+        app(HerreraOpenCartImportService::class)->import('herrera_test_source', 'oc_', false, ['customers', 'orders'], finalSync: true);
+
+        $this->assertDatabaseHas('orders', ['id' => $orderId, 'user_id' => null]);
+    }
+
+    public function test_old_completed_customer_proof_cannot_retroactively_authorize_a_missing_order_parent(): void
+    {
+        $orderId = $this->unlinkedHistoricalOrderWithoutBaseline();
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        $proof = json_decode(DB::table('herrera_source_records')->where('source_table', 'final_sync_created_parents')->value('payload'), true);
+        $this->assertTrue($proof['completed']);
+        // Simulate a proof produced before historical NULL parents were captured.
+        DB::table('herrera_source_records')->where('source_table', 'final_sync_fields')->where('source_key', 'like', 'order:%')->delete();
+
+        $importer->import('herrera_test_source', 'oc_', false, ['customers', 'orders'], finalSync: true);
+
+        $this->assertDatabaseHas('orders', ['id' => $orderId, 'user_id' => null]);
+    }
+
+    public function test_historical_null_parent_backfill_requires_the_completed_customer_proof_to_still_match(): void
+    {
+        $orderId = $this->unlinkedHistoricalOrderWithoutBaseline();
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        DB::table('users')->update(['password' => bcrypt('Native replacement password')]);
+
+        $retry = $importer->import('herrera_test_source', 'oc_', false, ['orders'], finalSync: true);
+
+        $this->assertSame(1, $retry['final_sync_conflicts']);
+        $this->assertDatabaseHas('orders', ['id' => $orderId, 'user_id' => null]);
+        $this->assertDatabaseHas('herrera_import_issues', ['entity' => 'order', 'source_id' => '500', 'code' => 'final_sync_unverified_created_customer_order_parent']);
+    }
+
+    public function test_new_customer_does_not_replace_an_existing_non_null_order_parent_baseline(): void
+    {
+        $orderId = $this->unlinkedHistoricalOrderWithoutBaseline();
+        $nativeCustomer = User::factory()->create();
+        $ownership = new HerreraFinalSyncOwnership('original-fixture', static function (): void {});
+        $ownership->rememberFields('order', '500', ['user_id' => $nativeCustomer->id]);
+
+        $retry = app(HerreraOpenCartImportService::class)->import('herrera_test_source', 'oc_', false, ['customers', 'orders'], finalSync: true);
+
+        $this->assertSame(1, $retry['final_sync_conflicts']);
+        $this->assertDatabaseHas('orders', ['id' => $orderId, 'user_id' => null]);
+        $this->assertSame(['user_id' => $nativeCustomer->id], $ownership->fields('order', '500'));
+    }
+
+    public function test_new_customer_preserves_an_existing_partial_order_baseline_for_review(): void
+    {
+        $orderId = $this->unlinkedHistoricalOrderWithoutBaseline();
+        $ownership = new HerreraFinalSyncOwnership('original-fixture', static function (): void {});
+        $partialBaseline = ['customer_note' => 'Historical order'];
+        $ownership->rememberFields('order', '500', $partialBaseline);
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        $this->assertSame($partialBaseline, $ownership->fields('order', '500'));
+        DB::table('users')->update(['password' => bcrypt('Native replacement password')]);
+
+        $retry = $importer->import('herrera_test_source', 'oc_', false, ['orders'], finalSync: true);
+
+        $this->assertSame(1, $retry['final_sync_conflicts']);
+        $this->assertDatabaseHas('orders', ['id' => $orderId, 'user_id' => null]);
+        $this->assertSame($partialBaseline, $ownership->fields('order', '500'));
+    }
+
     public function test_interrupted_new_customer_cannot_restore_a_legacy_verifier_after_a_native_password_change(): void
     {
         $failOnce = true;
@@ -709,6 +828,38 @@ class HerreraOpenCartImportTest extends TestCase
         }
         $this->assertSame(['10.1111', '50.1234', '55.2345', '79.9999'], $catalog->entries()->where('kind', 'special')->orderBy('price')->pluck('price')->all());
         $this->assertSame('draft', $catalog->fresh()->status);
+    }
+
+    private function unlinkedHistoricalOrderWithoutBaseline(): int
+    {
+        $this->source('order', [$this->historicalOrder(500)]);
+        foreach (['order_product', 'order_total', 'order_history'] as $table) {
+            Schema::connection('herrera_test_source')->create('oc_'.$table, function (Blueprint $schema) use ($table): void {
+                $schema->unsignedInteger($table.'_id')->primary();
+                $schema->unsignedInteger('order_id');
+            });
+        }
+        app(HerreraOpenCartImportService::class)->import('herrera_test_source', 'oc_', false, ['orders']);
+        DB::table('herrera_source_records')->where('source_table', 'final_sync_fields')->where('source_key', 'like', 'order:%')->delete();
+
+        return (int) DB::table('orders')->value('id');
+    }
+
+    private function interruptNewCustomerCreation(): void
+    {
+        $failOnce = true;
+        LegacyCredential::creating(function () use (&$failOnce): void {
+            if ($failOnce) {
+                $failOnce = false;
+                throw new \RuntimeException('Simulated interruption before customer dependents.');
+            }
+        });
+        try {
+            app(HerreraOpenCartImportService::class)->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+            $this->fail('The customer import must stop before its dependent records.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulated interruption before customer dependents.', $exception->getMessage());
+        }
     }
 
     private function source(string $table, array $rows): void

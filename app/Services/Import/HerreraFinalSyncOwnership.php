@@ -31,17 +31,59 @@ class HerreraFinalSyncOwnership
         $current = (array) DB::table($table)->where('id', $id)->first();
         $passwordFingerprint = isset($current['password']) ? hash('sha256', $current['password']) : null;
         unset($current['password'], $current['created_at'], $current['updated_at']);
+        if ($entity === 'customer') {
+            $this->rememberHistoricalNullOrderParents($sourceId);
+        }
         $this->write('final_sync_created_parents', $entity, $sourceId, [
             'table' => $table, 'target_id' => $id, 'fields' => $current,
             'password_fingerprint' => $passwordFingerprint, 'completed' => false,
         ]);
     }
 
+    /** Capture the missing parent before creating its customer import map. */
+    private function rememberHistoricalNullOrderParents(string $customerSourceId): void
+    {
+        $orders = DB::table('orders as native')->select('native.*', 'mapping.source_id as mapped_source_id')
+            ->join('herrera_import_maps as mapping', function ($join): void {
+                $join->on('mapping.target_id', '=', 'native.id')->where('mapping.source', 'herrera-opencart')->where('mapping.entity', 'order');
+            })
+            ->where('native.source', 'opencart_import')->whereNull('native.user_id')->orderBy('native.id');
+        foreach ($orders->cursor() as $order) {
+            $payload = $this->decoded($order->payload);
+            $orderSourceId = (string) $order->mapped_source_id;
+            if ((string) data_get($payload, 'opencart.customer_id', '') !== $customerSourceId
+                || (string) data_get($payload, 'opencart.order_id', '') !== $orderSourceId
+                || $order->order_number !== 'OC-HERRERA-'.$orderSourceId) {
+                continue;
+            }
+            $baseline = $this->fields('order', $orderSourceId);
+            // Existing full or partial baselines require their own reconciliation;
+            // a prior linked parent may have been deliberately removed natively.
+            if ($baseline !== null) {
+                continue;
+            }
+            $this->rememberFields('order', $orderSourceId, ['user_id' => null]);
+        }
+    }
+
     /** An interrupted creation may finish only while the native identity is untouched. */
     public function pendingCreatedParentMatches(string $entity, string $sourceId, string $table, int $id): bool
     {
         $proof = $this->read('final_sync_created_parents', $entity, $sourceId);
-        if (! $proof || ($proof['completed'] ?? true) || ($proof['table'] ?? null) !== $table
+
+        return $proof && ! ($proof['completed'] ?? true) && $this->createdParentMatches($proof, $table, $id);
+    }
+
+    public function completedCreatedParentMatches(string $entity, string $sourceId, string $table, int $id): bool
+    {
+        $proof = $this->read('final_sync_created_parents', $entity, $sourceId);
+
+        return $proof && ($proof['completed'] ?? false) && $this->createdParentMatches($proof, $table, $id);
+    }
+
+    private function createdParentMatches(array $proof, string $table, int $id): bool
+    {
+        if (($proof['table'] ?? null) !== $table
             || (int) ($proof['target_id'] ?? 0) !== $id) {
             return false;
         }

@@ -228,7 +228,8 @@ zona Europe/Zagreb. Nije izvršen novi izvoz produkcije, osvježavanje javne tes
 baze ni prebacivanje domene.
 
 - Kopiranje dvije izolirane baze: 51,41 s; uspostavljanje početnog stanja:
-  388,12 s; puni probni refresh: 718,14 s. To nisu ukupni minuti prekida rada:
+  388,12 s; puni probni refresh: 718,14 s; ponovljeni prijenos: 558,16 s.
+  To nisu ukupni minuti prekida rada:
   mjerenja ne uključuju svježi izvoz, mrežni prijenos, vraćanje baze na server,
   promjenu domene i završni pregled.
 - Financijska provjera: **PASS**, svih 724.730 važećih cjenovnih stavki na
@@ -242,11 +243,26 @@ baze ni prebacivanje domene.
 - Svih 11.376 starih CRM zapisa je sačuvano: 11.369 povezanih sesija, sedam
   arhivskih zapisa bez postojećeg kupca. Nisu izmišljani identiteti ni ishodi.
   Trinaest računa osoblja i 1.061 dodjela kupaca ostali su sačuvani.
+- Završno ponavljanje je dovršeno. Svih 11 provjerenih skupina postojećih
+  podataka nove aplikacije ostalo je sačuvano, a brojevi zapisa u svih šest
+  kontrolnih tablica izvorne lokalne baze ostali su jednaki.
 - Oba modula referentnih cijena isključena su u ovoj kopiji; dodatne tablice
   grupnih cijena opcija su prazne. Svježa kopija mora ponovno proći te provjere.
 - **1.381 artikl ima konflikt zaliha**: nova lokalna trgovina sadrži novija
   ažuriranja od starog izvora. Postupak ih čuva i blokira prijelaz do svježeg
   izvora ili provjerenog usklađenja. Cjenik ostaje neaktivan.
+- Od 1.219 izvornih kupaca 1.218 ima zasebnu provjerenu vezu. Jedan izvorni
+  identitet dijeli email s drugim kupcem i ostaje izdvojen za provjeru;
+  računi se ne spajaju automatski samo na temelju emaila.
+- Četiri stare narudžbe jednog naknadno prenesenog kupca još nemaju vezu s
+  njegovim računom. I izvorna lokalna kopija tih narudžbi imala je praznu vezu.
+  Završna provjera to otkriva i blokira prijelaz. Sama naknadno stvorena mapa
+  kupca ne dokazuje da je dopušteno vratiti eventualno ručno uklonjenu vezu.
+  Pri novom prijenosu takva se izvorna praznina bilježi prije stvaranja mape
+  kupca, uz provjeru izvornog ID-a, broja i sadržaja narudžbe. Potom se veza
+  može popuniti jednom, tek nakon dovršenog prijenosa i ponovne provjere
+  identiteta kupca. Kasnija ručna promjena ostaje sačuvana. Završena stara proba
+  nema taj raniji dokaz i njezine četiri veze ostaju za ručnu provjeru.
 
 Provjeru identiteta baze treba izvršiti prije ORM upisa i migracija. Kopirana
 konfiguracija odbacuje izvorno ime veze; inače model može koristiti drugu bazu
@@ -255,5 +271,6 @@ stare lozinke, lažne prijevode i ponovljivu CRM migraciju. Financijske provjere
 veza narudžbi koriste indeksirano povezivanje tekstualnih izvornih ID-eva.
 
 Konačni privatni izvještaj sadrži rezultat ponavljanja i svih preostalih
-automatskih uvjeta. Financijski PASS sam po sebi nije dopuštenje za prijelaz;
+automatskih uvjeta. Proba je dovršena, ali nije prošla sve uvjete i nije spremna
+za live. Financijski PASS sam po sebi nije dopuštenje za prijelaz;
 svježi podaci i ručni koraci iz ovog dokumenta ostaju obavezni.

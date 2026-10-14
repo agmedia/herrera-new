@@ -1247,6 +1247,7 @@ class HerreraOpenCartImportService
         $checksum = hash('sha256', $this->json($sourceRow));
         $id = $this->id($entity, $sourceId);
         $unchangedSource = $id && ($this->checksums[$entity][$sourceId] ?? null) === $checksum;
+        $baseline = $this->finalSync && ($unchangedSource || $entity === 'order') ? $this->ownership->fields($entity, $sourceId) : null;
         if ($this->finalSync && $id && ! DB::table($table)->where('id', $id)->exists()) {
             if ($entity === 'wishlist') {
                 // A mapped, now-absent favorite is a proven native user removal.
@@ -1255,12 +1256,26 @@ class HerreraOpenCartImportService
             }
             throw new RuntimeException('Final sync found a missing native target for an existing import mapping; review is required.');
         }
-        if ($unchangedSource && (! $this->finalSync || $this->ownership->fields($entity, $sourceId) === null)) {
+        if ($unchangedSource && (! $this->finalSync || $baseline === null)) {
             // Replaying the original frozen snapshot establishes exact prior
             // source values, while preserving every existing native edit.
             $this->ownership?->rememberFields($entity, $sourceId, $fields);
 
             return $id;
+        }
+        if ($this->finalSync && $entity === 'order' && $baseline === ['user_id' => null]) {
+            if (! ($fields['user_id'] ?? null) || ! $this->ownership->completedCreatedParentMatches('customer', (string) $sourceRow['customer_id'], 'users', (int) $fields['user_id'])) {
+                $this->issue($entity, $sourceId, 'final_sync_unverified_created_customer_order_parent');
+                $this->stats['final_sync_conflicts']++;
+
+                return $id;
+            }
+            // New customer creation captured this historical gap before its map
+            // existed. The unchanged source proves the remaining baseline fields;
+            // retaining NULL lets the normal three-way merge fill the gap once.
+            if ($unchangedSource) {
+                $this->ownership->rememberFields($entity, $sourceId, ['user_id' => null] + $fields);
+            }
         }
         $written = false;
         $write = function () use ($entity, $sourceId, $table, $fields, $checksum, &$id, &$written): void {

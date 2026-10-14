@@ -2,10 +2,15 @@
 
 namespace Tests\Feature\Import;
 
+use App\Models\Catalog\Pricing\PriceCatalog;
+use App\Models\User;
+use App\Models\User\B2BAccount;
 use App\Models\User\LegacyCredential;
 use App\Services\Import\HerreraOpenCartImportService;
+use App\Services\Pricing\PriceCatalogResolver;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -356,6 +361,354 @@ class HerreraOpenCartImportTest extends TestCase
         DB::table('catalog_price_catalogs')->update(['status' => 'active']);
         $this->expectException(\RuntimeException::class);
         $importer->import('herrera_test_source', 'oc_', false, ['base_prices']);
+    }
+
+    public function test_final_sync_merges_source_updates_preserving_native_workflow_metadata_and_stable_ids(): void
+    {
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['catalog', 'customers']);
+        $product = DB::table('products')->where('code', 'herrera-oc-product-30')->first();
+        $user = DB::table('users')->first();
+        $account = DB::table('b2b_accounts')->first();
+        $payload = json_decode($product->payload, true);
+        $payload['supplier_documents'] = [['source' => 'vayox', 'url' => 'https://www.bodex.net.pl/manual.pdf']];
+        DB::table('products')->where('id', $product->id)->update(['payload' => json_encode($payload), 'energy_label_url' => 'https://example.test/native-label']);
+        DB::table('b2b_accounts')->where('id', $account->id)->update(['sales_comment' => 'Native workflow note', 'proposed_terms' => '{"rebate":15}']);
+        DB::connection('herrera_test_source')->table('oc_product')->where('product_id', 30)->update(['quantity' => 25]);
+        DB::connection('herrera_test_source')->table('oc_customer')->where('customer_id', 7)->update(['telephone' => '+385999999']);
+
+        $summary = $importer->import('herrera_test_source', 'oc_', false, ['catalog', 'customers'], finalSync: true);
+        $this->assertSame(0, $summary['final_sync_conflicts']);
+        $this->assertTrue($summary['final_sync_ready']);
+        $this->assertDatabaseHas('products', ['id' => $product->id, 'stock_qty' => 25, 'energy_label_url' => 'https://example.test/native-label']);
+        $this->assertSame($payload['supplier_documents'], json_decode(DB::table('products')->where('id', $product->id)->value('payload'), true)['supplier_documents']);
+        $this->assertDatabaseHas('users', ['id' => $user->id]);
+        $this->assertDatabaseHas('b2b_accounts', ['id' => $account->id, 'status' => 'approved', 'phone' => '+385999999', 'sales_comment' => 'Native workflow note']);
+        $this->assertDatabaseCount('users', 1);
+    }
+
+    public function test_final_sync_resumes_a_proven_new_customer_after_interruption_without_reviving_native_removed_membership(): void
+    {
+        $failOnce = true;
+        LegacyCredential::creating(function () use (&$failOnce): void {
+            if ($failOnce) {
+                $failOnce = false;
+                throw new \RuntimeException('Simulated interruption before dependent records.');
+            }
+        });
+        try {
+            app(HerreraOpenCartImportService::class)->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+            $this->fail('The interrupted customer creation must stop the import.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulated interruption before dependent records.', $exception->getMessage());
+        }
+        $id = (int) DB::table('herrera_import_maps')->where('entity', 'customer')->where('source_id', '7')->value('target_id');
+        $this->assertDatabaseHas('users', ['id' => $id]);
+        $this->assertDatabaseCount('user_legacy_credentials', 0);
+        $this->assertDatabaseCount('user_profiles', 0);
+        $this->assertDatabaseCount('customer_group_user', 0);
+        $proof = json_decode(DB::table('herrera_source_records')->where('source_table', 'final_sync_created_parents')->value('payload'), true);
+        $this->assertFalse($proof['completed']);
+        $this->assertArrayNotHasKey('password', $proof['fields']);
+
+        $retry = app(HerreraOpenCartImportService::class)->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        $this->assertSame(0, $retry['final_sync_conflicts']);
+        $this->assertDatabaseCount('users', 1);
+        $this->assertDatabaseHas('user_profiles', ['user_id' => $id]);
+        $this->assertDatabaseHas('b2b_accounts', ['user_id' => $id]);
+        $this->assertDatabaseHas('customer_group_user', ['user_id' => $id]);
+        $this->assertDatabaseCount('user_legacy_credentials', 1);
+
+        DB::table('customer_group_user')->where('user_id', $id)->delete();
+        $removed = app(HerreraOpenCartImportService::class)->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        $this->assertGreaterThan(0, $removed['final_sync_conflicts']);
+        $this->assertDatabaseCount('customer_group_user', 0);
+        $this->assertDatabaseHas('herrera_import_issues', ['entity' => 'edge_customer_group_user', 'code' => 'final_sync_native_edge_removed']);
+    }
+
+    public function test_interrupted_new_customer_proof_does_not_override_a_native_group_assignment(): void
+    {
+        $failOnce = true;
+        LegacyCredential::creating(function () use (&$failOnce): void {
+            if ($failOnce) {
+                $failOnce = false;
+                throw new \RuntimeException('Simulated interruption.');
+            }
+        });
+        try {
+            app(HerreraOpenCartImportService::class)->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulated interruption.', $exception->getMessage());
+        }
+        $id = (int) DB::table('users')->value('id');
+        $nativeGroup = DB::table('customer_groups')->insertGetId(['code' => 'native-group', 'name' => 'Native group', 'is_active' => true, 'created_at' => now(), 'updated_at' => now()]);
+        DB::table('customer_group_user')->insert(['user_id' => $id, 'customer_group_id' => $nativeGroup, 'created_at' => now(), 'updated_at' => now()]);
+        $retry = app(HerreraOpenCartImportService::class)->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        $this->assertGreaterThan(0, $retry['final_sync_conflicts']);
+        $this->assertDatabaseCount('customer_group_user', 1);
+        $this->assertDatabaseHas('customer_group_user', ['user_id' => $id, 'customer_group_id' => $nativeGroup]);
+        $this->assertDatabaseHas('herrera_import_issues', ['entity' => 'edge_customer_group_user', 'code' => 'final_sync_unverified_edge_addition']);
+    }
+
+    public function test_interrupted_new_customer_cannot_restore_a_legacy_verifier_after_a_native_password_change(): void
+    {
+        $failOnce = true;
+        LegacyCredential::creating(function () use (&$failOnce): void {
+            if ($failOnce) {
+                $failOnce = false;
+                throw new \RuntimeException('Simulated interruption.');
+            }
+        });
+        try {
+            app(HerreraOpenCartImportService::class)->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('Simulated interruption.', $exception->getMessage());
+        }
+        $nativePassword = bcrypt('Native replacement password');
+        DB::table('users')->update(['password' => $nativePassword]);
+        $retry = app(HerreraOpenCartImportService::class)->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        $this->assertSame(1, $retry['final_sync_conflicts']);
+        $this->assertDatabaseCount('user_legacy_credentials', 0);
+        $this->assertDatabaseCount('customer_group_user', 0);
+        $this->assertSame($nativePassword, DB::table('users')->value('password'));
+        $this->assertDatabaseHas('herrera_import_issues', ['entity' => 'customer', 'source_id' => '7', 'code' => 'final_sync_missing_legacy_credential']);
+    }
+
+    public function test_final_sync_does_not_recreate_a_deliberately_removed_existing_legacy_verifier(): void
+    {
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        $nativePassword = DB::table('users')->value('password');
+        LegacyCredential::query()->delete();
+        $retry = $importer->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        $this->assertSame(1, $retry['final_sync_conflicts']);
+        $this->assertFalse($retry['final_sync_ready']);
+        $this->assertDatabaseCount('user_legacy_credentials', 0);
+        $this->assertSame($nativePassword, DB::table('users')->value('password'));
+        $this->assertDatabaseHas('herrera_import_issues', ['entity' => 'customer', 'source_id' => '7', 'code' => 'final_sync_missing_legacy_credential']);
+    }
+
+    public function test_orphan_option_languages_do_not_collide_with_croatian_or_hide_real_translation_conflicts(): void
+    {
+        $this->source('option', [['option_id' => 1, 'type' => 'select', 'sort_order' => 0]]);
+        $this->source('option_description', [
+            ['option_id' => 1, 'language_id' => 1, 'name' => 'Orphan option'],
+            ['option_id' => 1, 'language_id' => 3, 'name' => 'Izvorna opcija'],
+        ]);
+        $this->source('option_value', [['option_value_id' => 1, 'option_id' => 1, 'sort_order' => 0]]);
+        $this->source('option_value_description', [
+            ['option_value_id' => 1, 'language_id' => 1, 'name' => 'Orphan value'],
+            ['option_value_id' => 1, 'language_id' => 3, 'name' => 'Izvorna vrijednost'],
+        ]);
+        foreach (['product_option', 'product_option_value'] as $table) {
+            Schema::connection('herrera_test_source')->create('oc_'.$table, fn (Blueprint $schema) => $schema->integer($table.'_id'));
+        }
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['catalog']);
+        DB::table('herrera_source_records')->where('source_table', 'final_sync_fields')->delete();
+        DB::table('catalog_option_translations')->update(['name' => 'Native option', 'slug' => 'native-option']);
+        $prime = $importer->import('herrera_test_source', 'oc_', false, ['catalog'], finalSync: true);
+        $this->assertSame(0, $prime['final_sync_conflicts']);
+        $this->assertDatabaseCount('catalog_option_translations', 1);
+        $this->assertDatabaseCount('catalog_option_value_translations', 1);
+        $this->assertDatabaseHas('catalog_option_translations', ['locale' => 'hr', 'name' => 'Native option']);
+        $this->assertDatabaseHas('catalog_option_value_translations', ['locale' => 'hr', 'name' => 'Izvorna vrijednost']);
+        $this->assertDatabaseHas('herrera_import_issues', ['entity' => 'source_language', 'source_id' => 'option_description:1', 'code' => 'undefined_source_translation_language']);
+        DB::connection('herrera_test_source')->table('oc_option_description')->where('language_id', 3)->update(['name' => 'Source changed']);
+        $fresh = $importer->import('herrera_test_source', 'oc_', false, ['catalog'], finalSync: true);
+        $this->assertGreaterThan(0, $fresh['final_sync_conflicts']);
+        $this->assertDatabaseHas('catalog_option_translations', ['locale' => 'hr', 'name' => 'Native option']);
+    }
+
+    public function test_final_sync_reports_native_source_overlaps_and_keeps_the_entire_conflicting_row(): void
+    {
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['catalog']);
+        DB::table('products')->where('code', 'herrera-oc-product-30')->update(['stock_qty' => 777]);
+        DB::connection('herrera_test_source')->table('oc_product')->where('product_id', 30)->update(['quantity' => 25, 'price' => '120.9876']);
+        $summary = $importer->import('herrera_test_source', 'oc_', false, ['catalog'], finalSync: true);
+        $this->assertGreaterThan(0, $summary['final_sync_conflicts']);
+        $this->assertFalse($summary['final_sync_ready']);
+        $this->assertDatabaseHas('products', ['code' => 'herrera-oc-product-30', 'stock_qty' => 777, 'base_price' => '100.1234']);
+        $this->assertDatabaseHas('herrera_import_issues', ['entity' => 'product', 'source_id' => '30', 'code' => 'final_sync_field_conflict']);
+        $this->assertSame('completed_with_conflicts', DB::table('herrera_import_runs')->orderByDesc('id')->value('status'));
+    }
+
+    public function test_final_sync_gates_native_commercial_overrides_even_when_the_live_source_field_is_unchanged(): void
+    {
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['catalog', 'customers']);
+        DB::table('products')->where('code', 'herrera-oc-product-30')->update(['base_price' => '777.1234']);
+        DB::table('b2b_accounts')->update(['status' => 'suspended']);
+        $summary = $importer->import('herrera_test_source', 'oc_', false, ['catalog', 'customers'], finalSync: true);
+        $this->assertGreaterThanOrEqual(2, $summary['final_sync_conflicts']);
+        $this->assertFalse($summary['final_sync_ready']);
+        $this->assertDatabaseHas('products', ['code' => 'herrera-oc-product-30', 'base_price' => '777.1234']);
+        $this->assertDatabaseHas('b2b_accounts', ['status' => 'suspended']);
+    }
+
+    public function test_original_snapshot_priming_establishes_baselines_without_replacing_existing_native_edits(): void
+    {
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['catalog']);
+        DB::table('herrera_source_records')->where('source_table', 'final_sync_fields')->delete();
+        DB::table('products')->where('code', 'herrera-oc-product-30')->update(['stock_qty' => 777]);
+        $prime = $importer->import('herrera_test_source', 'oc_', false, ['catalog'], finalSync: true);
+        $this->assertSame(0, $prime['final_sync_conflicts']);
+        $this->assertDatabaseHas('products', ['code' => 'herrera-oc-product-30', 'stock_qty' => 777]);
+        DB::connection('herrera_test_source')->table('oc_product')->where('product_id', 30)->update(['quantity' => 25]);
+        $fresh = $importer->import('herrera_test_source', 'oc_', false, ['catalog'], finalSync: true);
+        $this->assertGreaterThan(0, $fresh['final_sync_conflicts']);
+        $this->assertFalse($fresh['final_sync_ready']);
+        $this->assertDatabaseHas('products', ['code' => 'herrera-oc-product-30', 'stock_qty' => 777]);
+    }
+
+    public function test_final_sync_refreshes_only_enabled_unretired_legacy_customer_verifiers(): void
+    {
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['customers']);
+        $credential = LegacyCredential::firstOrFail();
+        $nativePassword = DB::table('users')->where('id', $credential->user_id)->value('password');
+        DB::connection('herrera_test_source')->table('oc_customer')->update(['password' => str_repeat('b', 40), 'salt' => 'updated-salt']);
+        $summary = $importer->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        $this->assertSame(1, $summary['final_sync_legacy_credentials_refreshed']);
+        $this->assertSame(str_repeat('b', 40), $credential->fresh()->legacy_hash);
+        $this->assertSame('updated-salt', $credential->fresh()->legacy_salt);
+        $this->assertSame($nativePassword, DB::table('users')->where('id', $credential->user_id)->value('password'));
+        $credential->retire();
+        DB::connection('herrera_test_source')->table('oc_customer')->update(['password' => str_repeat('c', 40)]);
+        $summary = $importer->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        $this->assertSame(0, $summary['final_sync_legacy_credentials_refreshed']);
+        $this->assertFalse($credential->fresh()->enabled);
+        $this->assertNull($credential->fresh()->legacy_hash);
+    }
+
+    public function test_final_sync_does_not_update_disabled_verifiers_or_a_verifier_after_a_native_password_change(): void
+    {
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['customers']);
+        $credential = LegacyCredential::firstOrFail();
+        $credential->update(['enabled' => false]);
+        DB::connection('herrera_test_source')->table('oc_customer')->update(['password' => str_repeat('b', 40)]);
+        $summary = $importer->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        $this->assertSame(0, $summary['final_sync_legacy_credentials_refreshed']);
+        $this->assertSame(str_repeat('a', 40), $credential->fresh()->legacy_hash);
+        $credential->update(['enabled' => true]);
+        $native = \Illuminate\Support\Facades\Hash::make('new-native-password');
+        DB::table('users')->where('id', $credential->user_id)->update(['password' => $native]);
+        $summary = $importer->import('herrera_test_source', 'oc_', false, ['customers'], finalSync: true);
+        $this->assertSame(0, $summary['final_sync_legacy_credentials_refreshed']);
+        $this->assertSame(str_repeat('a', 40), $credential->fresh()->legacy_hash);
+        $this->assertSame($native, DB::table('users')->where('id', $credential->user_id)->value('password'));
+    }
+
+    public function test_final_sync_retires_removed_source_products_without_deleting_ids_or_native_products(): void
+    {
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['catalog']);
+        $id = DB::table('products')->where('code', 'herrera-oc-product-31')->value('id');
+        $native = DB::table('products')->insertGetId(['code' => 'native-product', 'is_active' => true, 'base_price' => '10']);
+        DB::connection('herrera_test_source')->table('oc_product')->where('product_id', 31)->delete();
+        DB::connection('herrera_test_source')->table('oc_product_description')->where('product_id', 31)->delete();
+        $summary = $importer->import('herrera_test_source', 'oc_', false, ['catalog'], finalSync: true);
+        $this->assertSame(0, $summary['final_sync_conflicts']);
+        $this->assertSame(1, $summary['final_sync_removed_records']);
+        $this->assertDatabaseHas('products', ['id' => $id, 'is_active' => false]);
+        $this->assertDatabaseHas('products', ['id' => $native, 'is_active' => true]);
+        $this->assertDatabaseHas('herrera_import_maps', ['entity' => 'product', 'source_id' => '31', 'target_id' => $id]);
+    }
+
+    public function test_final_sync_does_not_recreate_a_natively_deleted_mapped_target(): void
+    {
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['catalog']);
+        DB::table('products')->where('code', 'herrera-oc-product-31')->delete();
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('missing native target');
+        $importer->import('herrera_test_source', 'oc_', false, ['catalog'], finalSync: true);
+    }
+
+    public function test_final_pricing_requires_a_fresh_frozen_snapshot_and_preserves_the_published_catalog(): void
+    {
+        $this->source('product_discount', [['product_discount_id' => 1, 'product_id' => 30, 'customer_group_id' => 4, 'quantity' => 10, 'priority' => 1, 'price' => '70.1234', 'date_start' => '0000-00-00', 'date_end' => '0000-00-00']]);
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['catalog', 'customers', 'pricing']);
+        $published = DB::table('catalog_price_catalogs')->first();
+        DB::table('catalog_price_catalogs')->where('id', $published->id)->update(['status' => 'active']);
+        DB::table('catalog_price_catalog_state')->where('id', 1)->update(['price_catalog_id' => $published->id]);
+        $originalEntries = DB::table('catalog_price_entries')->where('price_catalog_id', $published->id)->get()->map(fn ($row) => (array) $row)->all();
+        try {
+            $importer->import('herrera_test_source', 'oc_', false, ['pricing'], finalSync: true);
+            $this->fail('Published snapshot must not be reused for final pricing.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('fresh uniquely named', $exception->getMessage());
+        }
+        DB::connection('herrera_test_source')->table('oc_product_special')->delete();
+        DB::disconnect('herrera_test_source');
+        $freshFile = tempnam(sys_get_temp_dir(), 'herrera-final-frozen-');
+        copy($this->sourceFile, $freshFile);
+        config(['database.connections.herrera_test_source.database' => $freshFile]);
+        DB::purge('herrera_test_source');
+        try {
+            $summary = $importer->import('herrera_test_source', 'oc_', false, ['pricing'], finalSync: true);
+            $draftId = $summary['draft_price_catalog_id'];
+            $this->assertNotSame($published->id, $draftId);
+            $this->assertSame('draft', DB::table('catalog_price_catalogs')->where('id', $draftId)->value('status'));
+            $this->assertFalse(DB::table('catalog_price_entries')->where('price_catalog_id', $draftId)->where('kind', 'special')->exists());
+            $this->assertSame($originalEntries, DB::table('catalog_price_entries')->where('price_catalog_id', $published->id)->get()->map(fn ($row) => (array) $row)->all());
+            $again = $importer->import('herrera_test_source', 'oc_', false, ['pricing'], finalSync: true);
+            $this->assertSame($draftId, $again['draft_price_catalog_id']);
+            DB::connection('herrera_test_source')->table('oc_product')->where('product_id', 30)->update(['price' => '130']);
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessage('snapshot changed');
+            $importer->import('herrera_test_source', 'oc_', false, ['pricing'], finalSync: true);
+        } finally {
+            DB::disconnect('herrera_test_source');
+            unlink($freshFile);
+        }
+    }
+
+    public function test_final_price_import_preserves_group_customer_quantity_action_priority_and_exclusive_windows_at_four_decimals(): void
+    {
+        config(['commerce.b2b_only' => true]);
+        $this->source('product_discount', [['product_discount_id' => 1, 'product_id' => 30, 'customer_group_id' => 4, 'quantity' => 10,
+            'priority' => 1, 'price' => '60.3456', 'date_start' => '0000-00-00', 'date_end' => '0000-00-00']]);
+        $source = DB::connection('herrera_test_source');
+        $source->table('oc_product_special')->update(['date_end' => '2026-10-13 23:59:59']);
+        foreach ([
+            ['id' => 2, 'priority' => 0, 'price' => '10.1111', 'start' => '2026-10-15 12:00:00', 'end' => '2026-10-16 12:00:00'],
+            ['id' => 3, 'priority' => 2, 'price' => '50.1234', 'start' => '2026-10-14 12:00:00', 'end' => '2026-10-14 14:00:00'],
+            ['id' => 4, 'priority' => 1, 'price' => '55.2345', 'start' => '2026-10-14 12:00:00', 'end' => '2026-10-14 14:00:00'],
+        ] as $special) {
+            $source->table('oc_product_special')->insert(['product_special_id' => $special['id'], 'product_id' => 30, 'customer_group_id' => 4,
+                'priority' => $special['priority'], 'price' => $special['price'], 'date_start' => $special['start'], 'date_end' => $special['end']]);
+        }
+        $importer = app(HerreraOpenCartImportService::class);
+        $importer->import('herrera_test_source', 'oc_', false, ['catalog', 'customers']);
+        $summary = $importer->import('herrera_test_source', 'oc_', false, ['pricing'], finalSync: true);
+        $catalog = PriceCatalog::findOrFail($summary['draft_price_catalog_id']);
+        $customer = User::where('email', 'source@example.test')->firstOrFail();
+        $groupBuyer = User::factory()->create();
+        B2BAccount::query()->create(['user_id' => $groupBuyer->id, 'company_name' => 'Group buyer', 'oib' => '12345678901',
+            'status' => 'approved', 'customer_group_id' => $customer->b2bAccount->customer_group_id]);
+        $product = \App\Models\Catalog\Product\Product::where('code', 'herrera-oc-product-30')->firstOrFail();
+        $resolver = app(PriceCatalogResolver::class);
+        foreach (['2026-10-14 12:00:00' => [85.6789, 91.2345, 60.3456],
+            '2026-10-14 12:00:01' => [55.2345, 55.2345, 55.2345],
+            '2026-10-14 14:00:00' => [85.6789, 91.2345, 60.3456],
+            '2026-10-15 12:00:01' => [10.1111, 10.1111, 10.1111]] as $time => $expected) {
+            $at = Carbon::parse($time);
+            $this->assertSame($expected[0], $resolver->resolve($product, $customer, catalog: $catalog, at: $at)->price);
+            $this->assertSame($expected[1], $resolver->resolve($product, $groupBuyer, catalog: $catalog, at: $at)->price);
+            $quantity = $resolver->resolve($product, $customer, 10, catalog: $catalog, at: $at);
+            $this->assertSame($expected[2], $quantity->price);
+            $this->assertTrue($quantity->is_final);
+            if ($time === '2026-10-14 12:00:01') {
+                $this->assertSame(60.3456, $quantity->previous_price);
+            }
+        }
+        $this->assertSame(['10.1111', '50.1234', '55.2345', '79.9999'], $catalog->entries()->where('kind', 'special')->orderBy('price')->pluck('price')->all());
+        $this->assertSame('draft', $catalog->fresh()->status);
     }
 
     private function source(string $table, array $rows): void

@@ -34,6 +34,14 @@ class HerreraOpenCartImportService
 
     private array $columnCache = [];
 
+    private bool $finalSync = false;
+
+    private ?HerreraFinalSyncOwnership $ownership = null;
+
+    private array $newMappings = [];
+
+    private array $sourceProductBases = [];
+
     /** Non-null only during the explicit assigned-customer prerequisite. */
     private ?array $missingAssignedCustomerIds = null;
 
@@ -44,6 +52,7 @@ class HerreraOpenCartImportService
 
     public function importMissingAssignedCustomers(string $connection, string $prefix = 'oc_'): array
     {
+        $this->finalSync = false;
         if (! preg_match('/^[a-zA-Z0-9_]*$/', $prefix)) {
             throw new RuntimeException('Invalid source table prefix.');
         }
@@ -126,7 +135,7 @@ class HerreraOpenCartImportService
         }
     }
 
-    public function import(string $connection = 'herrera_source', string $prefix = 'oc_', bool $dryRun = false, array $only = [], ?callable $progress = null): array
+    public function import(string $connection = 'herrera_source', string $prefix = 'oc_', bool $dryRun = false, array $only = [], ?callable $progress = null, bool $finalSync = false): array
     {
         if (! preg_match('/^[a-zA-Z0-9_]*$/', $prefix)) {
             throw new RuntimeException('Invalid source table prefix.');
@@ -134,6 +143,8 @@ class HerreraOpenCartImportService
         $this->source = DB::connection($connection);
         $this->prefix = $prefix;
         $this->snapshot = $this->source->getDatabaseName();
+        $this->finalSync = $finalSync;
+        $this->newMappings = $this->sourceProductBases = [];
         $this->guardSource();
         $stages = $only ?: ['catalog', 'customers', 'billing_addresses', 'pricing', 'orders', 'seo', 'relations', 'archive'];
         if (array_diff($stages, ['catalog', 'content', 'base_prices', 'supplier_stock', 'customers', 'billing_addresses', 'pricing', 'orders', 'order_identity', 'seo', 'relations', 'archive'])) {
@@ -146,12 +157,21 @@ class HerreraOpenCartImportService
             $this->guardSupplierStockRepair();
         }
         $this->stats = ['source_snapshot' => $this->snapshot];
+        if ($finalSync) {
+            $this->stats += ['final_sync' => true, 'final_sync_conflicts' => 0, 'final_sync_removed_records' => 0,
+                'final_sync_removed_edges' => 0, 'final_sync_legacy_credentials_refreshed' => 0];
+            $this->guardFinalSync($stages);
+        }
         foreach (['category', 'manufacturer', 'product', 'customer_group', 'customer', 'address', 'product_price_by_cigroup', 'product_price_by_customer_id', 'product_special', 'product_discount', 'order', 'seo_url', 'hb_url_preserve'] as $table) {
             $this->stats['source_'.$table] = $this->has($table) ? $this->source->table($this->table($table))->count() : 0;
         }
         if ($dryRun) {
             return $this->stats;
         }
+        $this->ownership = new HerreraFinalSyncOwnership($this->snapshot, function (string $entity, string $id, string $code, array $fields): void {
+            $this->issue($entity, $id, $code, ['fields' => $fields, 'snapshot' => $this->snapshot]);
+            $this->stats['final_sync_conflicts'] = ($this->stats['final_sync_conflicts'] ?? 0) + 1;
+        });
         $run = DB::table('herrera_import_runs')->insertGetId(['source_snapshot' => $this->snapshot, 'status' => 'running', 'created_at' => now(), 'updated_at' => now()]);
         $this->maps = $this->checksums = $this->keywords = $this->locales = [];
         DB::table('herrera_import_maps')->where('source', 'herrera-opencart')->orderBy('id')->chunkById(5000, function ($maps): void {
@@ -178,8 +198,20 @@ class HerreraOpenCartImportService
                 }
                 $this->{$stage}();
             }
+            if ($finalSync) {
+                $this->reconcileRemovedRecords($stages);
+            }
+            $edgeTables = $this->edgeTables($stages);
+            if ($finalSync) {
+                $this->stats['final_sync_removed_edges'] = $this->ownership->reconcileEdges($edgeTables);
+                $this->stats['final_sync_new_customer_source_ids'] = array_keys($this->newMappings['customer'] ?? []);
+                $this->stats['final_sync_ready'] = $this->stats['final_sync_conflicts'] === 0;
+            }
+            if (! $finalSync || $this->stats['final_sync_conflicts'] === 0) {
+                $this->ownership->markEdgeSetsComplete($edgeTables);
+            }
             $this->stats['unresolved_issues'] = DB::table('herrera_import_issues')->count();
-            DB::table('herrera_import_runs')->where('id', $run)->update(['status' => 'completed', 'summary' => $this->json($this->stats), 'updated_at' => now()]);
+            DB::table('herrera_import_runs')->where('id', $run)->update(['status' => $finalSync && $this->stats['final_sync_conflicts'] > 0 ? 'completed_with_conflicts' : 'completed', 'summary' => $this->json($this->stats), 'updated_at' => now()]);
         } catch (\Throwable $exception) {
             DB::table('herrera_import_runs')->where('id', $run)->update(['status' => 'failed', 'summary' => $this->json($this->stats), 'updated_at' => now()]);
             throw $exception;
@@ -194,6 +226,10 @@ class HerreraOpenCartImportService
             throw new RuntimeException('Import is restricted to local and testing environments.');
         }
         $target = DB::connection();
+        if ($this->finalSync) {
+            HerreraCutoverSafety::assertNoSplitConnection($target->getConfig());
+            HerreraCutoverSafety::assertNoSplitConnection($this->source->getConfig());
+        }
         if ($target === $this->source || ($target->getDatabaseName() === $this->snapshot && $target->getDriverName() === $this->source->getDriverName())) {
             throw new RuntimeException('Source and destination must be separate databases.');
         }
@@ -203,6 +239,166 @@ class HerreraOpenCartImportService
         if (in_array($target->getDriverName(), ['mysql', 'mariadb', 'pgsql', 'sqlsrv'], true) && ! in_array($target->getConfig('host'), ['127.0.0.1', 'localhost', '::1'], true)) {
             throw new RuntimeException('Only a local destination database is permitted.');
         }
+    }
+
+    private function guardFinalSync(array $stages): void
+    {
+        if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)
+            && ! preg_match('/^herrera_(?:rehearsal|cutover)_target_[a-z0-9_]+$/', DB::connection()->getDatabaseName())) {
+            throw new RuntimeException('Final sync writes are restricted to generated isolated rehearsal or cutover target databases.');
+        }
+        if (in_array($this->source->getDriverName(), ['mysql', 'mariadb'], true)
+            && ! preg_match('/^herrera_(?:(?:rehearsal|cutover)_source_[a-z0-9_]+|live_snapshot_[a-z0-9_]+)$/', $this->snapshot)) {
+            throw new RuntimeException('Final sync reads are restricted to named isolated frozen source snapshots.');
+        }
+        foreach (['catalog' => ['product', 'category', 'product_to_category'], 'customers' => ['customer', 'customer_group', 'address'],
+            'orders' => ['order', 'order_product', 'order_total', 'order_history'],
+            'pricing' => ['product', 'product_price_by_cigroup', 'product_price_by_customer_id', 'product_special', 'product_discount']] as $stage => $tables) {
+            if (! in_array($stage, $stages, true)) {
+                continue;
+            }
+            foreach ($tables as $table) {
+                if (! $this->has($table)) {
+                    throw new RuntimeException('Final sync requires a complete isolated source snapshot; missing table '.$table.'.');
+                }
+            }
+        }
+        foreach (['catalog' => 'product', 'customers' => 'customer', 'orders' => 'order'] as $stage => $entity) {
+            if (in_array($stage, $stages, true) && $this->source->table($this->table($entity))->count() === 0
+                && DB::table('herrera_import_maps')->where('source', 'herrera-opencart')->where('entity', $entity)->exists()) {
+                throw new RuntimeException('An empty source '.$entity.' table cannot authorize final-sync removals.');
+            }
+        }
+        if (in_array('catalog', $stages, true)) {
+            foreach (['manufacturer', 'option', 'option_value', 'product_option_value', 'blog', 'information'] as $entity) {
+                if (! $this->has($entity) && DB::table('herrera_import_maps')->where('source', 'herrera-opencart')->where('entity', $entity)->exists()) {
+                    throw new RuntimeException('Final sync is missing a previously imported source table: '.$entity.'.');
+                }
+            }
+            foreach (['product_attribute' => ['attribute', 'attribute_description', 'attribute_group_description'],
+                'option' => ['option_description', 'option_value', 'option_value_description', 'product_option', 'product_option_value']] as $set => $dependencies) {
+                if ($this->has($set) && $this->source->table($this->table($set))->exists()) {
+                    foreach ($dependencies as $dependency) {
+                        if (! $this->has($dependency)) {
+                            throw new RuntimeException('Final sync source metadata is incomplete: missing '.$dependency.'.');
+                        }
+                    }
+                }
+            }
+        }
+        if (in_array('pricing', $stages, true)) {
+            $catalog = DB::table('catalog_price_catalogs')->where('source_system', 'herrera-opencart')->where('source_snapshot', $this->snapshot)->first();
+            if ($catalog && ($catalog->status !== 'draft' || ! (json_decode($catalog->metadata ?: '{}', true)['final_sync'] ?? false))) {
+                throw new RuntimeException('Final pricing requires a fresh uniquely named source snapshot; published and earlier drafts are preserved.');
+            }
+            if ($catalog && DB::table('catalog_price_entries')->where('price_catalog_id', $catalog->id)
+                ->where(fn ($q) => $q->where('source_key', 'like', 'manual%')->orWhereNotNull('discount_rule_id'))->exists()) {
+                throw new RuntimeException('Final pricing cannot replace a draft containing native manual prices or discount rules.');
+            }
+            if ($catalog && (json_decode($catalog->metadata ?: '{}', true)['import_complete'] ?? false)
+                && ! hash_equals((string) $catalog->source_checksum, $this->sourcePriceChecksum())) {
+                throw new RuntimeException('A final-sync source snapshot changed after its verified pricing import. Create a new uniquely named frozen snapshot.');
+            }
+        }
+    }
+
+    private function sourcePriceChecksum(): string
+    {
+        $digest = hash_init('sha256');
+        foreach (['product', 'product_price_by_cigroup', 'product_price_by_customer_id', 'product_discount', 'product_special'] as $table) {
+            $this->each($table, fn (array $row) => hash_update($digest, $this->json($row)));
+        }
+
+        return hash_final($digest);
+    }
+
+    private function edgeTables(array $stages): array
+    {
+        $tables = [];
+        foreach (['catalog' => ['product_to_category' => 'category_product', 'product_attribute' => 'catalog_attribute_product',
+            'product_option' => 'catalog_option_product', 'product_attribute#specs' => 'catalog_product_specifications', 'blog_to_category' => 'content_blog_post_category'],
+            'customers' => ['customer' => 'customer_group_user'], 'content' => ['blog_to_category' => 'content_blog_post_category']] as $stage => $sets) {
+            if (in_array($stage, $stages, true)) {
+                foreach ($sets as $source => $target) {
+                    if ($this->has(explode('#', $source)[0])) {
+                        $tables[] = $target;
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($tables));
+    }
+
+    private function reconcileRemovedRecords(array $stages): void
+    {
+        $sets = [];
+        if (in_array('catalog', $stages, true)) {
+            $sets += ['product' => ['product_id', 'products'], 'category' => ['category_id', 'categories'],
+                'manufacturer' => ['manufacturer_id', 'catalog_manufacturers'], 'option' => ['option_id', 'catalog_options'],
+                'option_value' => ['option_value_id', 'catalog_option_values'], 'product_option_value' => ['product_option_value_id', 'catalog_product_option_values']];
+        }
+        if (in_array('content', $stages, true) || in_array('catalog', $stages, true)) {
+            $sets += ['blog' => ['blog_id', 'content_blog_posts'], 'information' => ['information_id', 'content_info_pages']];
+        }
+        foreach ($sets as $entity => [$key, $table]) {
+            if (! $this->has($entity)) {
+                continue; // A missing optional table is never proof of deletion.
+            }
+            $present = array_fill_keys(array_map('strval', $this->source->table($this->table($entity))->pluck($key)->all()), true);
+            foreach ($this->maps[$entity] ?? [] as $sourceId => $targetId) {
+                if (! isset($present[(string) $sourceId])) {
+                    $this->retireMapped($entity, (string) $sourceId, $table, $targetId, 'is_active', false);
+                }
+            }
+        }
+        if (in_array('customers', $stages, true)) {
+            $present = array_fill_keys(array_map('strval', $this->source->table($this->table('customer'))->pluck('customer_id')->all()), true);
+            foreach ($this->maps['customer'] ?? [] as $sourceId => $userId) {
+                if (! isset($present[(string) $sourceId]) && $accountId = $this->id('b2b_account', $sourceId)) {
+                    $this->retireMapped('b2b_account', (string) $sourceId, 'b2b_accounts', $accountId, 'status', 'suspended');
+                    LegacyCredential::query()->where('user_id', $userId)->whereNull('retired_at')->where('enabled', true)->each(fn ($credential) => $credential->update(['enabled' => false]));
+                }
+            }
+        }
+        // Historical transactions are retained. Missing source history is an
+        // explicit review gate, never permission to silently erase accounting.
+        if (in_array('orders', $stages, true)) {
+            foreach (['order' => 'order_id', 'order_product' => 'order_product_id', 'order_total' => 'order_total_id', 'order_history' => 'order_history_id'] as $entity => $key) {
+                $present = array_fill_keys(array_map('strval', $this->source->table($this->table($entity))->pluck($key)->all()), true);
+                foreach ($this->maps[$entity] ?? [] as $sourceId => $id) {
+                    if (! isset($present[(string) $sourceId])) {
+                        $this->issue($entity, $sourceId, 'final_sync_missing_historical_record', ['snapshot' => $this->snapshot]);
+                        $this->stats['final_sync_conflicts']++;
+                    }
+                }
+            }
+        }
+    }
+
+    private function retireMapped(string $entity, string $sourceId, string $table, int $id, string $field, mixed $value): void
+    {
+        $current = DB::table($table)->where('id', $id)->first();
+        if (! $current) {
+            $this->issue($entity, $sourceId, 'final_sync_missing_native_target');
+            $this->stats['final_sync_conflicts']++;
+
+            return;
+        }
+        $updates = $this->ownership->merge($entity, $sourceId, (array) $current, [$field => $value]);
+        if ($updates === null) {
+            return;
+        }
+        if ($updates !== []) {
+            DB::table($table)->where('id', $id)->update($updates + ['updated_at' => now()]);
+            $this->stats['final_sync_removed_records']++;
+        }
+        $basis = $this->ownership->fields($entity, $sourceId) ?? [];
+        $this->ownership->rememberFields($entity, $sourceId, array_replace($basis, [$field => $value]));
+        $checksum = hash('sha256', 'removed:'.$entity.':'.$sourceId);
+        DB::table('herrera_import_maps')->where('source', 'herrera-opencart')->where('entity', $entity)->where('source_id', $sourceId)
+            ->update(['checksum' => $checksum, 'updated_at' => now()]);
+        $this->checksums[$entity][$sourceId] = $checksum;
     }
 
     private function catalog(): void
@@ -245,7 +441,31 @@ class HerreraOpenCartImportService
                 $parent = null;
                 $this->issue('category', $row['category_id'], 'self_parent');
             }
-            DB::table('categories')->where('id', $id)->update(['parent_id' => $parent]);
+            if ($this->finalSync) {
+                $current = (array) DB::table('categories')->where('id', $id)->first();
+                $basis = $this->ownership->fields('category_parent', (string) $row['category_id']);
+                if ($basis === null && isset($this->newMappings['category'][(string) $row['category_id']])) {
+                    DB::table('categories')->where('id', $id)->update(['parent_id' => $parent]);
+                } elseif ($basis === null) {
+                    // Parent relationships predate the field-baseline feature.
+                    // Prime against the original snapshot before a final delta.
+                    if ($current['parent_id'] !== $parent && ! $this->ownership->same($current['parent_id'], $parent)) {
+                        $this->issue('category', $row['category_id'], 'final_sync_unverified_parent_change');
+                        $this->stats['final_sync_conflicts']++;
+
+                        return;
+                    }
+                } elseif (($updates = $this->ownership->merge('category_parent', (string) $row['category_id'], $current, ['parent_id' => $parent])) !== null) {
+                    if ($updates !== []) {
+                        DB::table('categories')->where('id', $id)->update($updates);
+                    }
+                } else {
+                    return;
+                }
+            } else {
+                DB::table('categories')->where('id', $id)->update(['parent_id' => $parent]);
+            }
+            $this->ownership?->rememberFields('category_parent', (string) $row['category_id'], ['parent_id' => $parent]);
         });
         Category::fixTree();
         $this->each('category_description', function (array $row): void {
@@ -254,6 +474,7 @@ class HerreraOpenCartImportService
             }
         });
         $this->each('product', function (array $row) use ($classRates, $weightClasses, $lengthClasses): void {
+            $this->sourceProductBases[(string) $row['product_id']] = (string) $row['price'];
             $sku = trim((string) ($row['sku'] ?: $row['model']));
             $existing = $this->id('product', $row['product_id']);
             if ($sku !== '' && DB::table('products')->where('sku', $sku)->when($existing, fn ($q) => $q->where('id', '!=', $existing))->exists()) {
@@ -285,13 +506,18 @@ class HerreraOpenCartImportService
             $product = $this->id('product', $row['product_id']);
             $category = $this->id('category', $row['category_id']);
             if ($product && $category) {
-                DB::table('category_product')->updateOrInsert(['product_id' => $product, 'category_id' => $category], ['sort_order' => 0, 'is_primary' => false, 'created_at' => now(), 'updated_at' => now()]);
+                $this->sourceEdge('category_product', ['product_id' => $product, 'category_id' => $category], ['sort_order' => 0, 'is_primary' => false, 'created_at' => now(), 'updated_at' => now()], isset($this->newMappings['product'][(string) $row['product_id']]));
             }
         });
         $gallery = [];
         $this->each('product_image', function (array $row) use (&$gallery): void {
             $gallery[$row['product_id']][] = ['image' => $row['image'], 'sort_order' => $row['sort_order']];
         });
+        if ($this->finalSync && $this->has('product_image')) {
+            foreach ($this->maps['product'] ?? [] as $sourceId => $id) {
+                $gallery[$sourceId] ??= [];
+            }
+        }
         foreach ($gallery as $sourceId => $images) {
             if ($id = $this->id('product', $sourceId)) {
                 $payload = json_decode(DB::table('products')->where('id', $id)->value('payload') ?: '{}', true);
@@ -328,16 +554,16 @@ class HerreraOpenCartImportService
             $groupCode = 'herrera-oc-attribute-'.$row['attribute_id'];
             $groupName = $names[$row['attribute_id']][$row['language_id']] ?? 'Atribut '.$row['attribute_id'];
             $group = $this->mapped('attribute_group', $row['attribute_id'], 'catalog_attribute_groups', ['code' => $groupCode, 'type' => 'select', 'sort_order' => max(0, $attribute['sort_order'] ?? 0), 'payload' => $this->json(['source' => 'herrera-opencart'])], $attribute);
-            DB::table('catalog_attribute_group_translations')->updateOrInsert(['attribute_group_id' => $group, 'locale' => $this->locale($row['language_id'])], ['name' => $groupName, 'created_at' => now(), 'updated_at' => now()]);
+            $this->sourceEdge('catalog_attribute_group_translations', ['attribute_group_id' => $group, 'locale' => $this->locale($row['language_id'])], ['name' => $groupName, 'created_at' => now(), 'updated_at' => now()], isset($this->newMappings['attribute_group'][(string) $row['attribute_id']]));
             $valueKey = $row['attribute_id'].':'.hash('sha256', trim($row['text']));
             $value = $this->mapped('attribute_value', $valueKey, 'catalog_attributes', ['attribute_group_id' => $group, 'code' => 'herrera-oc-attr-'.hash('sha256', $valueKey), 'group_code' => $groupCode, 'type' => 'select', 'is_active' => true, 'sort_order' => max(0, $attribute['sort_order'] ?? 0), 'payload' => $this->json(['source' => 'herrera-opencart'])], ['key' => $valueKey]);
             $this->translation('catalog_attribute_translations', 'attribute_id', $value, $this->locale($row['language_id']), trim($row['text']) ?: '—', 'attribute_value='.$value, [], ['group_name' => $groupName]);
-            DB::table('catalog_attribute_product')->updateOrInsert(['product_id' => $id, 'attribute_id' => $value], ['sort_order' => max(0, $attribute['sort_order'] ?? 0), 'created_at' => now(), 'updated_at' => now()]);
-            DB::table('catalog_product_specifications')->updateOrInsert(['product_id' => $id, 'source' => 'herrera-opencart', 'source_key' => $key], [
+            $this->sourceEdge('catalog_attribute_product', ['product_id' => $id, 'attribute_id' => $value], ['sort_order' => max(0, $attribute['sort_order'] ?? 0), 'created_at' => now(), 'updated_at' => now()], isset($this->newMappings['attribute_value'][$valueKey]) || isset($this->newMappings['product'][(string) $row['product_id']]));
+            $this->sourceEdge('catalog_product_specifications', ['product_id' => $id, 'source' => 'herrera-opencart', 'source_key' => $key], [
                 'group_name' => $groups[$attribute['attribute_group_id'] ?? 0][$row['language_id']] ?? 'Specifikacije',
                 'item_name' => $names[$row['attribute_id']][$row['language_id']] ?? 'Atribut '.$row['attribute_id'],
                 'values' => $this->json([$row['text']]), 'sort_order' => max(0, $attribute['sort_order'] ?? 0), 'payload' => $this->json(['opencart' => $row, 'locale' => $this->locale($row['language_id'])]), 'created_at' => now(), 'updated_at' => now(),
-            ]);
+            ], isset($this->newMappings['product'][(string) $row['product_id']]));
         });
     }
 
@@ -351,6 +577,9 @@ class HerreraOpenCartImportService
             }
         });
         $this->each('option_description', function (array $row): void {
+            if (! $this->definedTranslationLanguage('option_description', $row)) {
+                return;
+            }
             if ($id = $this->id('option', $row['option_id'])) {
                 $this->translation('catalog_option_translations', 'option_id', $id, $this->locale($row['language_id']), $row['name'], 'option_id='.$row['option_id']);
             }
@@ -361,18 +590,21 @@ class HerreraOpenCartImportService
             }
         });
         $this->each('option_value_description', function (array $row): void {
+            if (! $this->definedTranslationLanguage('option_value_description', $row)) {
+                return;
+            }
             if ($id = $this->id('option_value', $row['option_value_id'])) {
                 $this->translation('catalog_option_value_translations', 'option_value_id', $id, $this->locale($row['language_id']), $row['name'], 'option_value_id='.$row['option_value_id']);
             }
         });
         $this->each('product_option', function (array $row): void {
             if (($product = $this->id('product', $row['product_id'])) && ($option = $this->id('option', $row['option_id']))) {
-                DB::table('catalog_option_product')->updateOrInsert(['product_id' => $product, 'option_id' => $option], ['is_required' => (bool) $row['required'], 'sort_order' => 0, 'created_at' => now(), 'updated_at' => now()]);
+                $this->sourceEdge('catalog_option_product', ['product_id' => $product, 'option_id' => $option], ['is_required' => (bool) $row['required'], 'sort_order' => 0, 'created_at' => now(), 'updated_at' => now()], isset($this->newMappings['product'][(string) $row['product_id']]) || isset($this->newMappings['option'][(string) $row['option_id']]));
             }
         });
         $this->each('product_option_value', function (array $row): void {
             if (($product = $this->id('product', $row['product_id'])) && ($value = $this->id('option_value', $row['option_value_id']))) {
-                $base = (float) DB::table('products')->where('id', $product)->value('base_price');
+                $base = $this->finalSync ? (float) ($this->sourceProductBases[(string) $row['product_id']] ?? DB::table('products')->where('id', $product)->value('base_price')) : (float) DB::table('products')->where('id', $product)->value('base_price');
                 $this->mapped('product_option_value', $row['product_option_value_id'], 'catalog_product_option_values', ['product_id' => $product, 'option_value_id' => $value, 'mode' => 'single', 'stock_qty' => $row['quantity'], 'price_override' => $base + ($row['price_prefix'] === '-' ? -1 : 1) * (float) $row['price'], 'combination_hash' => hash('sha256', 'herrera:'.$row['product_option_value_id']), 'is_active' => true, 'payload' => $this->json(['opencart' => $row])], $row);
             }
         });
@@ -423,7 +655,7 @@ class HerreraOpenCartImportService
         });
         $this->each('blog_to_category', function (array $row): void {
             if (($post = $this->id('blog', $row['blog_id'])) && ($category = $this->id('blog_category', $row['blog_category_id']))) {
-                DB::table('content_blog_post_category')->updateOrInsert(['post_id' => $post, 'category_id' => $category], ['sort_order' => 0, 'is_primary' => false, 'created_at' => now(), 'updated_at' => now()]);
+                $this->sourceEdge('content_blog_post_category', ['post_id' => $post, 'category_id' => $category], ['sort_order' => 0, 'is_primary' => false, 'created_at' => now(), 'updated_at' => now()], isset($this->newMappings['blog'][(string) $row['blog_id']]));
             }
         });
         Category::fixTree();
@@ -473,7 +705,32 @@ class HerreraOpenCartImportService
                 $fields['password'] = Hash::make(Str::random(64));
             }
             $id = $this->mapped('customer', $row['customer_id'], 'users', $fields, $safe);
-            LegacyCredential::firstOrCreate(['user_id' => $id], ['legacy_hash' => $row['password'], 'legacy_salt' => $row['salt'], 'enabled' => (bool) $row['status']]);
+            $credential = LegacyCredential::query()->where('user_id', $id)->first();
+            if (! $credential) {
+                if ($this->finalSync && ! $this->ownership->pendingCreatedParentMatches('customer', (string) $row['customer_id'], 'users', $id)) {
+                    // A native reset or deliberate verifier removal must never
+                    // restore the old OpenCart password as a working login.
+                    $this->issue('customer', $row['customer_id'], 'final_sync_missing_legacy_credential', ['fields' => ['legacy_credential'], 'snapshot' => $this->snapshot]);
+                    $this->stats['final_sync_conflicts']++;
+
+                    return;
+                }
+                $credential = LegacyCredential::firstOrCreate(['user_id' => $id], ['legacy_hash' => $row['password'], 'legacy_salt' => $row['salt'], 'enabled' => (bool) $row['status']]);
+            }
+            if ($this->finalSync && ! $credential->retired_at && $credential->enabled
+                && hash_equals($credential->password_fingerprint, hash('sha256', (string) DB::table('users')->where('id', $id)->value('password')))) {
+                if (! $row['status']) {
+                    $credential->update(['enabled' => false]);
+                } elseif (in_array(strlen((string) $row['password']), [32, 40], true) && ctype_xdigit((string) $row['password'])) {
+                    if (! hash_equals((string) $credential->legacy_hash, (string) $row['password']) || (string) $credential->legacy_salt !== (string) $row['salt']) {
+                        $credential->update(['legacy_hash' => $row['password'], 'legacy_salt' => $row['salt']]);
+                        $this->stats['final_sync_legacy_credentials_refreshed']++;
+                    }
+                } else {
+                    $this->issue('customer', $row['customer_id'], 'final_sync_unsupported_password_format');
+                    $this->stats['final_sync_conflicts']++;
+                }
+            }
             $default = $addresses[$row['customer_id']][$row['address_id']] ?? (array_values($addresses[$row['customer_id']] ?? [])[0] ?? []);
             $custom = json_decode($row['custom_field'] ?: '{}', true) ?: [];
             $company = trim((string) ($custom['1'] ?? '')) ?: (trim((string) ($default['company'] ?? '')) ?: trim($row['firstname'].' '.$row['lastname']));
@@ -484,7 +741,13 @@ class HerreraOpenCartImportService
             $this->mapped('profile', $row['customer_id'], 'user_profiles', ['user_id' => $id, 'first_name' => $row['firstname'], 'last_name' => $row['lastname'], 'phone' => $row['telephone'], 'company' => $company, 'oib' => $oib, 'newsletter_opt_in' => (bool) $row['newsletter'], 'payload' => $this->json(['opencart' => $safe])], $safe + ['default_address' => $default]);
             $group = $this->id('customer_group', $row['customer_group_id']);
             if ($group) {
-                DB::table('customer_group_user')->updateOrInsert(['user_id' => $id, 'customer_group_id' => $group], ['created_at' => now(), 'updated_at' => now()]);
+                $newCustomer = isset($this->newMappings['customer'][(string) $row['customer_id']]);
+                if ($this->finalSync) {
+                    $newCustomer = $this->ownership->pendingCreatedParentMatches('customer', (string) $row['customer_id'], 'users', $id)
+                        && ! DB::table('customer_group_user')->where('user_id', $id)->where('customer_group_id', '!=', $group)->exists()
+                        && ! DB::table('b2b_accounts')->where('user_id', $id)->whereNotNull('customer_group_id')->where('customer_group_id', '!=', $group)->exists();
+                }
+                $this->sourceEdge('customer_group_user', ['user_id' => $id, 'customer_group_id' => $group], ['created_at' => now(), 'updated_at' => now()], $newCustomer);
             }
             // The live OpenCart login checks status, not its obsolete approved
             // column. Preserve the actual buying entitlement of existing users.
@@ -499,6 +762,7 @@ class HerreraOpenCartImportService
                 'customer_group_id' => $group, 'requested_customer_group_id' => $group, 'erp_customer_id' => (string) $row['customer_id'], 'requested_at' => $this->date($row['date_added']), 'reviewed_at' => $status === 'approved' ? $this->date($row['date_added']) : null,
                 'payload' => $this->json(['opencart' => ['customer_id' => $row['customer_id'], 'approved' => $row['approved'] ?? 0, 'status' => $row['status'], 'custom_field' => $custom]]),
             ], $safe + ['default_address' => $default]);
+            $this->ownership?->completeCreatedParent('customer', (string) $row['customer_id']);
         });
         foreach ($addresses as $customer => $rows) {
             if (! $user = $this->id('customer', $customer)) {
@@ -517,12 +781,24 @@ class HerreraOpenCartImportService
             throw new RuntimeException('Price catalog migration must be installed before pricing import.');
         }
         $catalog = DB::table('catalog_price_catalogs')->where('source_system', 'herrera-opencart')->where('source_snapshot', $this->snapshot)->first();
+        if ($this->finalSync) {
+            $activeId = DB::table('catalog_price_catalog_state')->where('id', 1)->value('price_catalog_id');
+            $this->stats['final_sync_native_price_rules'] = $activeId ? DB::table('catalog_group_discount_rules')->where('price_catalog_id', $activeId)->count() : 0;
+            $this->stats['final_sync_native_manual_prices'] = $activeId ? DB::table('catalog_price_entries')->where('price_catalog_id', $activeId)->where('source_key', 'like', 'manual%')->count() : 0;
+            if ($catalog && (json_decode($catalog->metadata ?: '{}', true)['import_complete'] ?? false)) {
+                $this->stats['draft_price_catalog_id'] = $catalog->id;
+                $this->stats['price_entries'] = DB::table('catalog_price_entries')->where('price_catalog_id', $catalog->id)->count();
+                $this->stats['price_catalog_unchanged'] = $catalog->id;
+
+                return;
+            }
+        }
         if ($catalog && $catalog->status !== 'draft') {
             $this->stats['price_catalog_unchanged'] = $catalog->id;
 
             return;
         }
-        $catalogId = $catalog?->id ?? DB::table('catalog_price_catalogs')->insertGetId(['name' => 'Herrera OpenCart snapshot', 'status' => 'draft', 'currency_code' => 'EUR', 'source_system' => 'herrera-opencart', 'source_snapshot' => $this->snapshot, 'metadata' => $this->json(['absolute_source_prices' => true, 'source_database' => $this->snapshot, 'import_complete' => false]), 'created_at' => now(), 'updated_at' => now()]);
+        $catalogId = $catalog?->id ?? DB::table('catalog_price_catalogs')->insertGetId(['name' => 'Herrera OpenCart snapshot', 'status' => 'draft', 'currency_code' => 'EUR', 'source_system' => 'herrera-opencart', 'source_snapshot' => $this->snapshot, 'metadata' => $this->json(['absolute_source_prices' => true, 'source_database' => $this->snapshot, 'import_complete' => false] + ($this->finalSync ? ['final_sync' => true] : [])), 'created_at' => now(), 'updated_at' => now()]);
         DB::transaction(function () use ($catalogId): void {
             $catalog = DB::table('catalog_price_catalogs')->where('id', $catalogId)->lockForUpdate()->first();
             if ($catalog->status !== 'draft') {
@@ -562,7 +838,7 @@ class HerreraOpenCartImportService
             $this->flushPrices($buffer);
         }
         $entryCount = DB::table('catalog_price_entries')->where('price_catalog_id', $catalogId)->count();
-        DB::table('catalog_price_catalogs')->where('id', $catalogId)->update(['source_checksum' => hash_final($digest), 'metadata' => $this->json(['absolute_source_prices' => true, 'source_database' => $this->snapshot, 'import_complete' => true, 'import_expected_entries' => $entryCount]), 'updated_at' => now()]);
+        DB::table('catalog_price_catalogs')->where('id', $catalogId)->update(['source_checksum' => hash_final($digest), 'metadata' => $this->json(['absolute_source_prices' => true, 'source_database' => $this->snapshot, 'import_complete' => true, 'import_expected_entries' => $entryCount] + ($this->finalSync ? ['final_sync' => true] : [])), 'updated_at' => now()]);
         $this->stats['draft_price_catalog_id'] = $catalogId;
         $this->stats['price_entries'] = DB::table('catalog_price_entries')->where('price_catalog_id', $catalogId)->count();
     }
@@ -903,6 +1179,11 @@ class HerreraOpenCartImportService
         $this->each('product_related', function (array $row) use (&$related): void {
             $related[$row['product_id']][] = (int) $row['related_id'];
         });
+        if ($this->finalSync && $this->has('product_related')) {
+            foreach ($this->maps['product'] ?? [] as $sourceId => $id) {
+                $related[$sourceId] ??= [];
+            }
+        }
         foreach ($related as $sourceId => $sourceIds) {
             if (! $product = $this->id('product', $sourceId)) {
                 continue;
@@ -911,12 +1192,29 @@ class HerreraOpenCartImportService
             $payload = json_decode(DB::table('products')->where('id', $product)->value('payload') ?: '{}', true);
             $checksum = hash('sha256', $this->json($sourceIds));
             if (($payload['opencart']['related_source_checksum'] ?? null) === $checksum) {
+                $this->ownership?->rememberFields('product_related', (string) $sourceId, ['related_product_ids' => $nativeIds]);
+
                 continue;
             }
-            $payload['related_product_ids'] = $nativeIds;
+            if ($this->finalSync && ! isset($this->newMappings['product'][(string) $sourceId])) {
+                if ($this->ownership->fields('product_related', (string) $sourceId) === null
+                    && array_key_exists('related_product_ids', $payload['opencart'] ?? [])) {
+                    $oldIds = array_values(array_unique(array_filter(array_map(fn ($id) => $this->id('product', $id), $payload['opencart']['related_product_ids']))));
+                    $this->ownership->rememberFields('product_related', (string) $sourceId, ['related_product_ids' => $oldIds]);
+                }
+                $updates = $this->ownership->merge('product_related', (string) $sourceId,
+                    ['related_product_ids' => $payload['related_product_ids'] ?? []], ['related_product_ids' => $nativeIds]);
+                if ($updates === null) {
+                    continue;
+                }
+                $payload['related_product_ids'] = $updates['related_product_ids'] ?? ($payload['related_product_ids'] ?? []);
+            } else {
+                $payload['related_product_ids'] = $nativeIds;
+            }
             $payload['opencart']['related_product_ids'] = $sourceIds;
             $payload['opencart']['related_source_checksum'] = $checksum;
             DB::table('products')->where('id', $product)->update(['payload' => $this->json($payload), 'updated_at' => now()]);
+            $this->ownership?->rememberFields('product_related', (string) $sourceId, ['related_product_ids' => $nativeIds]);
             $this->stats['related_product_associations'] = ($this->stats['related_product_associations'] ?? 0) + count($nativeIds);
         }
         $this->each('customer_wishlist', function (array $row): void {
@@ -948,16 +1246,46 @@ class HerreraOpenCartImportService
         $sourceId = (string) $sourceId;
         $checksum = hash('sha256', $this->json($sourceRow));
         $id = $this->id($entity, $sourceId);
-        if ($id && ($this->checksums[$entity][$sourceId] ?? null) === $checksum) {
+        $unchangedSource = $id && ($this->checksums[$entity][$sourceId] ?? null) === $checksum;
+        if ($this->finalSync && $id && ! DB::table($table)->where('id', $id)->exists()) {
+            if ($entity === 'wishlist') {
+                // A mapped, now-absent favorite is a proven native user removal.
+                // Preserve it rather than restore it from the old storefront.
+                return $id;
+            }
+            throw new RuntimeException('Final sync found a missing native target for an existing import mapping; review is required.');
+        }
+        if ($unchangedSource && (! $this->finalSync || $this->ownership->fields($entity, $sourceId) === null)) {
+            // Replaying the original frozen snapshot establishes exact prior
+            // source values, while preserving every existing native edit.
+            $this->ownership?->rememberFields($entity, $sourceId, $fields);
+
             return $id;
         }
-        $write = function () use ($entity, $sourceId, $table, $fields, $checksum, &$id): void {
+        $written = false;
+        $write = function () use ($entity, $sourceId, $table, $fields, $checksum, &$id, &$written): void {
             if ($id) {
-                DB::table($table)->where('id', $id)->update($fields + ['updated_at' => now()]);
+                $updates = $fields;
+                if ($this->finalSync) {
+                    $current = DB::table($table)->where('id', $id)->lockForUpdate()->first();
+                    $updates = $this->ownership->merge($entity, $sourceId, (array) $current, $fields);
+                    if ($updates === null) {
+                        return;
+                    }
+                }
+                if ($updates !== []) {
+                    DB::table($table)->where('id', $id)->update($updates + ['updated_at' => now()]);
+                }
             } else {
                 $id = DB::table($table)->insertGetId($fields + ['created_at' => now(), 'updated_at' => now()]);
+                $this->newMappings[$entity][$sourceId] = true;
+                if ($this->finalSync && $entity === 'customer') {
+                    $this->ownership->rememberCreatedParent($entity, $sourceId, $table, $id);
+                }
             }
             DB::table('herrera_import_maps')->updateOrInsert(['source' => 'herrera-opencart', 'entity' => $entity, 'source_id' => $sourceId], ['target_id' => $id, 'checksum' => $checksum, 'created_at' => now(), 'updated_at' => now()]);
+            $this->ownership?->rememberFields($entity, $sourceId, $fields);
+            $written = true;
         };
         if ($this->orderChunkMapUndo === null) {
             DB::transaction($write);
@@ -970,11 +1298,22 @@ class HerreraOpenCartImportService
             ];
             $write();
         }
-        $this->maps[$entity][$sourceId] = $id;
-        $this->checksums[$entity][$sourceId] = $checksum;
-        $this->stats[$entity.'_written'] = ($this->stats[$entity.'_written'] ?? 0) + 1;
+        if ($written) {
+            $this->maps[$entity][$sourceId] = $id;
+            $this->checksums[$entity][$sourceId] = $checksum;
+            $this->stats[$entity.'_written'] = ($this->stats[$entity.'_written'] ?? 0) + 1;
+        }
 
         return $id;
+    }
+
+    private function sourceEdge(string $table, array $where, array $fields, bool $allowNew = false): void
+    {
+        if ($this->ownership) {
+            $this->ownership->edge($table, $where, $fields, $this->finalSync, $allowNew);
+        } else {
+            DB::table($table)->updateOrInsert($where, $fields);
+        }
     }
 
     private function translation(string $table, string $foreignKey, int $id, string $locale, string $name, string $query, array $row = [], array $extra = []): void
@@ -1011,6 +1350,19 @@ class HerreraOpenCartImportService
     private function locale(int $id): string
     {
         return $this->locales[$id] ?? 'hr';
+    }
+
+    private function definedTranslationLanguage(string $table, array $row): bool
+    {
+        if (isset($this->locales[(int) $row['language_id']])) {
+            return true;
+        }
+        // OpenCart can retain descriptions for deleted languages. Mapping those
+        // to Croatian would overwrite the real Croatian source translation.
+        $this->issue('source_language', $table.':'.$row['language_id'], 'undefined_source_translation_language');
+        $this->archiveRow($table.'_orphan_language', hash('sha256', $this->json($row)), $row);
+
+        return false;
     }
 
     private function table(string $table): string

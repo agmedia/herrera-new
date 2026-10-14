@@ -31,6 +31,35 @@ return [
 
     'connections' => [
 
+        // Optional local-only administrator for creating disposable rehearsal copies.
+        // Never point this connection at either hosted shop.
+        'herrera_rehearsal_admin' => [
+            'driver' => 'mysql',
+            'host' => env('HERRERA_REHEARSAL_DB_HOST', '127.0.0.1'),
+            'port' => env('HERRERA_REHEARSAL_DB_PORT', env('DB_PORT', '3306')),
+            'database' => env('DB_DATABASE', 'herrera_new_migration'),
+            'username' => env('HERRERA_REHEARSAL_DB_USERNAME', env('DB_USERNAME')),
+            'password' => env('HERRERA_REHEARSAL_DB_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+        ],
+
+        // Original import snapshot used only to establish three-way ownership.
+        'herrera_baseline' => [
+            'driver' => 'mysql',
+            'host' => env('HERRERA_BASELINE_DB_HOST', env('HERRERA_SOURCE_DB_HOST', '127.0.0.1')),
+            'port' => env('HERRERA_BASELINE_DB_PORT', env('DB_PORT', '3306')),
+            'database' => env('HERRERA_BASELINE_DB_DATABASE', 'herrera_live_snapshot_20261006'),
+            'username' => env('HERRERA_BASELINE_DB_USERNAME', env('HERRERA_SOURCE_DB_USERNAME', env('DB_USERNAME'))),
+            'password' => env('HERRERA_BASELINE_DB_PASSWORD', env('HERRERA_SOURCE_DB_PASSWORD', env('DB_PASSWORD', ''))),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+        ],
+
         // This isolated snapshot connection is used exclusively for SELECTs.
         'herrera_source' => [
             'driver' => 'mysql',

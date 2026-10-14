@@ -11,11 +11,11 @@ class CustomerSalesSession extends Model
 {
     protected $table = 'customer_sales_sessions';
 
-    protected $fillable = ['customer_user_id', 'sales_rep_id', 'performed_by_id', 'started_at', 'ended_at', 'outcome', 'order_id'];
+    protected $fillable = ['customer_user_id', 'sales_rep_id', 'performed_by_id', 'started_at', 'ended_at', 'outcome', 'order_id', 'payload'];
 
     protected function casts(): array
     {
-        return ['started_at' => 'datetime', 'ended_at' => 'datetime'];
+        return ['started_at' => 'datetime', 'ended_at' => 'datetime', 'payload' => 'array'];
     }
 
     public function customer(): BelongsTo

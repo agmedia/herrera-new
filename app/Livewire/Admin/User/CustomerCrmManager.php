@@ -70,7 +70,7 @@ class CustomerCrmManager extends Component
         $this->authorizeView();
         $this->validate([
             'dateFrom' => ['nullable', 'date'], 'dateTo' => ['nullable', 'date', ...($this->dateFrom !== '' ? ['after_or_equal:dateFrom'] : [])],
-            'outcome' => ['nullable', 'in:order,quote,nothing,open'], 'source' => ['required', 'in:visits,sessions'],
+            'outcome' => ['nullable', 'in:order,quote,nothing,open,unknown'], 'source' => ['required', 'in:visits,sessions'],
         ]);
         $query = $this->source === 'sessions' ? CustomerSalesSession::query() : CustomerVisit::query();
         $dateColumn = $this->source === 'sessions' ? 'started_at' : 'visited_at';

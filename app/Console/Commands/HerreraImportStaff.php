@@ -10,7 +10,7 @@ use RuntimeException;
 
 class HerreraImportStaff extends Command
 {
-    protected $signature = 'herrera:import-staff {--source-connection=herrera_source} {--prefix=oc_} {--legacy-config= : Verified legacy server configuration} {--include-missing-customers : Import only unmapped assigned customers before staff; requires --apply} {--apply : Apply the validated import; default is dry-run}';
+    protected $signature = 'herrera:import-staff {--source-connection=herrera_source} {--prefix=oc_} {--legacy-config= : Verified legacy server configuration} {--include-missing-customers : Import only unmapped assigned customers before staff; requires --apply} {--apply : Apply the validated import; default is dry-run} {--final-sync : Preserve native staff and assignments; isolated local rehearsal only}';
 
     protected $description = 'Restore Herrera staff, original password compatibility and assigned-customer permissions';
 
@@ -19,6 +19,10 @@ class HerreraImportStaff extends Command
         try {
             if ($this->option('include-missing-customers') && ! $this->option('apply')) {
                 throw new RuntimeException('The assigned-customer prerequisite requires --apply.');
+            }
+            $finalSync = (bool) $this->option('final-sync');
+            if ($finalSync && $this->option('legacy-config')) {
+                throw new RuntimeException('Final staff sync cannot read the live legacy configuration; use an isolated local source snapshot.');
             }
             $connection = (string) $this->option('source-connection');
             if ($path = $this->option('legacy-config')) {
@@ -44,16 +48,19 @@ class HerreraImportStaff extends Command
                 }
             }
             $source = DB::connection($connection);
+            if ($finalSync) {
+                $importer->assertFinalSyncContext($source, (string) $this->option('prefix'));
+            }
             // The source transaction is explicitly read-only, including when using production credentials.
-            if ($source->getDriverName() === 'mysql') {
+            if (in_array($source->getDriverName(), ['mysql', 'mariadb'], true)) {
                 $source->statement('SET TRANSACTION READ ONLY');
             }
             $source->beginTransaction();
             try {
                 $report = $this->option('apply') && $this->option('include-missing-customers')
                     ? DB::transaction(fn (): array => $customers->importMissingAssignedCustomers($connection, (string) $this->option('prefix'))
-                        + $importer->import($source, (string) $this->option('prefix'), true))
-                    : $importer->import($source, (string) $this->option('prefix'), (bool) $this->option('apply'));
+                        + $importer->import($source, (string) $this->option('prefix'), true, $finalSync))
+                    : $importer->import($source, (string) $this->option('prefix'), (bool) $this->option('apply'), $finalSync);
             } finally {
                 $source->rollBack();
             }
@@ -61,7 +68,7 @@ class HerreraImportStaff extends Command
                 $this->line($key.': '.$value);
             }
 
-            return self::SUCCESS;
+            return $finalSync && ($report['conflicts'] ?? 0) > 0 ? self::FAILURE : self::SUCCESS;
         } catch (RuntimeException $e) {
             // Connection/query exceptions can include credentials or source SQL; do not print those.
             $this->error($e instanceof \Illuminate\Database\QueryException || $e instanceof \PDOException

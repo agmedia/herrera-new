@@ -14,8 +14,13 @@ use Silber\Bouncer\BouncerFacade as Bouncer;
 /** Imports staff separately from storefront customers, using SELECTs on the source. */
 class HerreraStaffImportService
 {
-    public function import(ConnectionInterface $source, string $prefix = 'oc_', bool $apply = false): array
+    public function import(ConnectionInterface $source, string $prefix = 'oc_', bool $apply = false, bool $finalSync = false): array
     {
+        if ($finalSync) {
+            $this->assertFinalSyncContext($source, $prefix);
+
+            return app(HerreraStaffFinalSync::class)->import($source, $prefix, $apply);
+        }
         $this->guard($source, $prefix);
         $groups = $source->table($prefix.'user_group')->get()->keyBy('user_group_id');
         $rows = $source->table($prefix.'user')->orderBy('user_id')->get();
@@ -113,14 +118,16 @@ class HerreraStaffImportService
                 }
             }
             $customerIds = [];
+            $sourceCustomerIds = [];
             foreach ($assignments->where('user_id', $row->user_id) as $assignment) {
                 $target = $customerMap->get((string) $assignment->customer_id);
                 if (! $target || ! User::whereKey($target)->where('account_type', 'customer')->exists()) {
                     throw new RuntimeException('An assigned source customer has no verified destination mapping.');
                 }
                 $customerIds[] = (int) $target;
+                $sourceCustomerIds[] = (int) $assignment->customer_id;
             }
-            $plan[] = compact('row', 'role', 'username', 'email', 'candidate', 'permissions', 'customerIds');
+            $plan[] = compact('row', 'role', 'username', 'email', 'candidate', 'permissions', 'customerIds', 'sourceCustomerIds');
         }
 
         $report = ['mode' => $apply ? 'apply' : 'dry-run', 'staff' => count($plan), 'administrators' => 0,
@@ -171,7 +178,8 @@ class HerreraStaffImportService
                 $profile = $user->profile()->firstOrNew();
                 $payload = (array) ($profile->payload ?? []);
                 $payload['legacy_admin'] = ['source_id' => (int) $row->user_id, 'source_group_id' => (int) $row->user_group_id,
-                    'username' => $item['username'], 'permissions' => $item['permissions'], 'source_database' => $source->getDatabaseName()];
+                    'username' => $item['username'], 'permissions' => $item['permissions'], 'source_database' => $source->getDatabaseName(),
+                    'assignment_baseline' => ['version' => 1, 'source_customer_ids' => array_values(array_unique($item['sourceCustomerIds'])), 'removed_source_customer_ids' => []]];
                 $profile->forceFill(['first_name' => $row->firstname, 'last_name' => $row->lastname, 'payload' => $payload])->save();
                 DB::table('herrera_import_maps')->updateOrInsert(['source' => 'herrera-opencart', 'entity' => 'admin_user', 'source_id' => (string) $row->user_id],
                     ['target_id' => $user->id, 'checksum' => hash('sha256', json_encode([$item['username'], $item['email'], $row->status, $role, $item['permissions'], $item['customerIds']])), 'created_at' => now(), 'updated_at' => now()]);
@@ -184,6 +192,21 @@ class HerreraStaffImportService
         Bouncer::refresh();
 
         return $report;
+    }
+
+    public function assertFinalSyncContext(ConnectionInterface $source, string $prefix = 'oc_'): void
+    {
+        if (! app()->environment(['local', 'testing'])) {
+            throw new RuntimeException('Final staff sync is restricted to an isolated local rehearsal.');
+        }
+        foreach ([$source, DB::connection()] as $connection) {
+            HerreraCutoverSafety::assertNoSplitConnection($connection->getConfig());
+            if (in_array($connection->getDriverName(), ['mysql', 'mariadb', 'pgsql', 'sqlsrv'], true)
+                && ! in_array($connection->getConfig('host'), ['127.0.0.1', 'localhost', '::1'], true)) {
+                throw new RuntimeException('Final staff sync requires isolated local source and destination databases.');
+            }
+        }
+        $this->guard($source, $prefix, finalSync: true);
     }
 
     private function ensureRole(string $name, string $title, array $abilities): void
@@ -203,14 +226,15 @@ class HerreraStaffImportService
         }
     }
 
-    private function guard(ConnectionInterface $source, string $prefix): void
+    private function guard(ConnectionInterface $source, string $prefix, bool $finalSync = false): void
     {
         if (! preg_match('/^[a-zA-Z0-9_]+$/', $prefix) || $source === DB::connection()
             || $source->getDatabaseName() === DB::connection()->getDatabaseName()) {
             throw new RuntimeException('Staff source and destination must be separate verified databases.');
         }
         if (! app()->environment('testing') && ! (
-            (app()->environment('local') && DB::connection()->getDatabaseName() === 'herrera_new_migration')
+            (app()->environment('local') && (DB::connection()->getDatabaseName() === 'herrera_new_migration'
+                || ($finalSync && preg_match('/\Aherrera_rehearsal_target_[0-9]{8}_[0-9]{6}_[a-f0-9]{4}\z/', DB::connection()->getDatabaseName()) === 1)))
             || (app()->environment('staging') && DB::connection()->getDatabaseName() === 'herrera_redesign'
                 && rtrim(config('app.url'), '/') === 'https://herrera.herrera.hr')
         )) {

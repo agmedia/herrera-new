@@ -5,8 +5,10 @@ namespace App\Console\Commands;
 use App\Models\Catalog\Pricing\PriceCatalog;
 use App\Models\Catalog\Product\Product;
 use App\Models\User;
+use App\Services\Pricing\B2BAccessService;
 use App\Services\Pricing\PriceCatalogResolver;
 use Brick\Math\BigDecimal;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Query\Builder;
@@ -16,7 +18,7 @@ use RuntimeException;
 /** Select-only migration gate. No customer identifiers or contract amounts are printed. */
 class HerreraPricingAudit extends Command
 {
-    protected $signature = 'herrera:audit-pricing {--source-connection=herrera_source} {--prefix=oc_} {--catalog= : Original imported catalog ID; defaults to the first catalog for this snapshot} {--samples=200 : Effective-price sample limit, between 1 and 2000}';
+    protected $signature = 'herrera:audit-pricing {--source-connection=herrera_source} {--prefix=oc_} {--catalog= : Original imported catalog ID; defaults to the first catalog for this snapshot} {--samples=200 : Effective-price sample limit, between 1 and 2000} {--cover-groups : Add bounded checks for every usable mapped group and scheduled/quantity boundaries}';
 
     protected $description = 'Read-only local Herrera audit of all source prices and a bounded legacy effective-price sample';
 
@@ -29,6 +31,8 @@ class HerreraPricingAudit extends Command
     private array $counts = [];
 
     private array $errors = [];
+
+    protected const MAX_EFFECTIVE_SCENARIOS = 4000;
 
     private const DEFINITIONS = [
         'product' => ['base', null, null],
@@ -50,6 +54,7 @@ class HerreraPricingAudit extends Command
                 throw new RuntimeException('Pricing import is incomplete. Wait for it to finish before auditing.');
             }
             $this->loadMaps();
+            $this->auditUnsupportedPriceScopes();
             $before = $this->catalogFingerprint($catalog);
             $digest = hash_init('sha256');
             foreach (self::DEFINITIONS as $table => [$kind, $groupKey, $customerKey]) {
@@ -63,7 +68,10 @@ class HerreraPricingAudit extends Command
             $this->countError('native_count_mismatch', $nativeCount !== ($this->counts['source_valid_entries'] ?? 0));
             $this->countError('metadata_count_mismatch', (int) ($catalog->metadata['import_expected_entries'] ?? -1) !== $nativeCount);
             $this->countError('currency_mismatch', $catalog->currency_code !== 'EUR');
-            $this->auditEffectiveSamples($catalog, $resolver);
+            $sampleContext = $this->auditEffectiveSamples($catalog, $resolver);
+            if ($this->option('cover-groups')) {
+                $this->auditGroupCoverage($catalog, $resolver, $sampleContext);
+            }
             $this->countError('catalog_changed_during_audit', $before !== $this->catalogFingerprint($catalog->fresh()));
 
             $this->table(['Aggregate check', 'Count'], collect($this->counts + $this->errors)->map(fn ($value, $key) => [$key, $value])->all());
@@ -72,8 +80,13 @@ class HerreraPricingAudit extends Command
 
                 return self::FAILURE;
             }
-            $this->info('PASS: all stored source prices match; the bounded effective-price sample matches the legacy algorithm. No data was changed.');
-            $this->line('Effective combinations are sampled, not exhaustively enumerated. Taxes, order history, SEO and media require their separate audits.');
+            $this->info('PASS: supported charged-price tables match; the bounded effective-price sample matches the legacy algorithm. No data was changed.');
+            $this->line($this->counts['reference_rows'] > 0
+                ? 'Reference-price display is outside this parity proof. Archived anchor rows are present; both source display features are verified disabled.'
+                : 'Reference-price display is outside this parity proof. No source anchor rows are present.');
+            $this->line($this->option('cover-groups')
+                ? 'Every usable mapped group is covered; scheduled and quantity boundaries use bounded representative rows, not every effective combination. Groups without usable accounts are reported separately.'
+                : 'Effective combinations are sampled, not exhaustively enumerated. Taxes, order history, SEO and media require their separate audits.');
 
             return self::SUCCESS;
         } catch (\Throwable $exception) {
@@ -101,6 +114,7 @@ class HerreraPricingAudit extends Command
         $target = DB::connection();
         $this->source = DB::connection((string) $this->option('source-connection'));
         foreach ([$target, $this->source] as $connection) {
+            \App\Services\Import\HerreraCutoverSafety::assertNoSplitConnection($connection->getConfig());
             if (in_array($connection->getDriverName(), ['mysql', 'mariadb'], true)
                 && ! in_array($connection->getConfig('host'), ['127.0.0.1', 'localhost', '::1'], true)) {
                 throw new RuntimeException('Only isolated local database connections are permitted.');
@@ -113,7 +127,8 @@ class HerreraPricingAudit extends Command
             && ! ($target->getDriverName() === 'sqlite' && $target->getDatabaseName() === ':memory:'))) {
             throw new RuntimeException('Source and target must be separate databases.');
         }
-        if (app()->environment('local') && $target->getDatabaseName() !== 'herrera_new_migration') {
+        if (app()->environment('local') && $target->getDatabaseName() !== 'herrera_new_migration'
+            && ! \App\Services\Import\HerreraCutoverSafety::rehearsalDatabase($target->getDatabaseName())) {
             throw new RuntimeException('Local audit target must be herrera_new_migration.');
         }
         foreach ([...array_keys(self::DEFINITIONS), 'customer'] as $table) {
@@ -138,6 +153,36 @@ class HerreraPricingAudit extends Command
             ->whereIn('entity', ['product', 'customer_group', 'customer'])->get(['entity', 'source_id', 'target_id']) as $map) {
             $this->maps[$map->entity][(string) $map->source_id] = (int) $map->target_id;
         }
+    }
+
+    private function auditUnsupportedPriceScopes(): void
+    {
+        $schema = $this->source->getSchemaBuilder();
+        $unsupported = 0;
+        foreach (['product_option_price_by_cigroup', 'product_customergroup_price'] as $table) {
+            $rows = $schema->hasTable($this->prefix.$table) ? $this->source->table($this->prefix.$table)->count() : 0;
+            $this->counts['unsupported_'.$table.'_rows'] = $rows;
+            $unsupported += $rows;
+        }
+        $this->countError('unsupported_charged_price_scope', $unsupported > 0);
+        $this->counts['reference_rows'] = $schema->hasTable($this->prefix.'product_anchor_price')
+            ? $this->source->table($this->prefix.'product_anchor_price')->count() : 0;
+        $settingsAvailable = $schema->hasTable($this->prefix.'setting') && $schema->hasColumns($this->prefix.'setting', ['store_id', 'key', 'value']);
+        $unavailable = 0;
+        $enabled = false;
+        foreach (['module_anchor_price_status', 'module_digital_pricelist_status'] as $key) {
+            $values = $settingsAvailable
+                ? $this->source->table($this->prefix.'setting')->where('store_id', 0)->where('key', $key)->pluck('value')
+                : collect();
+            $value = $values->count() === 1 ? trim((string) $values->first()) : '';
+            $verified = in_array($value, ['0', '1'], true);
+            $this->counts[$key] = $verified ? (int) $value : -1;
+            $unavailable += (int) ! $verified;
+            $enabled = $enabled || ($verified && $value === '1');
+        }
+        $this->counts['reference_display_flags_unavailable'] = $unavailable;
+        $this->counts['reference_display_unverified_rows'] = $this->counts['reference_rows'];
+        $this->countError('unsupported_active_reference_display', $this->counts['reference_rows'] > 0 && ($enabled || $unavailable > 0));
     }
 
     private function auditSourceTable(PriceCatalog $catalog, string $table, string $kind, ?string $groupKey, ?string $customerKey, $digest): void
@@ -223,7 +268,7 @@ class HerreraPricingAudit extends Command
         }
     }
 
-    private function auditEffectiveSamples(PriceCatalog $catalog, PriceCatalogResolver $resolver): void
+    private function auditEffectiveSamples(PriceCatalog $catalog, PriceCatalogResolver $resolver): array
     {
         $maximum = (int) $this->option('samples');
         $sourceCustomers = $this->source->table($this->prefix.'customer')->get(['customer_id', 'customer_group_id', 'status'])->keyBy('customer_id');
@@ -279,6 +324,183 @@ class HerreraPricingAudit extends Command
         $this->counts['effective_samples_checked'] = count($checked);
         $this->counts['approved_source_accounts_available'] = count($eligible);
         $this->countError('effective_sample_unavailable', $checked === []);
+
+        return compact('eligible', 'reverseProducts', 'at');
+    }
+
+    /** Select-only supplement. No synthetic customer identities or account changes are needed. */
+    private function auditGroupCoverage(PriceCatalog $catalog, PriceCatalogResolver $resolver, array $context): void
+    {
+        $metrics = [
+            'coverage_enabled', 'coverage_mapped_groups', 'coverage_groups_with_usable_accounts', 'coverage_groups_without_usable_accounts',
+            'coverage_groups_checked', 'coverage_groups_without_mapped_products', 'coverage_scenarios_planned', 'coverage_scenarios_checked',
+            'coverage_scenarios_unchecked', 'coverage_date_boundaries_checked', 'coverage_quantity_boundaries_checked',
+            'coverage_groups_with_group_prices', 'coverage_groups_with_special_prices', 'coverage_groups_with_quantity_prices',
+            'coverage_group_price_groups_checked', 'coverage_special_groups_checked', 'coverage_quantity_groups_checked',
+            'coverage_groups_without_group_prices', 'coverage_groups_without_special_prices', 'coverage_groups_without_quantity_prices',
+            'coverage_special_rows_sampled', 'coverage_quantity_rows_sampled',
+        ];
+        foreach ($metrics as $metric) {
+            $this->counts[$metric] = 0;
+        }
+        $this->counts['coverage_enabled'] = 1;
+        $this->counts['effective_scenario_limit'] = static::MAX_EFFECTIVE_SCENARIOS;
+        $at = CarbonImmutable::parse($context['at']);
+        $users = User::query()->with('b2bAccount.customerGroup')->whereIn('id', array_keys($context['eligible']))->orderBy('id')->get()->keyBy('id');
+        $bySourceGroup = [];
+        foreach ($users as $userId => $user) {
+            $sourceCustomer = $context['eligible'][$userId];
+            if ($user && app(B2BAccessService::class)->approvedAccount($user)) {
+                $bySourceGroup[(int) $sourceCustomer->customer_group_id] ??= $user;
+            }
+        }
+        $products = Product::query()->whereIn('id', array_values($this->maps['product'] ?? []))->orderBy('id')->get()->keyBy('id');
+        $sourceProductIds = array_flip($this->maps['product'] ?? []);
+        $firstProduct = $products->first();
+        $groups = [];
+        $mappedGroups = $this->maps['customer_group'] ?? [];
+        ksort($mappedGroups, SORT_NUMERIC);
+        foreach ($mappedGroups as $sourceGroupId => $targetGroupId) {
+            $this->counts['coverage_mapped_groups']++;
+            $user = $bySourceGroup[(int) $sourceGroupId] ?? null;
+            if (! $user) {
+                $this->counts['coverage_groups_without_usable_accounts']++;
+
+                continue;
+            }
+            $this->counts['coverage_groups_with_usable_accounts']++;
+            if (! $firstProduct) {
+                $this->counts['coverage_groups_without_mapped_products']++;
+
+                continue;
+            }
+            $rows = [];
+            foreach (['group' => ['product_price_by_cigroup', 'group_id', 'product_id'], 'special' => ['product_special', 'customer_group_id', 'product_special_id'], 'quantity' => ['product_discount', 'customer_group_id', 'product_discount_id']] as $kind => [$table, $column, $order]) {
+                $representatives = [];
+                foreach ($this->source->table($this->prefix.$table)->where($column, $sourceGroupId)->orderBy($order)->cursor() as $record) {
+                    $targetProductId = $this->maps['product'][(string) $record->product_id] ?? null;
+                    if (! $targetProductId || ! $products->has($targetProductId)) {
+                        continue;
+                    }
+                    $stratum = $kind === 'group' ? 'group' : $this->scheduleStratum((array) $record, $at);
+                    $representatives[$stratum] ??= (array) $record;
+                    if ($kind === 'group' || count($representatives) === 4) {
+                        break;
+                    }
+                }
+                $rows[$kind] = array_values($representatives);
+                $this->counts['coverage_groups_'.($representatives ? 'with_' : 'without_').$kind.'_prices']++;
+                if ($kind !== 'group') {
+                    $this->counts['coverage_'.$kind.'_rows_sampled'] += count($representatives);
+                }
+            }
+            $groups[] = compact('sourceGroupId', 'user', 'rows') + ['sourceCustomer' => $context['eligible'][$user->id]];
+        }
+        $seen = $planned = $checkedGroups = $checkedKinds = [];
+        $check = function (array $group, array $row, int $quantity, string $time, string $origin, string $boundary = '') use ($catalog, $resolver, $products, $sourceProductIds, &$seen, &$planned, &$checkedGroups, &$checkedKinds): void {
+            $productId = $this->maps['product'][(string) $row['product_id']] ?? null;
+            $product = $productId ? $products->get($productId) : null;
+            if (! $product) {
+                return;
+            }
+            $key = $group['user']->id.':'.$productId.':'.$quantity.':'.$time;
+            if (! isset($planned[$key])) {
+                $planned[$key] = true;
+                $this->counts['coverage_scenarios_planned']++;
+            }
+            if (! isset($seen[$key])) {
+                if (($this->counts['effective_samples_checked'] ?? 0) + $this->counts['coverage_scenarios_checked'] >= static::MAX_EFFECTIVE_SCENARIOS) {
+                    return;
+                }
+                $sourceCustomer = $group['sourceCustomer'];
+                if (! $sourceCustomer) {
+                    return;
+                }
+                $expected = $this->legacyPrice((int) $sourceProductIds[$productId], (int) $sourceCustomer->customer_id, (int) $group['sourceGroupId'], $quantity, $time);
+                $actual = $resolver->resolve($product, $group['user'], $quantity, catalog: $catalog, at: $time);
+                $this->countError('coverage_effective_price_mismatch', ! $actual || $this->decimal(number_format($actual->price, 4, '.', '')) !== $this->decimal($expected['price']) || $actual->source_type !== 'price_catalog_'.$expected['kind']);
+                $this->counts['coverage_effective_source_'.$expected['kind']] = ($this->counts['coverage_effective_source_'.$expected['kind']] ?? 0) + 1;
+                $seen[$key] = true;
+                $this->counts['coverage_scenarios_checked']++;
+            }
+            $checkedGroups[(int) $group['sourceGroupId']] = true;
+            if ($origin !== 'base') {
+                $checkedKinds[$origin][(int) $group['sourceGroupId']] = true;
+            }
+            if ($boundary !== '' && ! isset($seen[$key.':'.$boundary])) {
+                $seen[$key.':'.$boundary] = true;
+                $this->counts['coverage_'.$boundary.'_boundaries_checked']++;
+            }
+        };
+        // Reserve one applicable scenario for each group and kind before spending the budget on boundaries.
+        foreach ($groups as $group) {
+            $check($group, ['product_id' => $sourceProductIds[$firstProduct->id]], 1, $context['at'], 'base');
+            foreach ($group['rows'] as $kind => $rows) {
+                if ($row = $rows[0] ?? null) {
+                    $quantity = max(1, (int) ($row['quantity'] ?? 1));
+                    $check($group, $row, $quantity, $this->interiorTime($row, $at), $kind);
+                }
+            }
+        }
+        foreach ($groups as $group) {
+            foreach (['special', 'quantity'] as $kind) {
+                foreach ($group['rows'][$kind] as $row) {
+                    $threshold = max(1, (int) ($row['quantity'] ?? 1));
+                    $interior = $this->interiorTime($row, $at);
+                    $check($group, $row, $threshold, $context['at'], $kind);
+                    foreach (array_unique([max(1, $threshold - 1), $threshold, $threshold + 1]) as $quantity) {
+                        $check($group, $row, $quantity, $interior, $kind, 'quantity');
+                    }
+                    foreach (['date_start', 'date_end'] as $column) {
+                        if ($date = $this->sourcePriceDate($row[$column] ?? null)) {
+                            foreach ([-1, 0, 1] as $offset) {
+                                $check($group, $row, $threshold, CarbonImmutable::parse($date)->addSeconds($offset)->format('Y-m-d H:i:s'), $kind, 'date');
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        $this->counts['coverage_groups_checked'] = count($checkedGroups);
+        foreach (['group', 'special', 'quantity'] as $kind) {
+            $this->counts[$kind === 'group' ? 'coverage_group_price_groups_checked' : 'coverage_'.$kind.'_groups_checked'] = count($checkedKinds[$kind] ?? []);
+        }
+        $this->counts['coverage_scenarios_unchecked'] = $this->counts['coverage_scenarios_planned'] - $this->counts['coverage_scenarios_checked'];
+        $this->counts['effective_scenarios_total'] = ($this->counts['effective_samples_checked'] ?? 0) + $this->counts['coverage_scenarios_checked'];
+        $this->countError('coverage_limit_exceeded', $this->counts['coverage_scenarios_unchecked'] > 0);
+        $this->countError('coverage_usable_group_unchecked', count($checkedGroups) !== $this->counts['coverage_groups_with_usable_accounts']);
+    }
+
+    private function sourcePriceDate(?string $date): ?string
+    {
+        // Legacy predicates exempt only the zero date; native import normalization must not define the oracle.
+        if (! $date || str_starts_with($date, '0000-')) {
+            return null;
+        }
+
+        return strlen($date) === 10 ? $date.' 00:00:00' : $date;
+    }
+
+    private function scheduleStratum(array $row, CarbonImmutable $at): string
+    {
+        $start = $this->sourcePriceDate($row['date_start'] ?? null);
+        $end = $this->sourcePriceDate($row['date_end'] ?? null);
+        if (! $start && ! $end) {
+            return 'unbounded';
+        }
+        if ($start && CarbonImmutable::parse($start)->gte($at)) {
+            return 'future';
+        }
+
+        return $end && CarbonImmutable::parse($end)->lte($at) ? 'expired' : 'active';
+    }
+
+    private function interiorTime(array $row, CarbonImmutable $at): string
+    {
+        $start = $this->sourcePriceDate($row['date_start'] ?? null);
+        $end = $this->sourcePriceDate($row['date_end'] ?? null);
+
+        return ($start ? CarbonImmutable::parse($start)->addSecond() : ($end ? CarbonImmutable::parse($end)->subSecond() : $at))->format('Y-m-d H:i:s');
     }
 
     /** Read the old algorithm independently from source tables, never from the copied payload. */
@@ -289,8 +511,8 @@ class HerreraPricingAudit extends Command
         foreach ([
             ['product_price_by_cigroup', 'group', fn (Builder $q) => $q->where('group_id', $groupId)],
             ['product_price_by_customer_id', 'customer', fn (Builder $q) => $q->where('customer_id', $customerId)],
-            ['product_discount', 'quantity', fn (Builder $q) => $this->activeLegacy($q, $at)->where('customer_group_id', $groupId)->where('quantity', '<=', $quantity)->orderByDesc('quantity')->orderBy('priority')->orderBy('price')],
-            ['product_special', 'special', fn (Builder $q) => $this->activeLegacy($q, $at)->where('customer_group_id', $groupId)->orderBy('priority')->orderBy('price')],
+            ['product_discount', 'quantity', fn (Builder $q) => $this->legacyQuantity($q, $groupId, $quantity, $at)],
+            ['product_special', 'special', fn (Builder $q) => $this->legacyPriority($this->activeLegacy($q, $at)->where('customer_group_id', $groupId))],
         ] as [$table, $kind, $scope]) {
             $row = $scope($this->source->table($this->prefix.$table)->where('product_id', $productId))->first(['price']);
             if ($row) {
@@ -301,8 +523,31 @@ class HerreraPricingAudit extends Command
         return $result;
     }
 
+    private function legacyQuantity(Builder $query, int $groupId, int $quantity, string $at): Builder
+    {
+        $query = $this->activeLegacy($query, $at)->where('customer_group_id', $groupId);
+        $query = $this->source->getDriverName() === 'sqlite'
+            ? $query->whereRaw('CAST(quantity AS INTEGER) <= ?', [$quantity])->orderByRaw('CAST(quantity AS INTEGER) DESC')
+            : $query->where('quantity', '<=', $quantity)->orderByDesc('quantity');
+
+        return $this->legacyPriority($query);
+    }
+
+    private function legacyPriority(Builder $query): Builder
+    {
+        return $this->source->getDriverName() === 'sqlite'
+            ? $query->orderByRaw('CAST(priority AS INTEGER)')->orderByRaw('CAST(price AS NUMERIC)')
+            : $query->orderBy('priority')->orderBy('price');
+    }
+
     private function activeLegacy(Builder $query, string $at): Builder
     {
+        // SQLite test snapshots store DATE values as text; normalize midnight to match real MySQL DATE comparisons.
+        if ($this->source->getDriverName() === 'sqlite') {
+            return $query->where(fn (Builder $q) => $q->where('date_start', '0000-00-00')->orWhereRaw("(CASE WHEN LENGTH(date_start) = 10 THEN date_start || ' 00:00:00' ELSE date_start END) < ?", [$at]))
+                ->where(fn (Builder $q) => $q->where('date_end', '0000-00-00')->orWhereRaw("(CASE WHEN LENGTH(date_end) = 10 THEN date_end || ' 00:00:00' ELSE date_end END) > ?", [$at]));
+        }
+
         return $query->where(fn (Builder $q) => $q->where('date_start', '0000-00-00')->orWhere('date_start', '<', $at))
             ->where(fn (Builder $q) => $q->where('date_end', '0000-00-00')->orWhere('date_end', '>', $at));
     }

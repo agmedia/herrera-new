@@ -63,6 +63,9 @@
                         <option value="open">
                             {{ __('Bez zabilježenog završetka') }}
                         </option>
+                        <option value="unknown">
+                            {{ __('Nepotvrđen ishod') }}
+                        </option>
                     @endif
                     <option value="nothing">
                         {{ __('Bez narudžbe / ponude') }}
@@ -97,6 +100,7 @@
                             {{ __('Bez ishoda') }}: {{ $totals->where('outcome', 'nothing')->sum('total') }}
                             @if ($source === 'sessions')
                                 · {{ __('Bez završetka') }}: {{ $totals->where('outcome', 'open')->sum('total') }}
+                                · {{ __('Nepotvrđen ishod') }}: {{ $totals->where('outcome', 'unknown')->sum('total') }}
                             @endif
                         </div>
                     </div>
@@ -232,7 +236,7 @@
                             @endif
                         </td>
                         <td class="px-3 py-3">
-                            {{ __(['order' => 'Narudžba', 'quote' => 'Ponuda', 'nothing' => 'Bez narudžbe / ponude', 'open' => 'Bez zabilježenog završetka'][$row->outcome] ?? $row->outcome) }}
+                            {{ __(['order' => 'Narudžba', 'quote' => 'Ponuda', 'nothing' => 'Bez narudžbe / ponude', 'open' => 'Bez zabilježenog završetka', 'unknown' => 'Nepotvrđen ishod'][$row->outcome] ?? $row->outcome) }}
                             @if ($row->order && (auth()->user()->isA('superadmin') || auth()->user()->can('sales.orders.view')))
                                 <a class="mt-1 block text-xs text-cyan-700" href="{{ route('admin.orders.show', $row->order) }}">
                                     {{ $row->order->order_number }}
@@ -249,6 +253,11 @@
                                 {{ $row->note }}
                             @else
                                 {{ $row->ended_at ? $row->ended_at->format('d.m.Y. H:i') : __('Sesija nije završena') }}
+                                @if (is_string(data_get($row->payload, 'opencart.napomena')) && data_get($row->payload, 'opencart.napomena') !== '')
+                                    <div class="mt-1 text-xs text-slate-500">
+                                        {{ data_get($row->payload, 'opencart.napomena') }}
+                                    </div>
+                                @endif
                             @endif
                         </td>
                     </tr>

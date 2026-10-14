@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="light">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    @include('front.partials.storefront-theme-head')
     @include('front.partials.seo-meta')
     @include('front.partials.schema-markup')
     @include('front.partials.analytics')
@@ -62,6 +63,7 @@
         <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-typography.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-typography.css')) }}-{{ $storefrontAssetVersion }}">
         <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-surfaces.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-surfaces.css')) }}-{{ $storefrontAssetVersion }}">
     @endif
+    <link rel="stylesheet" href="{{ asset('front-theme/styles/storefront-theme.css') }}?v={{ filemtime(public_path('front-theme/styles/storefront-theme.css')) }}-{{ $storefrontAssetVersion }}">
 </head>
 @php
     $cartService = app(\App\Services\Front\CartService::class);
@@ -74,6 +76,9 @@
     $storeBrandName = trim((string) (($storeSettings['branding']['store_name'] ?? null) ?: config('app.name', 'AG Shop')));
     $herreraStorefront = str_contains(strtolower($storeBrandName), 'herrera');
     $storeBrandLogoUrl = trim((string) ($storeSettings['branding']['logo_url'] ?? ''));
+    $storeBrandDarkLogoUrl = $herreraStorefront && parse_url($storeBrandLogoUrl, PHP_URL_PATH) === '/assets/brand/herrera-logo.svg'
+        ? asset('assets/brand/herrera-logo-dark.svg').'?v='.filemtime(public_path('assets/brand/herrera-logo-dark.svg'))
+        : '';
     $storeBrandLogoRawWidth = (int) ($storeSettings['branding']['logo_width'] ?? 0);
     $storeBrandLogoRawHeight = (int) ($storeSettings['branding']['logo_height'] ?? 0);
     $storeBrandLogoWidth = $storeBrandLogoRawWidth > 0 ? $storeBrandLogoRawWidth : 176;
@@ -185,7 +190,10 @@
         <div class="site-main-header-row {{ $herreraStorefront ? 'herrera-header-layout herrera-layout-container' : '' }} storefront-header-container relative mx-auto flex h-[60px] w-full items-stretch justify-between px-2 sm:px-4 lg:px-0" @if ($herreraStorefront) data-herrera-header @endif>
             <a href="{{ route('home') }}" class="responsive-header-brand inline-flex h-full shrink-0 items-center pr-4 text-2xl font-black tracking-tight text-slate-900 sm:text-4xl lg:w-[230px] lg:px-6">
                 @if ($storeBrandLogoUrl !== '')
-                    <img src="{{ $storeBrandLogoUrl }}" alt="{{ $storeBrandName }}" class="site-main-logo h-10 w-auto object-contain" width="{{ $storeBrandLogoWidth }}" height="{{ $storeBrandLogoHeight }}" data-store-brand-logo>
+                    <img src="{{ $storeBrandLogoUrl }}" alt="{{ $storeBrandName }}" class="site-main-logo h-10 w-auto object-contain" width="{{ $storeBrandLogoWidth }}" height="{{ $storeBrandLogoHeight }}" data-store-brand-logo @if ($storeBrandDarkLogoUrl !== '') data-store-brand-logo-light @endif>
+                    @if ($storeBrandDarkLogoUrl !== '')
+                        <img src="{{ $storeBrandDarkLogoUrl }}" alt="{{ $storeBrandName }}" class="site-main-logo h-10 w-auto object-contain" width="{{ $storeBrandLogoWidth }}" height="{{ $storeBrandLogoHeight }}" data-store-brand-logo-dark>
+                    @endif
                 @else
                     {{ $storeBrandName }}
                 @endif
@@ -299,6 +307,7 @@
                     </div>
                 @endif
 
+                <x-front.storefront-theme-toggle />
                 @auth
                     <a href="{{ route('account.dashboard') }}" class="inline-flex min-w-[136px] items-center justify-center gap-2 border-r border-slate-200 px-4 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-black">
                         <x-fa-icon :inline="$herreraStorefront" name="user" style="regular" class="h-5 w-5" />
@@ -353,6 +362,7 @@
                         <x-fa-icon :inline="$herreraStorefront" name="magnifying-glass" class="h-5 w-5" />
                     </button>
                 @endif
+                <x-front.storefront-theme-toggle :mobile="true" />
                 @auth
                     <a href="{{ route('account.dashboard') }}" class="responsive-header-action inline-flex w-12 items-center justify-center border-r border-slate-200 text-slate-700 transition hover:bg-slate-50 hover:text-black sm:w-14 lg:w-16" aria-label="{{ __('ui.front.desktop.account') }}">
                         <x-fa-icon :inline="$herreraStorefront" name="user" style="regular" class="h-5 w-5" />
@@ -813,7 +823,10 @@
     <aside id="mobile-navigation" class="absolute inset-y-0 left-0 flex w-full max-w-none -translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300 ease-out" role="dialog" aria-modal="true" aria-label="{{ __('Izbornik') }}" tabindex="-1" data-mobile-menu-panel>
         <div class="desktop-mobile-menu-header flex items-center justify-between border-b border-slate-200 px-4 py-4">
             @if ($storeBrandLogoUrl !== '')
-                <img src="{{ $storeBrandLogoUrl }}" alt="{{ $storeBrandName }}" class="block h-10 w-auto max-w-[12rem] object-contain" width="{{ $storeBrandLogoWidth }}" height="{{ $storeBrandLogoHeight }}" data-store-brand-logo>
+                <img src="{{ $storeBrandLogoUrl }}" alt="{{ $storeBrandName }}" class="block h-10 w-auto max-w-[12rem] object-contain" width="{{ $storeBrandLogoWidth }}" height="{{ $storeBrandLogoHeight }}" data-store-brand-logo @if ($storeBrandDarkLogoUrl !== '') data-store-brand-logo-light @endif>
+                @if ($storeBrandDarkLogoUrl !== '')
+                    <img src="{{ $storeBrandDarkLogoUrl }}" alt="{{ $storeBrandName }}" class="block h-10 w-auto max-w-[12rem] object-contain" width="{{ $storeBrandLogoWidth }}" height="{{ $storeBrandLogoHeight }}" data-store-brand-logo-dark>
+                @endif
             @else
                 <span class="text-xl font-black tracking-tight text-slate-900">{{ $storeBrandName }}</span>
             @endif

@@ -54,6 +54,7 @@ $icons = [
         'house',
         'kitchen-set',
         'lightbulb',
+        'lightbulb-on',
         'outlet',
         'reel',
         'ruler',

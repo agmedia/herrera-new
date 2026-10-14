@@ -59,6 +59,11 @@ return [
             'history' => 'Find previous orders and easily order again.',
         ],
     ],
+    'theme' => [
+        'dark_mode' => 'Dark mode',
+        'enable_dark' => 'Enable dark mode',
+        'enable_light' => 'Enable light mode',
+    ],
     'header' => [
         'main_navigation' => 'Main navigation',
         'categories' => 'All categories',

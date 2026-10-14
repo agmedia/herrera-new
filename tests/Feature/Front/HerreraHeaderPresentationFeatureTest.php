@@ -52,7 +52,9 @@ class HerreraHeaderPresentationFeatureTest extends TestCase
         $this->assertTrue($toggle->hasAttribute('data-header-search-toggle'));
         $this->assertSame('false', $toggle->getAttribute('aria-expanded'));
         $this->assertSame('header-search-panel', $toggle->getAttribute('aria-controls'));
-        $account = $xpath->query('//*[contains(@class, "responsive-header-actions")]/*[2]')->item(0);
+        $theme = $xpath->query('//*[contains(@class, "responsive-header-actions")]/*[2]')->item(0);
+        $this->assertTrue($theme->hasAttribute('data-storefront-theme-toggle'));
+        $account = $xpath->query('//*[contains(@class, "responsive-header-actions")]/*[3]')->item(0);
         $this->assertSame(route('front.auth.login'), $account->getAttribute('href'));
         $panel = $xpath->query('//*[@id="header-search-panel"]')->item(0);
         $this->assertFalse($panel->hasAttribute('data-header-search-persistent'));

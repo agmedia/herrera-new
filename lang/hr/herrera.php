@@ -59,6 +59,11 @@ return [
         'eu_information' => 'Više službenih EU informacija o jamstvima',
         'close' => 'Zatvori',
     ],
+    'theme' => [
+        'dark_mode' => 'Tamni prikaz',
+        'enable_dark' => 'Uključi tamni prikaz',
+        'enable_light' => 'Uključi svijetli prikaz',
+    ],
     'header' => [
         'main_navigation' => 'Glavni izbornik',
         'categories' => 'Sve kategorije',

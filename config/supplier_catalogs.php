@@ -3,6 +3,15 @@
 return [
     'max_pdf_kb' => 256000,
 
+    // Display variants preserve the original URLs stored in catalogue records.
+    'portrait_covers' => [
+        '/assets/supplier-catalogs/braytron-2026.jpg' => '/assets/supplier-catalogs/braytron-2026-portrait.jpg',
+        '/assets/supplier-catalogs/videx-led-2026.jpg' => '/assets/supplier-catalogs/videx-led-2026-portrait.jpg',
+        '/assets/supplier-catalogs/struhm-2026.jpg' => '/assets/supplier-catalogs/struhm-2026-portrait.jpg',
+        '/assets/supplier-catalogs/dpm-catalogue.jpg' => '/assets/supplier-catalogs/dpm-catalogue-portrait.jpg',
+        '/assets/supplier-catalogs/videx-nota-2026.jpg' => '/assets/supplier-catalogs/videx-nota-2026-portrait.jpg',
+    ],
+
     // Verified on the suppliers' own catalogue pages on 2026-10-14.
     // Store links only; the seed command never downloads these catalogues.
     'official_catalogs' => [

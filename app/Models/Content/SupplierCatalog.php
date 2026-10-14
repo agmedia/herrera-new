@@ -55,6 +55,11 @@ class SupplierCatalog extends Model
             return route('supplier-catalogs.cover', $this);
         }
         if (preg_match('#^/assets/supplier-catalogs/[a-zA-Z0-9_-]+\.(?:jpg|jpeg|png|webp)$#D', (string) $this->cover_url)) {
+            $portrait = config('supplier_catalogs.portrait_covers', [])[$this->cover_url] ?? null;
+            if (is_string($portrait) && is_file(public_path(ltrim($portrait, '/')))) {
+                return asset(ltrim($portrait, '/'));
+            }
+
             return is_file(public_path(ltrim($this->cover_url, '/'))) ? asset(ltrim($this->cover_url, '/')) : null;
         }
 

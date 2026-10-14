@@ -1,0 +1,36 @@
+{
+  "tool": "built-in image_gen",
+  "purpose": "Adapted display thumbnails in a common portrait format; official catalogue PDFs and original source thumbnails are retained separately.",
+  "dimensions": {
+    "width": 720,
+    "height": 960
+  },
+  "generated_at": "2026-10-14",
+  "covers": [
+    {
+      "file": "braytron-2026-portrait.jpg",
+      "original": "braytron-2026.jpg",
+      "prompt": "Use case: precise-object-edit. Edit target is provided official Braytron 2026 catalogue cover. Produce exact portrait aspect ratio 3:4 for a website thumbnail. OUTPAINT ONLY: preserve every original logo, word, product and original artwork without redrawing or distorting it. Keep whole existing cover full width centered vertically. Extend its original very light gray background seamlessly above and below to fill the 3:4 canvas; gently continue bottom product-line background if needed. No added white bands or borders; extended background must be EXACT same light gray as the original so no seam is visible. No cropping, stretching, new text, new logos, replacement products or changes to original content. It must read as the identical official cover naturally extended vertically."
+    },
+    {
+      "file": "videx-led-2026-portrait.jpg",
+      "original": "videx-led-2026.jpg",
+      "prompt": "Use case: precise-object-edit. Edit target is the provided official VIDEX LED LIGHT catalogue cover. Create a tall portrait website thumbnail, exact desired aspect ratio 3:4. OUTPAINT ONLY: preserve the entire existing cover, every logo, word, QR pattern, light fixture and their proportions. Keep original artwork at full width, centered vertically, extending ONLY the dark charcoal photographic background ABOVE and BELOW to fill the taller 3:4 canvas. Seamlessly extend the vertical light/rod and gradient where needed above, and plain charcoal at the bottom. Absolutely no white bands, borders, added text, additional logos, cropping, stretching, or re-layout. All original content must remain complete and legible. The result should look like the same official cover on a naturally taller canvas, not a redesigned catalogue."
+    },
+    {
+      "file": "struhm-2026-portrait.jpg",
+      "original": "struhm-2026.jpg",
+      "prompt": "Use case: precise-object-edit. Edit target is this official supplier catalogue cover. Output exact portrait aspect ratio 3:4, matching 1086x1448 if possible. OUTPAINT ONLY. Preserve the entire original cover, artwork, text, logos and all product/scene proportions. Original image is slightly narrower than 3:4; fit the entire original HEIGHT and seamlessly extend ONLY the existing background on LEFT and RIGHT to make it 3:4. Do not crop, stretch, redesign, change colors, add text or invent products. No blank letterbox bars, no outer border or added frame. Keep all typography verbatim including STRÜHM, www.ideus.pl, OŚWIETLENIE 2026 and ideus. Preserve every lighting photograph and diagonal composition. Only extend the existing red and gray design into a small added left/right margin."
+    },
+    {
+      "file": "dpm-catalogue-portrait.jpg",
+      "original": "dpm-catalogue.jpg",
+      "prompt": "Use case: precise-object-edit. Edit target is this official supplier catalogue cover. Output exact portrait aspect ratio 3:4, matching 1086x1448 if possible. OUTPAINT ONLY. Preserve the entire original cover, artwork, text, logos and all product/scene proportions. Original image is slightly narrower than 3:4; fit the entire original HEIGHT and seamlessly extend ONLY the existing background on LEFT and RIGHT to make it 3:4. Do not crop, stretch, redesign, change colors, add text or invent products. No blank letterbox bars, no outer border or added frame. Keep the exact DPM logo, four colored icon squares, KATALOG and www.dpm.eu unchanged. Extend only the white original background on the left and right, seamlessly; this original cover is already white so retain its original white design. No extra outer frame or bars."
+    },
+    {
+      "file": "videx-nota-2026-portrait.jpg",
+      "original": "videx-nota-2026.jpg",
+      "prompt": "Use case: precise-object-edit. Edit target is this official supplier catalogue cover. Output exact portrait aspect ratio 3:4, matching 1086x1448 if possible. OUTPAINT ONLY. Preserve the entire original cover, artwork, text, logos and all product/scene proportions. Original image is slightly narrower than 3:4; fit the entire original HEIGHT and seamlessly extend ONLY the existing background on LEFT and RIGHT to make it 3:4. Do not crop, stretch, redesign, change colors, add text or invent products. No blank letterbox bars, no outer border or added frame. Keep all words, VIDEX logo, NOTA letters, QR and electrical accessories exactly as supplied. Extend only the dark charcoal background subtly on left and right."
+    }
+  ]
+}

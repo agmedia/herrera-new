@@ -14,7 +14,7 @@
 
 <nav class="herrera-subcategories storefront-container px-3 sm:px-4 lg:px-6" aria-labelledby="{{ $subcategoryCarouselId }}-title" data-herrera-subcategory-carousel>
     <div class="herrera-subcategories-heading">
-        <h2 id="{{ $subcategoryCarouselId }}-title">{{ __('herrera.subcategories.title') }}</h2>
+        <h2 id="{{ $subcategoryCarouselId }}-title">{{ __('herrera.subcategories.title') }} ({{ $carouselCategories->count() }})</h2>
         <div class="herrera-subcategories-controls" data-subcategory-controls hidden>
             <button type="button" data-subcategory-previous aria-label="{{ __('herrera.subcategories.previous') }}" aria-controls="{{ $subcategoryCarouselId }}" disabled>
                 <x-fa-icon name="chevron-left" style="solid" />

@@ -294,6 +294,7 @@ class AuthController extends Controller
                 'city' => trim((string) $validated['city']),
                 'country_code' => strtoupper((string) $validated['country_code']),
                 'requested_at' => now(),
+                'payload' => ['approval_workflow_required' => true],
             ]);
 
             Bouncer::assign('customer')->to($user);

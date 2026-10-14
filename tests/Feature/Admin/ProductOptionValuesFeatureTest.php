@@ -31,6 +31,95 @@ class ProductOptionValuesFeatureTest extends TestCase
             ->assertSessionHas('notify.type', 'warning');
     }
 
+    public function test_herrera_options_can_be_enabled_without_assigning_any_product_values(): void
+    {
+        $settings = app(SystemSettingsService::class);
+        $settings->putMany(['store_brand_name' => 'Herrera', 'catalog_use_options' => false]);
+        $user = $this->makeAdminUser();
+        $product = $this->createProduct($user);
+
+        $migration = require database_path('migrations/2026_10_14_100000_enable_optional_herrera_product_options.php');
+        $migration->up();
+
+        $this->actingAs($user)->get(route('admin.products.options', ['product' => $product->id]))->assertOk();
+        $this->get(route('admin.products'))->assertOk()
+            ->assertSee('href="'.route('admin.options', ['locale' => config('app.locale')]).'"', false);
+        $this->assertSame(0, $product->options()->count());
+        $this->assertSame(0, $product->optionValues()->count());
+        $this->assertSame(25, $product->fresh()->stock_qty);
+    }
+
+    public function test_adding_option_groups_and_resaving_values_preserves_existing_variant_ids_and_metadata(): void
+    {
+        app(SystemSettingsService::class)->put('catalog_use_options', true);
+        $user = $this->makeAdminUser();
+        $product = $this->createProduct($user);
+        $power = $this->createOption($user, 'power', 'Snaga', 'snaga');
+        $color = $this->createOption($user, 'light-color', 'Boja svjetla', 'boja-svjetla');
+        $value = $this->createOptionValue($user, $power, '20w', '20 W', '20w');
+        $product->options()->attach($power->id);
+        $row = $product->optionValues()->create([
+            'option_value_id' => $value->id, 'mode' => 'single', 'sku' => 'LAMP-20W',
+            'stock_qty' => 8, 'price_override' => 23.5, 'is_active' => true,
+            'combination_hash' => hash('sha256', 'legacy-import:'.$value->id),
+            'payload' => ['supplier' => ['identifier' => 'KEEP-ME']],
+        ]);
+
+        Livewire::actingAs($user)->test(OptionValuesManager::class, ['productId' => $product->id])
+            ->set('selectedOptionIds', [$power->id, $color->id])->call('saveOptionGroups')
+            ->assertHasNoErrors()->assertCount('rows', 1)->assertSet('rows.0.id', $row->id)
+            ->call('save')->assertHasNoErrors()->assertSet('rows.0.id', $row->id);
+
+        $this->assertSame('KEEP-ME', data_get($row->fresh()->payload, 'supplier.identifier'));
+        $this->assertSame(8, $row->fresh()->stock_qty);
+        $this->assertSame('LAMP-20W', $row->fresh()->sku);
+        $this->assertSame(1, $product->optionValues()->count());
+    }
+
+    public function test_removing_one_group_preserves_values_of_other_assigned_groups(): void
+    {
+        app(SystemSettingsService::class)->put('catalog_use_options', true);
+        $user = $this->makeAdminUser();
+        $product = $this->createProduct($user);
+        $power = $this->createOption($user, 'power', 'Snaga', 'snaga');
+        $color = $this->createOption($user, 'color', 'Boja', 'boja');
+        $color->update(['payload' => [Option::PAYLOAD_SHOW_ON_PRODUCT_PAGE => false]]);
+        $watts = $this->createOptionValue($user, $power, '20w', '20 W', '20w');
+        $white = $this->createOptionValue($user, $color, 'white', 'Bijela', 'bijela');
+        $product->options()->attach([$power->id, $color->id]);
+        $powerRow = $product->optionValues()->create([
+            'option_value_id' => $watts->id, 'mode' => 'single', 'sku' => 'LAMP-20W',
+            'stock_qty' => 8, 'is_active' => true, 'combination_hash' => hash('sha256', 's:'.$watts->id),
+        ]);
+        $filterRow = $product->optionValues()->create([
+            'option_value_id' => $white->id, 'mode' => 'filter', 'is_active' => true,
+            'combination_hash' => hash('sha256', 'filter:'.$white->id),
+        ]);
+
+        Livewire::actingAs($user)->test(OptionValuesManager::class, ['productId' => $product->id])
+            ->set('selectedOptionIds', [$power->id])->call('saveOptionGroups')->assertHasNoErrors();
+
+        $this->assertDatabaseHas('catalog_product_option_values', ['id' => $powerRow->id]);
+        $this->assertDatabaseMissing('catalog_product_option_values', ['id' => $filterRow->id]);
+    }
+
+    public function test_variant_stock_must_be_a_whole_number(): void
+    {
+        app(SystemSettingsService::class)->put('catalog_use_options', true);
+        $user = $this->makeAdminUser();
+        $product = $this->createProduct($user);
+        $power = $this->createOption($user, 'power', 'Snaga', 'snaga');
+        $value = $this->createOptionValue($user, $power, '20w', '20 W', '20w');
+        $product->options()->attach($power->id);
+
+        Livewire::actingAs($user)->test(OptionValuesManager::class, ['productId' => $product->id])
+            ->set('rows', [[
+                'option_value_id' => $value->id, 'sku' => 'LAMP-20W', 'stock_qty' => '2.5',
+                'price_override' => '', 'is_active' => true,
+            ]])->call('save')->assertHasErrors(['rows.0.stock_qty']);
+        $this->assertSame(0, $product->optionValues()->count());
+    }
+
     public function test_option_values_manager_saves_linked_rows_for_product(): void
     {
         app(SystemSettingsService::class)->put('catalog_use_options', true);

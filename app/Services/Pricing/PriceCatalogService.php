@@ -5,6 +5,7 @@ namespace App\Services\Pricing;
 use App\Models\Catalog\Pricing\PriceCatalog;
 use App\Models\Catalog\Pricing\PriceCatalogAudit;
 use App\Models\Catalog\Pricing\PriceCatalogEntry;
+use App\Models\Catalog\Product\Product;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -169,6 +170,7 @@ class PriceCatalogService
                 throw ValidationException::withMessages(['catalog' => 'Nedostaje kontrolni zapis aktivnog cjenika. Objavljivanje je zaustavljeno.']);
             }
             $catalog = $this->lockedDraft($catalog);
+            $publicationProductIdCeiling = (int) Product::query()->max('id');
             app(CatalogGroupDiscountService::class)->rebuildForPublication($catalog, $actor);
             $count = $catalog->entries()->count();
             $invalid = $catalog->entries()->where(function ($q): void {
@@ -191,7 +193,8 @@ class PriceCatalogService
             if ($state?->price_catalog_id) {
                 PriceCatalog::query()->whereKey($state->price_catalog_id)->update(['status' => PriceCatalog::RETIRED, 'updated_at' => now()]);
             }
-            $catalog->update(['status' => PriceCatalog::ACTIVE, 'activated_at' => now(), 'activated_by' => $actor->id]);
+            $catalog->update(['status' => PriceCatalog::ACTIVE, 'activated_at' => now(), 'activated_by' => $actor->id,
+                'metadata' => array_replace($catalog->metadata ?? [], ['publication_product_id_ceiling' => $publicationProductIdCeiling])]);
             DB::table('catalog_price_catalog_state')->where('id', 1)->update(['price_catalog_id' => $catalog->id]);
             $this->audit($catalog, $actor, 'activated', ['previous_catalog_id' => $state?->price_catalog_id, 'entry_count' => $count, 'source_checksum' => $catalog->source_checksum]);
         });

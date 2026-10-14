@@ -66,6 +66,7 @@
                                     <div class="text-xs text-slate-500">{{ $row->user?->email }}</div>
                                 </td>
                                 <td class="px-4 py-3 text-slate-700">
+                                    <div class="mb-1 text-xs text-cyan-700">{{ $row->assignedSalesRep?->name ?: __('Komercijalist nije dodijeljen') }}</div>
                                     <div>{{ $row->customerGroup?->name ?? '—' }}</div>
                                     <div class="text-xs text-slate-500">{{ $row->contract_number ?: __('Bez broja ugovora') }}</div>
                                 </td>
@@ -103,14 +104,49 @@
                     <button type="button" wire:click="closeEditor" class="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">{{ __('Zatvori') }}</button>
                 </div>
 
+                @if ($selectedAccount?->status === \App\Models\User\B2BAccount::STATUS_PENDING)
+                    <div class="space-y-3 rounded-xl border border-cyan-200 bg-cyan-50 p-4">
+                        <h3 class="font-semibold text-cyan-900">{{ __('Obrada novog zahtjeva') }}</h3>
+                        <p class="text-xs text-cyan-900">{{ __('Komercijalist kontaktira kupca i predlaže uvjete. Administrator ili superadministrator donosi konačnu odluku.') }}</p>
+                        @if ($canFinalize)
+                            <label class="block text-sm">{{ __('Dodijeljeni komercijalist') }}<select wire:model="assignedRepresentative" class="admin-select mt-1 w-full rounded-lg border px-3 py-2"><option value="">{{ __('Odaberite komercijalista') }}</option>@foreach ($representatives as $rep)<option value="{{ $rep->id }}">{{ $rep->name }}</option>@endforeach</select></label>
+                            @error('assignedRepresentative')<p class="text-xs text-rose-600">{{ $message }}</p>@enderror
+                            <button type="button" wire:click="assignRepresentative" wire:confirm="{{ __('Dodjela započinje novu obradu zahtjeva i briše prethodni prijedlog uvjeta. Nastaviti?') }}" class="rounded-lg border border-cyan-300 px-3 py-2 text-sm font-semibold">{{ __('Dodijeli zahtjev') }}</button>
+                        @else
+                            <p class="text-sm">{{ __('Komercijalist') }}: <strong>{{ $selectedAccount->assignedSalesRep?->name ?: '—' }}</strong></p>
+                        @endif
+                        @if ((int) $selectedAccount->assigned_sales_rep_id === (int) auth()->id())
+                            <label class="block text-sm">{{ __('Datum razgovora s kupcem') }}<input type="datetime-local" wire:model="proposal.contacted_at" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+                            <label class="block text-sm">{{ __('Obavezan komentar razgovora') }}<textarea rows="3" wire:model="proposal.sales_comment" class="mt-1 w-full rounded-lg border px-3 py-2"></textarea></label>
+                            <label class="block text-sm">{{ __('Predložena cjenovna grupa') }}<select wire:model="proposal.customer_group_id" class="admin-select mt-1 w-full rounded-lg border px-3 py-2"><option value="">{{ __('Odaberite grupu') }}</option>@foreach ($customerGroups as $group)<option value="{{ $group->id }}">{{ $group->name }}</option>@endforeach</select></label>
+                            <label class="block text-sm">{{ __('Predloženi rok plaćanja (dana)') }}<input type="number" min="0" max="365" wire:model="proposal.payment_terms_days" class="mt-1 w-full rounded-lg border px-3 py-2"></label>
+                            <label class="flex gap-2 text-sm"><input type="checkbox" wire:model="proposal.purchase_order_required">{{ __('Obavezan broj narudžbenice') }}</label>
+                            <label class="block text-sm">{{ __('Prijedlog uvjeta i obrazloženje') }}<textarea rows="3" wire:model="proposal.terms_note" class="mt-1 w-full rounded-lg border px-3 py-2"></textarea></label>
+                            @foreach ($errors->getMessages() as $key => $messages) @if (str_starts_with($key, 'proposal.')) @foreach ($messages as $message)<p class="text-xs text-rose-600">{{ $message }}</p>@endforeach @endif @endforeach
+                            <button type="button" wire:click="submitProposal" class="rounded-lg bg-cyan-700 px-3 py-2 text-sm font-semibold text-white">{{ __('Pošalji prijedlog administratoru') }}</button>
+                        @endif
+                        @if ($selectedAccount->proposed_at)
+                            <div class="space-y-1 border-t border-cyan-200 pt-3 text-sm">
+                                <strong>{{ __('Prijedlog čeka konačnu odluku') }}</strong>
+                                <p>{{ $selectedAccount->proposer?->name }} · {{ $selectedAccount->proposed_at->format('d.m.Y. H:i') }}</p>
+                                <p>{{ __('Razgovor') }}: {{ $selectedAccount->contacted_at?->format('d.m.Y. H:i') }}</p>
+                                <p class="whitespace-pre-line">{{ $selectedAccount->sales_comment }}</p>
+                                <p class="whitespace-pre-line">{{ $selectedAccount->proposed_terms['terms_note'] ?? '' }}</p>
+                                <p>{{ __('Predložena grupa') }}: {{ $customerGroups->firstWhere('id', $selectedAccount->proposed_terms['customer_group_id'] ?? null)?->name ?: '—' }} · {{ __('Rok plaćanja') }}: {{ $selectedAccount->proposed_terms['payment_terms_days'] ?? '—' }} {{ __('dana') }}</p>
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
                 <div class="grid gap-3 md:grid-cols-2">
                     <div class="md:col-span-2">
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Status') }}</label>
-                        <select wire:model.live="form.status" class="admin-select w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                        <select wire:model.live="form.status" @disabled(! $canFinalize) class="admin-select w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
                             @foreach ($statusOptions as $value => $label)
                                 <option value="{{ $value }}">{{ __($label) }}</option>
                             @endforeach
                         </select>
+                        @error('form.status')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                     </div>
                     <div class="md:col-span-2">
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Cjenovna grupa') }}</label>

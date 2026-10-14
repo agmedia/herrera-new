@@ -158,6 +158,37 @@ class CatalogGroupDiscountCheckoutFlowTest extends TestCase
         }
     }
 
+    public function test_new_product_inherits_published_discount_in_storefront_cart_and_order_without_republishing(): void
+    {
+        [$admin, $catalog, $customer, $group, , $existing] = $this->fixture();
+        $rule = app(CatalogGroupDiscountService::class)->saveRule($catalog, $this->ruleData($group, '40'), $admin);
+        app(PriceCatalogService::class)->activate($catalog, $admin);
+        $snapshotCount = $catalog->entries()->count();
+        $new = $this->product('NEW-AFTER-PUBLICATION', '10.2400', $existing->tax_rate_id);
+        $this->actingAs($customer)->get(route('shop.index', ['sort' => 'price_low']))->assertOk()
+            ->assertViewHas('products', fn ($rows) => $rows->pluck('id')->all() === [$new->id, $existing->id])
+            ->assertViewHas('priceBounds', ['min' => 6.14, 'max' => 12.29]);
+        $this->get(route('shop.index', ['price_max' => 7]))->assertOk()
+            ->assertViewHas('products', fn ($rows) => $rows->pluck('id')->all() === [$new->id]);
+        $cart = app(CartService::class);
+        $this->assertTrue($cart->add($new, 3));
+        $line = $cart->lines()->sole();
+        $this->assertSame(6.144, $line['unit_price']);
+        $this->assertSame(18.432, $line['line_total']);
+        $this->assertSame($rule->id, $line['b2b_rule_id']);
+        $this->assertNull($line['price_catalog_entry_id']);
+        $this->assertTrue($line['price_is_final']);
+        $this->checkoutMethods();
+        $order = app(CheckoutService::class)->placeOrder($this->checkoutPayload($customer), $customer);
+        $item = $order->items()->sole();
+        $this->assertSame('6.1440', $item->unit_price);
+        $this->assertSame('18.4320', $item->line_total);
+        $this->assertSame('price_catalog_group_discount', $item->payload['pricing']['source']);
+        $this->assertSame($rule->id, $item->payload['pricing']['rule_id']);
+        $this->assertSame($snapshotCount, $catalog->entries()->count());
+        $this->assertSame(1, $rule->fresh()->materialized_product_count);
+    }
+
     private function fixture(): array
     {
         $admin = User::factory()->create();

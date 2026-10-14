@@ -84,9 +84,8 @@ class CheckoutCartAvailabilityTest extends TestCase
         $requested = $cart->raw();
         $variant->delete();
 
-        // The display still contains one line and the same quantity, but its identity changed.
-        $this->assertCount(1, $cart->lines());
-        $this->assertNull($cart->lines()->sole()['product_option_value_id']);
+        // A removed variant must never be displayed or submitted as its base product.
+        $this->assertCount(0, $cart->lines());
         $this->assertCartRejectedBeforeWrites();
         $this->assertSame($requested, $cart->raw());
         $this->assertSame(100, $product->fresh()->stock_qty);

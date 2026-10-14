@@ -5,6 +5,7 @@
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Catalog / Products / Option Values') }}</p>
                 <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{{ $productName }}</h1>
                 <p class="mt-2 text-sm text-slate-600">{{ __('Assign option groups and define per-product option value rows with SKU, stock and optional price override.') }}</p>
+                <p class="mt-2 text-sm text-slate-600">{{ app()->getLocale() === 'hr' ? 'Opcije su neobavezne. Kupac bira samo vrijednosti dodijeljene ovom artiklu, primjerice boju, dimenziju, snagu ili boju svjetla. Za dvije povezane opcije unesite dostupne kombinacije.' : 'Options are optional. Customers choose only values assigned to this product, such as color, dimensions, wattage or light temperature. For two linked options, enter the available combinations.' }}</p>
                 <div class="mt-2 flex flex-wrap items-center gap-2">
                     <span class="admin-chip">{{ __('Code:') }} {{ $productCode }}</span>
                     <span class="admin-chip">{{ __('SKU:') }} {{ $productSku !== '' ? $productSku : __('n/a') }}</span>
@@ -35,6 +36,7 @@
                 </div>
                 @error('selectedOptionIds.*') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 <p class="mt-2 text-xs text-slate-500">{{ __('Order controls primary/secondary defaults in linked mode. Save groups before editing rows.') }}</p>
+                <p class="mt-1 text-xs text-slate-500">{{ app()->getLocale() === 'hr' ? 'Dodavanje grupe čuva postojeće vrijednosti. Uklanjanje grupe uklanja samo njezine kombinacije. Bez spremljenih vrijednosti artikl se naručuje uobičajeno.' : 'Adding a group preserves existing values. Removing a group removes only its combinations. Products without saved values can be ordered normally.' }}</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 <a href="{{ route('admin.options', ['locale' => $locale]) }}" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">

@@ -16,6 +16,15 @@
         ? 'product-description'
         : ($hasSpecificationAttributes ? 'product-specifications' : 'product-comments');
     $isHerreraProductContent = str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera');
+    $productDescriptionHtml = (string) ($translation?->description ?? '');
+    if ($isHerreraProductContent) {
+        $compactProductSpecifications = $compactProductSpecifications ?? app(\App\Support\ProductSpecificationPresenter::class)
+            ->compact($product, $locale, $fallbackLocale, $productDescriptionHtml);
+        $productDescriptionHtml = $compactProductSpecifications['description'];
+        $hasProductStory = trim(strip_tags($productDescriptionHtml)) !== ''
+            || preg_match('~<(?:img|video|iframe|audio)\b~i', $productDescriptionHtml)
+            || trim((string) ($translation?->excerpt ?? '')) !== '';
+    }
 @endphp
 
 @if ($isHerreraProductContent)
@@ -68,8 +77,8 @@
             </header>
 
             <div class="product-detail-section-body">
-                @if (! empty($translation?->description))
-                    <div class="product-detail-description-content">{!! $translation->description !!}</div>
+                @if (trim(strip_tags($productDescriptionHtml)) !== '' || preg_match('~<(?:img|video|iframe|audio)\b~i', $productDescriptionHtml))
+                    <div class="product-detail-description-content">{!! $productDescriptionHtml !!}</div>
                 @elseif (! empty($translation?->excerpt))
                     <p class="product-detail-description-content">{{ $translation->excerpt }}</p>
                 @endif
@@ -77,7 +86,7 @@
         </section>
     @endif
 
-    @if ($hasSpecificationAttributes)
+    @if ($hasSpecificationAttributes && ! $isHerreraProductContent)
         <section id="product-specifications" class="product-detail-content-section" data-product-detail-section>
             <header class="product-detail-section-intro">
                 <h2 class="product-detail-section-heading">{{ __('ui.product.specifications') }}</h2>

@@ -55,4 +55,5 @@
     </section>
     @include('front.partials.herrera-home-carousel-script')
 @endif
+@include('front.partials.herrera-home-registration')
 @endonce

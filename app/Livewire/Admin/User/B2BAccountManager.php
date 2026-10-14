@@ -9,9 +9,12 @@ use App\Models\User\UserAddress;
 use App\Models\User\UserProfile;
 use App\Services\Admin\OrderManagerAccess;
 use App\Services\B2B\B2BAccountService;
+use App\Services\B2B\B2BApprovalWorkflow;
 use App\Services\Settings\SystemSettingsService;
+use App\Services\User\CustomerManagementService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -23,9 +26,14 @@ class B2BAccountManager extends Component
 
     public string $statusFilter = B2BAccount::STATUS_PENDING;
 
+    #[Locked]
     public ?int $selectedId = null;
 
     public array $form = [];
+
+    public string $assignedRepresentative = '';
+
+    public array $proposal = [];
 
     public function mount(): void
     {
@@ -54,6 +62,15 @@ class B2BAccountManager extends Component
         $account = B2BAccount::query()->findOrFail($accountId);
         app(OrderManagerAccess::class)->assertCustomer(User::query()->findOrFail($account->user_id));
         $this->selectedId = (int) $account->getKey();
+        $this->assignedRepresentative = (string) ($account->assigned_sales_rep_id ?? '');
+        $this->proposal = [
+            'contacted_at' => $account->contacted_at?->format('Y-m-d\TH:i') ?? '',
+            'sales_comment' => $account->sales_comment ?? '',
+            'customer_group_id' => $account->proposed_terms['customer_group_id'] ?? null,
+            'payment_terms_days' => $account->proposed_terms['payment_terms_days'] ?? '',
+            'purchase_order_required' => $account->proposed_terms['purchase_order_required'] ?? false,
+            'terms_note' => $account->proposed_terms['terms_note'] ?? '',
+        ];
         $this->form = [
             'status' => $account->status,
             'company_name' => $account->company_name,
@@ -65,14 +82,14 @@ class B2BAccountManager extends Component
             'postal_code' => $account->postal_code ?? '',
             'city' => $account->city ?? '',
             'country_code' => $account->country_code ?: 'HR',
-            'customer_group_id' => $account->customer_group_id,
+            'customer_group_id' => $account->customer_group_id ?? ($account->proposed_terms['customer_group_id'] ?? null),
             'erp_customer_id' => $account->erp_customer_id ?? '',
             'erp_company_code' => $account->erp_company_code ?? '',
             'contract_number' => $account->contract_number ?? '',
             'contract_starts_at' => $account->contract_starts_at?->format('Y-m-d') ?? '',
             'contract_ends_at' => $account->contract_ends_at?->format('Y-m-d') ?? '',
-            'payment_terms_days' => $account->payment_terms_days ?? '',
-            'purchase_order_required' => (bool) $account->purchase_order_required,
+            'payment_terms_days' => $account->payment_terms_days ?? ($account->proposed_terms['payment_terms_days'] ?? ''),
+            'purchase_order_required' => (bool) ($account->proposed_terms['purchase_order_required'] ?? $account->purchase_order_required),
             'status_reason' => $account->status_reason ?? '',
         ];
         $this->resetValidation();
@@ -125,6 +142,11 @@ class B2BAccountManager extends Component
         $account = B2BAccount::query()->with('user')->findOrFail($this->selectedId);
         app(OrderManagerAccess::class)->assertCustomer($account->user);
 
+        try {
+            app(B2BApprovalWorkflow::class)->assertReview($account, (string) $validated['form']['status'], auth()->user());
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            throw \Illuminate\Validation\ValidationException::withMessages(collect($exception->errors())->mapWithKeys(fn ($errors, $key) => ['form.'.$key => $errors])->all());
+        }
         DB::transaction(function () use ($account, $validated, $service): void {
             $account->fill([
                 'company_name' => trim((string) $validated['form']['company_name']),
@@ -171,6 +193,29 @@ class B2BAccountManager extends Component
         $this->dispatch('notify', type: 'success', message: __('B2B račun je spremljen.'));
     }
 
+    public function assignRepresentative(B2BApprovalWorkflow $workflow): void
+    {
+        $this->ensureCanMutate();
+        $this->validate(['assignedRepresentative' => ['required', 'integer', 'min:1']]);
+        $account = B2BAccount::query()->findOrFail($this->selectedId);
+        $workflow->assign($account, (int) $this->assignedRepresentative, auth()->user());
+        $this->selectAccount($account->id);
+        $this->dispatch('notify', type: 'success', message: __('Zahtjev je dodijeljen komercijalistu.'));
+    }
+
+    public function submitProposal(B2BApprovalWorkflow $workflow): void
+    {
+        $this->ensureCanView();
+        $account = B2BAccount::query()->with('user')->findOrFail($this->selectedId);
+        try {
+            $workflow->propose($account, $this->proposal, auth()->user());
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            throw \Illuminate\Validation\ValidationException::withMessages(collect($exception->errors())->mapWithKeys(fn ($errors, $key) => ['proposal.'.$key => $errors])->all());
+        }
+        $this->selectAccount($account->id);
+        $this->dispatch('notify', type: 'success', message: __('Prijedlog uvjeta je poslan administratoru na konačno odobrenje.'));
+    }
+
     public function render()
     {
         $this->ensureCanView();
@@ -188,6 +233,7 @@ class B2BAccountManager extends Component
                 'user:id,name,email,account_type,admin_username,admin_login_enabled',
                 'customerGroup:id,code,name',
                 'reviewer:id,name',
+                'assignedSalesRep:id,name',
             ])
             ->when($this->search !== '', function ($query): void {
                 $term = trim($this->search);
@@ -219,6 +265,9 @@ class B2BAccountManager extends Component
                 ->orderBy('name')
                 ->get(['id', 'code', 'name']),
             'canMutate' => $this->canMutate(),
+            'canFinalize' => app(B2BApprovalWorkflow::class)->canFinalize(),
+            'selectedAccount' => $this->selectedId ? B2BAccount::query()->whereHas('user', fn ($query) => app(OrderManagerAccess::class)->scopeCustomers($query))->with(['assignedSalesRep', 'proposer'])->findOrFail($this->selectedId) : null,
+            'representatives' => app(CustomerManagementService::class)->representatives()->orderBy('name')->get(['id', 'name']),
         ]);
     }
 

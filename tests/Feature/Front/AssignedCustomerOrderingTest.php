@@ -102,6 +102,12 @@ class AssignedCustomerOrderingTest extends TestCase
             $payload['customer_impersonation'] = ['admin_id' => $this->foreign->id];
             $this->postJson(route('checkout.store'), $payload)->assertOk()->assertJsonPath('status', 'ok');
             $order = Order::query()->where('user_id', $customer->id)->sole();
+            $salesSession = \App\Models\User\CustomerSalesSession::query()->where('customer_user_id', $customer->id)->sole();
+            $this->assertSame($this->manager->id, $salesSession->sales_rep_id);
+            $this->assertSame($this->manager->id, $salesSession->performed_by_id);
+            $this->assertSame($order->id, $salesSession->order_id);
+            $this->assertSame('order', $salesSession->outcome);
+            $this->assertDatabaseCount('customer_visits', 0);
             $this->assertSame($this->manager->id, $order->created_by);
             $this->assertSame($this->manager->id, $order->updated_by);
             $this->assertSame($customer->companyName(), $order->billing_company);
@@ -113,6 +119,8 @@ class AssignedCustomerOrderingTest extends TestCase
             $this->assertSame($password, $customer->fresh()->password);
             $this->post(route('front.impersonation.stop'))->assertRedirect(route('admin.users'))->assertSessionMissing(CustomerImpersonationService::SESSION_KEY)->assertSessionHas('front', $staffFront);
             $this->assertAuthenticatedAs($this->manager);
+            $this->assertNotNull($salesSession->fresh()->ended_at);
+            $this->assertSame('order', $salesSession->fresh()->outcome);
             $this->get(route('admin.orders.show', $order))->assertOk()
                 ->assertSee('Narudžbu unio:')->assertSee($this->manager->name);
         }
@@ -155,6 +163,10 @@ class AssignedCustomerOrderingTest extends TestCase
             $payload = $this->checkoutPayload($customer) + ['created_by' => $this->foreign->id, 'staff_impersonation' => ['admin_id' => $this->foreign->id]];
             $this->postJson(route('checkout.store'), $payload)->assertOk()->assertJsonPath('status', 'ok');
             $order = Order::query()->where('user_id', $customer->id)->sole();
+            $salesSession = \App\Models\User\CustomerSalesSession::query()->where('customer_user_id', $customer->id)->sole();
+            $this->assertSame($this->manager->id, $salesSession->sales_rep_id);
+            $this->assertSame($admin->id, $salesSession->performed_by_id);
+            $this->assertSame($order->id, $salesSession->order_id);
             $this->assertSame($admin->id, $order->created_by);
             $this->assertSame($admin->id, $order->updated_by);
             $this->assertSame($price * 2, (float) $order->grand_total);

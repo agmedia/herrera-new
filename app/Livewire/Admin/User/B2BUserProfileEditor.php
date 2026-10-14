@@ -93,6 +93,7 @@ class B2BUserProfileEditor extends Component
 
         return view('livewire.admin.user.b2b-user-profile-editor', [
             'canUpdate' => $this->canUpdate(),
+            'canFinalize' => app(\App\Services\B2B\B2BApprovalWorkflow::class)->canFinalize(),
             'saveAvailable' => method_exists(B2BAccountService::class, 'saveForUser'),
             'account' => $target->b2bAccount,
             'accessAvailable' => app(B2BAccessService::class)->approvedAccount($target) !== null,

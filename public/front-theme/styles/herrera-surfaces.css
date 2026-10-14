@@ -7,6 +7,7 @@ body.herrera-storefront {
 .herrera-storefront .herrera-b2b-hero,
 .herrera-storefront .herrera-catalog-heading-band,
 .herrera-storefront .herrera-brand-strip,
+.herrera-storefront .herrera-home-registration,
 .herrera-storefront .site-footer-newsletter {
     background-image: var(--herrera-surface-pattern);
     background-position: center top;
@@ -57,6 +58,7 @@ body.herrera-storefront {
 
 .herrera-storefront .herrera-catalog-heading-band,
 .herrera-storefront .herrera-brand-strip,
+.herrera-storefront .herrera-home-registration,
 .herrera-storefront .site-footer-newsletter {
     position: relative;
     isolation: isolate;
@@ -68,6 +70,7 @@ body.herrera-storefront {
 /* Paint the motif across the viewport too, rather than stopping at the content gutter. */
 .herrera-storefront .herrera-catalog-heading-band::before,
 .herrera-storefront .herrera-brand-strip::before,
+.herrera-storefront .herrera-home-registration::before,
 .herrera-storefront .site-footer-newsletter::before {
     position: absolute;
     z-index: -1;
@@ -115,9 +118,11 @@ body.herrera-storefront {
     .herrera-storefront .herrera-b2b-hero,
     .herrera-storefront .herrera-catalog-heading-band,
     .herrera-storefront .herrera-brand-strip,
+    .herrera-storefront .herrera-home-registration,
     .herrera-storefront .site-footer-newsletter,
     .herrera-storefront .herrera-catalog-heading-band::before,
     .herrera-storefront .herrera-brand-strip::before,
+    .herrera-storefront .herrera-home-registration::before,
     .herrera-storefront .site-footer-newsletter::before {
         background-size: 100vw max(600px, 100vh);
     }

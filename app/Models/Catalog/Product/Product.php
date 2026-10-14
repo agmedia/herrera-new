@@ -391,13 +391,13 @@ class Product extends Model implements HasMedia
     public function visibleOptionRows(bool $inStockOnly = false): Collection
     {
         $this->loadMissing([
-            'optionValues.optionValue.option:id,payload',
-            'optionValues.parentOptionValue.option:id,payload',
+            'optionValues.optionValue.option:id,is_active,payload',
+            'optionValues.parentOptionValue.option:id,is_active,payload',
         ]);
 
         $rows = $this->optionValues
             ->where('is_active', true)
-            ->filter(static fn (ProductOptionValue $row): bool => $row->showsOnProductPage())
+            ->filter(static fn (ProductOptionValue $row): bool => $row->isVisibleOnStorefront())
             ->values();
 
         if (! $inStockOnly) {

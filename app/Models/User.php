@@ -104,6 +104,21 @@ class User extends Authenticatable implements HasMedia
             ->withTimestamps();
     }
 
+    public function salesRepresentatives(): BelongsToMany
+    {
+        return $this->belongsToMany(self::class, 'admin_customer_assignments', 'customer_user_id', 'admin_user_id')->withTimestamps();
+    }
+
+    public function customerVisits(): HasMany
+    {
+        return $this->hasMany(\App\Models\User\CustomerVisit::class, 'customer_user_id');
+    }
+
+    public function customerSalesSessions(): HasMany
+    {
+        return $this->hasMany(\App\Models\User\CustomerSalesSession::class, 'customer_user_id');
+    }
+
     public function b2bAccount(): HasOne
     {
         return $this->hasOne(\App\Models\User\B2BAccount::class);

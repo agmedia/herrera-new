@@ -540,12 +540,12 @@ class CatalogController extends Controller
                     ->orderBy('id')
                     ->with([
                         'optionValue.option' => fn ($optionQuery) => $optionQuery
-                            ->select(['id', 'payload']),
+                            ->select(['id', 'is_active', 'payload']),
                         'optionValue.translations' => fn ($tq) => $tq
                             ->select(['id', 'option_value_id', 'locale', 'name'])
                             ->whereIn('locale', [$locale, $fallbackLocale]),
                         'parentOptionValue.option' => fn ($optionQuery) => $optionQuery
-                            ->select(['id', 'payload']),
+                            ->select(['id', 'is_active', 'payload']),
                         'parentOptionValue.translations' => fn ($tq) => $tq
                             ->select(['id', 'option_value_id', 'locale', 'name'])
                             ->whereIn('locale', [$locale, $fallbackLocale]),
@@ -933,12 +933,12 @@ class CatalogController extends Controller
                         ->orderBy('id')
                         ->with([
                             'optionValue.option' => fn ($optionQuery) => $optionQuery
-                                ->select(['id', 'payload']),
+                                ->select(['id', 'is_active', 'payload']),
                             'optionValue.translations' => fn ($tq) => $tq
                                 ->select(['id', 'option_value_id', 'locale', 'name'])
                                 ->whereIn('locale', [$locale, $fallbackLocale]),
                             'parentOptionValue.option' => fn ($optionQuery) => $optionQuery
-                                ->select(['id', 'payload']),
+                                ->select(['id', 'is_active', 'payload']),
                             'parentOptionValue.translations' => fn ($tq) => $tq
                                 ->select(['id', 'option_value_id', 'locale', 'name'])
                                 ->whereIn('locale', [$locale, $fallbackLocale]),

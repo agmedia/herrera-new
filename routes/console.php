@@ -15,6 +15,11 @@ use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('herrera:sync-vayox-documents')
+    ->dailyAt('03:30')->timezone(config('supplier-documents.vayox.timezone', 'Europe/Zagreb'))
+    ->withoutOverlapping(60)->when(fn () => (bool) config('supplier-documents.vayox.scheduled', false));
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

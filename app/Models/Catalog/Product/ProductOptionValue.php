@@ -92,4 +92,18 @@ class ProductOptionValue extends Model
 
         return $childVisible ?? $parentVisible ?? true;
     }
+
+    public function isVisibleOnStorefront(): bool
+    {
+        if (! $this->is_active || $this->mode === 'filter' || ! $this->showsOnProductPage()) {
+            return false;
+        }
+
+        if (! $this->optionValue?->is_active || ! $this->childOption()?->is_active) {
+            return false;
+        }
+
+        return ! $this->parent_option_value_id
+            || ($this->parentOptionValue?->is_active && $this->parentOption()?->is_active);
+    }
 }

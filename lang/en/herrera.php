@@ -46,6 +46,19 @@ return [
         'contact' => 'Contact us',
         'register' => 'Register your company',
     ],
+    'registration' => [
+        'eyebrow' => 'Become a Herrera business partner',
+        'title' => 'Your purchasing, one step simpler.',
+        'description' => 'Register your company and enjoy the benefits of B2B purchasing. Everything you need for everyday orders, in one place.',
+        'action' => 'Register your company',
+        'login' => 'Already have an account? Sign in',
+        'note' => 'Prices and ordering become available once your registration is approved.',
+        'benefits' => [
+            'prices' => 'View prices and terms tailored to your company.',
+            'order' => 'Add items by product code and prepare your order faster.',
+            'history' => 'Find previous orders and easily order again.',
+        ],
+    ],
     'header' => [
         'main_navigation' => 'Main navigation',
         'categories' => 'All categories',

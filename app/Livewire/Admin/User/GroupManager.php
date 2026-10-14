@@ -139,6 +139,7 @@ class GroupManager extends Component
 
     public function edit(int $groupId): void
     {
+        $this->authorizeAccess();
         $group = CustomerGroup::query()->findOrFail($groupId);
 
         $this->editingId = $group->id;
@@ -160,6 +161,7 @@ class GroupManager extends Component
 
     public function delete(int $groupId): void
     {
+        $this->authorizeAccess();
         $group = CustomerGroup::query()->findOrFail($groupId);
         $wasDefault = (bool) $group->is_default;
 
@@ -193,6 +195,7 @@ class GroupManager extends Component
 
     public function toggleActive(int $groupId): void
     {
+        $this->authorizeAccess();
         $group = CustomerGroup::query()->findOrFail($groupId);
         $group->update(['is_active' => ! $group->is_active]);
 

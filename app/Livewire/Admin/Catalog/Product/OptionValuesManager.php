@@ -7,10 +7,12 @@ use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Product\ProductOptionValue;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class OptionValuesManager extends Component
 {
+    #[Locked]
     public int $productId;
 
     public string $locale = 'en';
@@ -134,6 +136,9 @@ class OptionValuesManager extends Component
         }
 
         foreach ($this->valuesForOption($this->singleOptionId) as $value) {
+            if (! $value['is_active']) {
+                continue;
+            }
             $valueId = (int) $value['id'];
             if (isset($existing[$valueId])) {
                 continue;
@@ -167,6 +172,9 @@ class OptionValuesManager extends Component
 
         foreach ($this->valuesForOption($this->primaryOptionId) as $primaryValue) {
             foreach ($this->valuesForOption($this->secondaryOptionId) as $secondaryValue) {
+                if (! $primaryValue['is_active'] || ! $secondaryValue['is_active']) {
+                    continue;
+                }
                 $parentId = (int) $primaryValue['id'];
                 $valueId = (int) $secondaryValue['id'];
                 $key = $parentId.':'.$valueId;
@@ -183,6 +191,9 @@ class OptionValuesManager extends Component
 
     public function save(): void
     {
+        // Definitions and assignments come from the product, never editable browser state.
+        $this->loadProductContext();
+
         $this->validate([
             'mode' => ['required', 'in:single,linked'],
             'singleOptionId' => ['nullable', 'integer'],
@@ -255,9 +266,27 @@ class OptionValuesManager extends Component
                 continue;
             }
 
+            if (($row['is_active'] ?? true)
+                && ! collect($this->valuesForOption($this->mode === 'single' ? $this->singleOptionId : $this->secondaryOptionId))
+                    ->contains(fn (array $value): bool => $value['id'] === $valueId && $value['is_active'])) {
+                $this->addError('rows.'.$index.'.option_value_id', __('Activate the option value before enabling this variant.'));
+                $hasRowErrors = true;
+
+                continue;
+            }
+
             if ($this->mode === 'linked') {
                 if (! $parentId || ! isset($validParentIds[$parentId])) {
                     $this->addError('rows.'.$index.'.parent_option_value_id', __('Invalid primary value.'));
+                    $hasRowErrors = true;
+
+                    continue;
+                }
+
+                if (($row['is_active'] ?? true)
+                    && ! collect($this->valuesForOption($this->primaryOptionId))
+                        ->contains(fn (array $value): bool => $value['id'] === $parentId && $value['is_active'])) {
+                    $this->addError('rows.'.$index.'.parent_option_value_id', __('Activate the option value before enabling this variant.'));
                     $hasRowErrors = true;
 
                     continue;
@@ -277,7 +306,7 @@ class OptionValuesManager extends Component
             $seenCombinations[$combinationKey] = true;
 
             $stockRaw = $row['stock_qty'] ?? 0;
-            if (! is_numeric($stockRaw) || (int) $stockRaw < 0) {
+            if (filter_var($stockRaw, FILTER_VALIDATE_INT) === false || (int) $stockRaw < 0) {
                 $this->addError('rows.'.$index.'.stock_qty', __('Stock must be a non-negative integer.'));
                 $hasRowErrors = true;
 
@@ -317,15 +346,23 @@ class OptionValuesManager extends Component
         $filterOnlyOptionIds = $this->filterOnlyOptionIds();
 
         DB::transaction(function () use ($rowsToInsert, $userId, $filterOnlyOptionIds): void {
-            $this->deletePurchasableRows($filterOnlyOptionIds);
-
+            $keptIds = [];
             foreach ($rowsToInsert as $row) {
-                ProductOptionValue::query()->create($row + [
-                    'payload' => null,
-                    'created_by' => $userId,
-                    'updated_by' => $userId,
+                $optionRow = ProductOptionValue::query()->firstOrNew([
+                    'product_id' => $this->productId,
+                    'option_value_id' => $row['option_value_id'],
+                    'parent_option_value_id' => $row['parent_option_value_id'],
                 ]);
+                $optionRow->fill($row + ['updated_by' => $userId]);
+                if (! $optionRow->exists) {
+                    $optionRow->created_by = $userId;
+                }
+                $optionRow->save();
+                $keptIds[] = $optionRow->id;
             }
+
+            // Preserve IDs and supplier metadata for existing combinations and carts.
+            $this->deletePurchasableRows($filterOnlyOptionIds, $keptIds);
         });
 
         $count = count($rowsToInsert);
@@ -340,6 +377,16 @@ class OptionValuesManager extends Component
 
     public function saveFilterOnlyOptions(): void
     {
+        $selectedValues = collect($this->filterOnlyOptions)->mapWithKeys(
+            fn (array $option): array => [(int) ($option['id'] ?? 0) => $option['selected_value_id'] ?? null]
+        );
+        $this->loadProductContext();
+        $this->loadFilterOnlyOptions();
+        foreach ($this->filterOnlyOptions as &$option) {
+            $option['selected_value_id'] = $selectedValues->get($option['id']);
+        }
+        unset($option);
+
         if (empty($this->filterOnlyOptions)) {
             $this->dispatch('notify', type: 'warning', message: __('No filter-only option groups are assigned to this product.'));
 
@@ -441,14 +488,19 @@ class OptionValuesManager extends Component
             ];
         }
 
-        DB::transaction(function () use ($product, $syncPayload, $changed): void {
+        DB::transaction(function () use ($product, $syncPayload): void {
             $product->options()->sync($syncPayload);
 
-            if ($changed) {
-                ProductOptionValue::query()
-                    ->where('product_id', $this->productId)
-                    ->delete();
-            }
+            $selectedIds = array_keys($syncPayload);
+            ProductOptionValue::query()
+                ->where('product_id', $this->productId)
+                ->where(function ($query) use ($selectedIds): void {
+                    $query->whereDoesntHave('optionValue', fn ($q) => $q->whereIn('option_id', $selectedIds))
+                        ->orWhere(function ($query) use ($selectedIds): void {
+                            $query->whereNotNull('parent_option_value_id')
+                                ->whereDoesntHave('parentOptionValue', fn ($q) => $q->whereIn('option_id', $selectedIds));
+                        });
+                })->delete();
         });
 
         $this->loadProductContext();
@@ -459,7 +511,7 @@ class OptionValuesManager extends Component
             'notify',
             type: 'success',
             message: $changed
-                ? 'Option groups saved. Existing option-value rows were reset.'
+                ? __('Option groups saved. Rows belonging to removed groups were removed; other values were preserved.')
                 : 'Option groups saved.'
         );
     }
@@ -620,6 +672,7 @@ class OptionValuesManager extends Component
 
         $options = Option::query()
             ->whereIn('id', $this->selectedOptionIds)
+            ->where('is_active', true)
             ->with([
                 'translations' => fn ($q) => $q->where('locale', $this->locale),
                 'values' => fn ($vq) => $vq
@@ -918,7 +971,13 @@ class OptionValuesManager extends Component
     {
         $values = $this->valuesForOption($optionId);
 
-        return isset($values[0]['id']) ? (int) $values[0]['id'] : null;
+        foreach ($values as $value) {
+            if ($value['is_active']) {
+                return (int) $value['id'];
+            }
+        }
+
+        return null;
     }
 
     private function optionIdForValue(int $valueId): ?int
@@ -961,10 +1020,11 @@ class OptionValuesManager extends Component
     /**
      * @param  array<int, int>  $filterOnlyOptionIds
      */
-    private function deletePurchasableRows(array $filterOnlyOptionIds): void
+    private function deletePurchasableRows(array $filterOnlyOptionIds, array $keptIds = []): void
     {
         $query = ProductOptionValue::query()
-            ->where('product_id', $this->productId);
+            ->where('product_id', $this->productId)
+            ->whereNotIn('id', $keptIds);
 
         if ($filterOnlyOptionIds !== []) {
             $query->where(function ($query) use ($filterOnlyOptionIds): void {

@@ -1,0 +1,70 @@
+.herrera-storefront .herrera-product-specifications {
+    margin-bottom: 20px;
+    border: 1px solid #dbe6e9;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.herrera-storefront .herrera-product-specifications > h2 {
+    margin: 0;
+    padding: 16px 20px;
+    background: #edf7f9;
+    color: #24353b;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.herrera-storefront .herrera-product-specifications > dl {
+    padding: 4px 20px;
+}
+
+.herrera-storefront .herrera-product-specifications .product-information-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    gap: 16px;
+    padding: 11px 0;
+    border-bottom: 1px solid #edf1f2;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.herrera-storefront .herrera-product-specifications .product-information-row:last-child {
+    border-bottom: 0;
+}
+
+.herrera-storefront .herrera-product-specifications dt {
+    color: #61747c;
+    overflow-wrap: anywhere;
+}
+
+.herrera-storefront .herrera-product-specifications dd {
+    margin: 0;
+    color: #24353b;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+.herrera-storefront .herrera-product-more-specifications {
+    margin: 0;
+    border: 0;
+    border-top: 1px solid #dbe6e9;
+    border-radius: 0;
+}
+
+.herrera-storefront .herrera-product-more-specifications summary {
+    grid-template-columns: minmax(0, 1fr) 18px;
+    padding: 14px 20px;
+    font-size: 13px;
+    color: #007b8b;
+}
+
+.herrera-storefront .herrera-product-more-specifications summary:focus-visible {
+    outline: 2px solid #007b8b;
+    outline-offset: -3px;
+}
+
+.herrera-storefront .herrera-product-more-specifications > dl {
+    margin: 0;
+    padding: 0 20px 8px;
+}

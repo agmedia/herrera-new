@@ -119,7 +119,7 @@ class ProductController extends Controller
             ->with([
                 'taxRate:id,rate,rate_type,is_active',
                 'media' => fn ($q) => $q
-                    ->whereIn('collection_name', ['product_main', 'product_gallery'])
+                    ->whereIn('collection_name', ['product_main', 'product_gallery', 'product_documents'])
                     ->orderBy('order_column')
                     ->orderBy('id'),
                 'translations' => fn ($q) => $q
@@ -148,13 +148,13 @@ class ProductController extends Controller
                     'sort_order',
                 ]),
                 'optionValues' => fn ($q) => $q
-                    ->select(['id', 'product_id', 'option_value_id', 'parent_option_value_id', 'sku', 'stock_qty', 'price_override', 'is_active', 'sort_order'])
+                    ->select(['id', 'product_id', 'option_value_id', 'parent_option_value_id', 'mode', 'sku', 'stock_qty', 'price_override', 'is_active', 'sort_order'])
                     ->where('is_active', true)
                     ->orderBy('sort_order')
                     ->orderBy('id')
                     ->with([
                         'optionValue.option' => fn ($optionQuery) => $optionQuery
-                            ->select(['id', 'code', 'payload'])
+                            ->select(['id', 'code', 'is_active', 'payload'])
                             ->with([
                                 'translations' => fn ($oq) => $oq
                                     ->select(['id', 'option_id', 'locale', 'name'])
@@ -164,7 +164,7 @@ class ProductController extends Controller
                             ->select(['id', 'option_value_id', 'locale', 'name'])
                             ->whereIn('locale', [$locale, $fallbackLocale]),
                         'parentOptionValue.option' => fn ($optionQuery) => $optionQuery
-                            ->select(['id', 'code', 'payload'])
+                            ->select(['id', 'code', 'is_active', 'payload'])
                             ->with([
                                 'translations' => fn ($oq) => $oq
                                     ->select(['id', 'option_id', 'locale', 'name'])
@@ -220,13 +220,13 @@ class ProductController extends Controller
                     ->whereIn('locale', [$locale, $fallbackLocale]),
                 'attributes' => ProductMaterialLabel::eagerLoadAttributes($locale, $fallbackLocale),
                 'optionValues' => fn ($q) => $q
-                    ->select(['id', 'product_id', 'option_value_id', 'parent_option_value_id', 'sku', 'stock_qty', 'price_override', 'is_active', 'sort_order'])
+                    ->select(['id', 'product_id', 'option_value_id', 'parent_option_value_id', 'mode', 'sku', 'stock_qty', 'price_override', 'is_active', 'sort_order'])
                     ->where('is_active', true)
                     ->orderBy('sort_order')
                     ->orderBy('id')
                     ->with([
                         'optionValue.option' => fn ($optionQuery) => $optionQuery
-                            ->select(['id', 'code', 'payload'])
+                            ->select(['id', 'code', 'is_active', 'payload'])
                             ->with([
                                 'translations' => fn ($oq) => $oq
                                     ->select(['id', 'option_id', 'locale', 'name'])
@@ -236,7 +236,7 @@ class ProductController extends Controller
                             ->select(['id', 'option_value_id', 'locale', 'name'])
                             ->whereIn('locale', [$locale, $fallbackLocale]),
                         'parentOptionValue.option' => fn ($optionQuery) => $optionQuery
-                            ->select(['id', 'code', 'payload'])
+                            ->select(['id', 'code', 'is_active', 'payload'])
                             ->with([
                                 'translations' => fn ($oq) => $oq
                                     ->select(['id', 'option_id', 'locale', 'name'])

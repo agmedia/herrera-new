@@ -443,6 +443,7 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
         })->name('users.groups.edit');
         Route::view('users/access', 'admin.users.access')->name('users.access');
         Route::view('users/activity', 'admin.users.activity')->name('users.activity');
+        Route::view('users/crm', 'admin.users.crm')->name('users.crm');
         Route::middleware('user.feature:user_loyalty_enabled')->group(function (): void {
             Route::view('users/loyalty', 'admin.users.loyalty')->name('users.loyalty');
         });

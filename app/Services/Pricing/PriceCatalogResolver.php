@@ -17,8 +17,10 @@ class PriceCatalogResolver
 
     private bool $catalogLoaded = false;
 
-    /** @var array<string, array<int, array{entry:?PriceCatalogEntry,regular:?PriceCatalogEntry}>> */
+    /** @var array<string, array<int, array{entry:?PriceCatalogEntry,regular:?PriceCatalogEntry,inherited:?array}>> */
     private array $productBatches = [];
+
+    private ?CatalogGroupDiscountInheritance $inheritedDiscounts = null;
 
     /** @var array<string, array<int, true>> */
     private array $primedProductIds = [];
@@ -29,6 +31,12 @@ class PriceCatalogResolver
         $this->catalogLoaded = false;
         $this->productBatches = [];
         $this->primedProductIds = [];
+        $this->inheritedDiscounts = null;
+    }
+
+    public function inheritedDiscounts(): CatalogGroupDiscountInheritance
+    {
+        return $this->inheritedDiscounts ??= new CatalogGroupDiscountInheritance;
     }
 
     public function activeCatalog(): ?PriceCatalog
@@ -79,7 +87,7 @@ class PriceCatalogResolver
         $entries = $this->eligibleEntries($catalog, $user, $groupId, $quantity, $at)
             ->whereIn('product_id', $missingIds)->get();
         foreach ($missingIds as $productId) {
-            $this->productBatches[$key][$productId] = ['entry' => null, 'regular' => null];
+            $this->productBatches[$key][$productId] = ['entry' => null, 'regular' => null, 'inherited' => null];
         }
         foreach ($entries as $entry) {
             $candidate = &$this->productBatches[$key][(int) $entry->product_id];
@@ -88,6 +96,10 @@ class PriceCatalogResolver
                 $candidate['regular'] ??= $entry;
             }
             unset($candidate);
+        }
+        $unpricedIds = array_values(array_filter($missingIds, fn (int $id) => $this->productBatches[$key][$id]['entry'] === null));
+        foreach ($this->inheritedDiscounts()->forProducts($unpricedIds, $catalog, $groupId, $at) as $productId => $price) {
+            $this->productBatches[$key][$productId]['inherited'] = $price;
         }
     }
 
@@ -117,6 +129,7 @@ class PriceCatalogResolver
         if ($candidate !== null) {
             $entry = $candidate['entry'];
             $regular = $candidate['regular'];
+            $inherited = $candidate['inherited'];
         } else {
             $query = $this->eligibleEntries($catalog, $user, (int) $account->customer_group_id, $quantity, $at)
                 ->where('product_id', $product->getKey());
@@ -124,17 +137,19 @@ class PriceCatalogResolver
             $regular = $entry?->kind === PriceCatalogEntry::SPECIAL
                 ? (clone $query)->where('kind', '!=', PriceCatalogEntry::SPECIAL)->first()
                 : null;
+            $inherited = $entry ? null : ($this->inheritedDiscounts()->forProducts([(int) $product->getKey()], $catalog,
+                (int) $account->customer_group_id, $at)[(int) $product->getKey()] ?? null);
         }
 
         return new ResolvedB2BPrice(
             id: (int) ($entry?->id ?? $catalog->id),
-            price: (float) ($entry?->price ?? $fallback ?? $product->base_price),
-            source_type: 'price_catalog_'.($entry?->kind ?? 'base'),
+            price: (float) ($entry?->price ?? $inherited['price'] ?? $fallback ?? $product->base_price),
+            source_type: 'price_catalog_'.($entry?->kind ?? ($inherited ? PriceCatalogEntry::GROUP_DISCOUNT : 'base')),
             customer_group_id: (int) $account->customer_group_id,
             user_id: $entry?->kind === PriceCatalogEntry::CUSTOMER ? (int) $user->getKey() : null,
             catalog_id: (int) $catalog->id,
             catalog_entry_id: $entry ? (int) $entry->id : null,
-            rule_id: $entry?->discount_rule_id ? (int) $entry->discount_rule_id : null,
+            rule_id: $entry?->discount_rule_id ? (int) $entry->discount_rule_id : ($inherited['rule_id'] ?? null),
             is_final: true,
             previous_price: $entry?->kind === PriceCatalogEntry::SPECIAL
                 ? (float) ($regular?->price ?? $fallback ?? $product->base_price)

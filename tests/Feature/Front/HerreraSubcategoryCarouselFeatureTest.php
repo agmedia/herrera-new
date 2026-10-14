@@ -39,6 +39,7 @@ class HerreraSubcategoryCarouselFeatureTest extends TestCase
         $response = $this->get(route('categories.show', ['slug' => 'carousel-root']))->assertOk();
         $xpath = $this->xpath($response->getContent());
         $this->assertSame([$first->id, $last->id], $this->cardIds($xpath));
+        $this->assertSame('Podkategorije (2)', trim($xpath->query('//*[@id="category-subcategories-'.$root->id.'-title"]')->item(0)->textContent));
         $this->assertSame(1, $xpath->query('//main/*[contains(@class, "herrera-catalog-heading-band")]/following-sibling::*[1][@data-herrera-subcategory-carousel]')->count());
         $this->assertSame(1, $xpath->query('//*[@data-herrera-subcategory-carousel]/following-sibling::*[contains(@class, "catalog-filter-section")]')->count());
         $this->assertSame(2, $xpath->query('//*[@data-subcategory-controls]//button[@aria-controls="category-subcategories-'.$root->id.'"]')->count());
@@ -98,7 +99,7 @@ class HerreraSubcategoryCarouselFeatureTest extends TestCase
         $image = $xpath->query('.//img', $card)->item(0);
         $this->assertSame(asset('assets/brand/herrera-logo.svg'), $image->getAttribute('src'));
         $this->assertSame('', $image->getAttribute('alt'));
-        $this->assertSame('Subcategories', trim($xpath->query('//*[@id="category-subcategories-'.$root->id.'-title"]')->item(0)->textContent));
+        $this->assertSame('Subcategories (1)', trim($xpath->query('//*[@id="category-subcategories-'.$root->id.'-title"]')->item(0)->textContent));
         $this->assertTrue($response->viewData('subcategoryCards')->first()->relationLoaded('media'));
     }
 
@@ -157,6 +158,7 @@ class HerreraSubcategoryCarouselFeatureTest extends TestCase
                 DB::disableQueryLog();
             }
             $this->assertSame([$branch->id], $this->cardIds($this->xpath($response->getContent())));
+            $this->assertSame('Podkategorije (1)', trim($this->xpath($response->getContent())->query('//*[@id="category-subcategories-'.$root->id.'-title"]')->item(0)->textContent));
             $this->assertSame($showFilters ? [$branch->id] : [], $response->viewData('subcategories')->pluck('id')->all());
             $this->assertCount(1, $countQueries);
         }

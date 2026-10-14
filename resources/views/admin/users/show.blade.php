@@ -28,6 +28,11 @@
 
         @include('admin.users.partials.purchase-statistics')
 
+        @if ($user->account_type === 'customer' && ! $user->can('admin.access'))
+            <livewire:admin.user.customer-details-editor :user-id="$user->id" />
+            <livewire:admin.user.customer-crm-manager :customer-id="$user->id" />
+        @endif
+
         @if ($user->b2bAccount)
             @php
                 $b2b = $user->b2bAccount;

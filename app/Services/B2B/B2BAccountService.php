@@ -7,6 +7,7 @@ use App\Models\User\B2BAccount;
 use App\Models\User\CustomerGroup;
 use App\Models\User\UserAddress;
 use App\Models\User\UserProfile;
+use App\Services\Admin\OrderManagerAccess;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -54,6 +55,7 @@ class B2BAccountService
             // serijalizira ovaj postupak i za novi OIB koji još nema red za zaključavanje.
             User::query()->orderBy('id')->lockForUpdate()->firstOrFail(['id']);
             $lockedUser = User::query()->lockForUpdate()->findOrFail($user->getKey());
+            app(OrderManagerAccess::class)->assertCustomer($lockedUser, $reviewer);
             if ($lockedUser->isA('superadmin') && ! $reviewer->isA('superadmin')) {
                 throw new AuthorizationException('Samo superadministrator može uređivati ovaj račun.');
             }
@@ -126,7 +128,12 @@ class B2BAccountService
      */
     public function review(B2BAccount $account, array $data, User $reviewer, bool $preserveGroupMemberships = false, ?array $editableFields = null): B2BAccount
     {
+        abort_unless($reviewer->isA('superadmin', 'admin') || ($reviewer->can('admin.access') && $reviewer->can('users.profile.update')), 403);
+        app(OrderManagerAccess::class)->assertCustomer($account->user, $reviewer);
+
         return DB::transaction(function () use ($account, $data, $reviewer, $preserveGroupMemberships, $editableFields): B2BAccount {
+            $account = B2BAccount::query()->lockForUpdate()->findOrFail($account->id);
+            app(B2BApprovalWorkflow::class)->assertReview($account, (string) $data['status'], $reviewer);
             $previousGroupId = $account->customer_group_id
                 ? (int) $account->customer_group_id
                 : null;
@@ -148,8 +155,8 @@ class B2BAccountService
                     : null,
                 'purchase_order_required' => (bool) ($data['purchase_order_required'] ?? false),
                 'status_reason' => $this->nullableString($data['status_reason'] ?? null),
-                'reviewed_at' => now(),
-                'reviewed_by' => $reviewer->getKey(),
+                'reviewed_at' => app(B2BApprovalWorkflow::class)->canFinalize($reviewer) ? now() : $account->reviewed_at,
+                'reviewed_by' => app(B2BApprovalWorkflow::class)->canFinalize($reviewer) ? $reviewer->getKey() : $account->reviewed_by,
             ];
             if ($editableFields !== null) {
                 $fields = Arr::only($fields, array_merge(

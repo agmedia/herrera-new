@@ -340,7 +340,8 @@ return [
         ],
         'admin.users.b2b' => [
             'view' => ['users.list.view'],
-            'mutate' => ['users.profile.update'],
+            // Proposals authorize the assigned representative; profile edits authorize separately.
+            'mutate' => ['users.list.view'],
         ],
         'admin.users.groups*' => [
             'view' => ['users.groups.manage'],
@@ -361,8 +362,13 @@ return [
             'view' => ['users.access.manage'],
             'mutate' => ['users.access.manage'],
         ],
+        'admin.users.crm' => [
+            'view' => ['users.list.view'],
+            'mutate' => ['users.list.view'],
+        ],
         'admin.users' => [
             'view' => ['users.list.view'],
+            'mutate' => ['users.profile.update', 'users.groups.manage'],
         ],
 
         'admin.profile' => [

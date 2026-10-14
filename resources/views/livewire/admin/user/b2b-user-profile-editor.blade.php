@@ -3,6 +3,9 @@
         <div>
             <h2 class="admin-section-title">{{ __('B2B poslovni profil') }}</h2>
             <p class="mt-2 max-w-3xl text-sm text-slate-600">{{ __('Profil tvrtke i grupa kupaca ne odobravaju B2B pristup automatski. Za cijene i brzu narudžbu odaberite status Odobreno i aktivnu primarnu cjenovnu grupu, pa spremite ovaj profil.') }}</p>
+            @if ($account?->requiresSalesProposal() && $account->status === \App\Models\User\B2BAccount::STATUS_PENDING)
+                <p class="mt-2 text-sm font-semibold text-cyan-800">{{ __('Novi zahtjev odobrava administrator nakon razgovora i prijedloga dodijeljenog komercijalista. Otvorite B2B račun za obradu zahtjeva.') }}</p>
+            @endif
             @if (! $account)
                 <p class="mt-2 text-xs text-slate-500">{{ __('Podaci su preuzeti iz spremljenog profila i adrese korisnika. B2B profil spremate zasebnim gumbom ispod.') }}</p>
             @endif
@@ -36,7 +39,7 @@
         <fieldset @disabled(! $canUpdate) class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <div>
                 <label for="b2b-status-{{ $userId }}" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Status') }} *</label>
-                <select id="b2b-status-{{ $userId }}" wire:model.live="b2b.status" class="admin-select w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                <select id="b2b-status-{{ $userId }}" wire:model.live="b2b.status" @disabled(! $canFinalize) class="admin-select w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                     @foreach ($statusOptions as $value => $label)
                         <option value="{{ $value }}">{{ __($label) }}</option>
                     @endforeach

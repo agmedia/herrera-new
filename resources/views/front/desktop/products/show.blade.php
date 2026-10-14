@@ -5,6 +5,9 @@
     $canViewPrices = $canViewPrices ?? app(\App\Services\Pricing\B2BAccessService::class)->canViewPrices(auth()->user());
     $translation = $product->translations->firstWhere('locale', $locale)
         ?? $product->translations->firstWhere('locale', $fallbackLocale);
+    $compactProductSpecifications = $isHerreraProductDetail
+        ? app(\App\Support\ProductSpecificationPresenter::class)->compact($product, $locale, $fallbackLocale, (string) ($translation?->description ?? ''))
+        : null;
     $manufacturerTranslation = $product->manufacturer?->translations?->firstWhere('locale', $locale)
         ?? $product->manufacturer?->translations?->firstWhere('locale', $fallbackLocale);
     $manufacturerEnabled = app(\App\Services\Catalog\CatalogFeatureService::class)->useManufacturers();
@@ -132,6 +135,10 @@
     $hasLinkedOptions = $optionRows->contains(fn ($row) => (int) ($row->parent_option_value_id ?? 0) > 0);
     $primaryOptionLabel = __('ui.cart.modal.option');
     $secondaryOptionLabel = __('ui.cart.modal.option');
+    $singleOptionTranslation = $optionRows->first()?->optionValue?->option?->translations?->firstWhere('locale', $locale)
+        ?? $optionRows->first()?->optionValue?->option?->translations?->firstWhere('locale', $fallbackLocale)
+        ?? $optionRows->first()?->optionValue?->option?->translations?->first();
+    $singleOptionLabel = trim((string) ($singleOptionTranslation?->name ?? '')) ?: __('ui.product.select_options');
     $linkedPrimaryValues = collect();
     if ($hasLinkedOptions) {
         $firstLinkedRow = $optionRows->first(fn ($row) => (int) ($row->parent_option_value_id ?? 0) > 0);
@@ -432,6 +439,8 @@
                 data-ga4-item-category="{{ (string) ($firstCategoryTranslation?->name ?? '') }}"
                 data-ga4-currency="EUR"
                 data-product-base-sku="{{ $productDisplayCode }}"
+                data-product-default-local-stock="{{ $localStockQuantity }}"
+                data-product-default-supplier-stock="{{ $supplierStockQuantity }}"
                 data-product-fallback-id="{{ (int) $product->id }}"
                 data-product-name="{{ $translation?->name ?? $product->code }}"
                 data-product-image="{{ (string) (($gallery->first()['full'] ?? '') ?: '') }}"
@@ -458,7 +467,7 @@
                 @if ($optionRows->isNotEmpty())
                     <div>
                         <div class="mb-4 flex flex-col items-start gap-2 sm:mb-3 sm:flex-row sm:items-center sm:justify-between">
-                            <label class="text-xs font-semibold uppercase tracking-wide text-slate-900">{{ $hasLinkedOptions ? __('ui.product.select_options') : __('ui.product.select_size') }} <span class="text-rose-600">*</span></label>
+                            <label class="text-xs font-semibold uppercase tracking-wide text-slate-900">{{ $hasLinkedOptions ? __('ui.product.select_options') : $singleOptionLabel }} <span class="text-rose-600">*</span></label>
                             <div class="flex w-full flex-wrap items-center gap-x-3 gap-y-1 sm:w-auto sm:justify-end">
                                 @if ($fitFinderEnabled && $optionRows->count() > 1)
                                     @if ($fitFinderSavedSize !== '')
@@ -506,6 +515,7 @@
                                                 value="{{ $row->id }}"
                                                 data-parent-id="{{ (int) ($row->parent_option_value_id ?? 0) }}"
                                                 data-option-sku="{{ (string) ($row->sku ?: '') }}"
+                                                data-option-stock="{{ max(0, (int) $row->stock_qty) }}"
                                                 data-option-price-current="{{ $rowPriceData['current'] }}"
                                                 data-option-price-current-value="{{ $rowPriceData['current_value'] }}"
                                                 data-option-price-net="{{ $rowPriceData['current_net'] }}"
@@ -538,6 +548,7 @@
                                             class="sr-only product-size-radio"
                                             data-size-label="{{ $label }}"
                                             data-option-sku="{{ (string) ($row->sku ?: '') }}"
+                                            data-option-stock="{{ max(0, (int) $row->stock_qty) }}"
                                             data-option-price-current="{{ $rowPriceData['current'] }}"
                                             data-option-price-current-value="{{ $rowPriceData['current_value'] }}"
                                             data-option-price-net="{{ $rowPriceData['current_net'] }}"

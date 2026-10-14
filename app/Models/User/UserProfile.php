@@ -13,6 +13,8 @@ class UserProfile extends Model
         'last_name',
         'phone',
         'company',
+        'county',
+        'customer_type',
         'oib',
         'birthday',
         'gender',
@@ -33,4 +35,3 @@ class UserProfile extends Model
         return $this->belongsTo(\App\Models\User::class);
     }
 }
-

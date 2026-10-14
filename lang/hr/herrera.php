@@ -39,6 +39,19 @@ return [
         'contact' => 'Kontaktirajte nas',
         'register' => 'Registracija tvrtke',
     ],
+    'registration' => [
+        'eyebrow' => 'Postanite Herrera poslovni partner',
+        'title' => 'Vaša nabava, korak jednostavnija.',
+        'description' => 'Registrirajte svoju tvrtku i iskoristite prednosti B2B kupnje. Sve što trebate za svakodnevnu nabavu, na jednom mjestu.',
+        'action' => 'Registrirajte tvrtku',
+        'login' => 'Već imate račun? Prijavite se',
+        'note' => 'Pristup cijenama i naručivanju nakon odobrenja registracije.',
+        'benefits' => [
+            'prices' => 'Pregledajte cijene i uvjete prilagođene vašoj tvrtki.',
+            'order' => 'Dodajte artikle po šifri i brže pripremite narudžbu.',
+            'history' => 'Pronađite prethodne narudžbe i jednostavno naručite ponovno.',
+        ],
+    ],
     'warranty' => [
         'title' => 'Zakonsko jamstvo – najmanje 2 godine',
         'modal_title' => 'Službena obavijest o zakonskom jamstvu',

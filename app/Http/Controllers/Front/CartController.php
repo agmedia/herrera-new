@@ -94,11 +94,11 @@ class CartController extends Controller
                 ->where('product_id', $product->id)
                 ->where('is_active', true)
                 ->with([
-                    'optionValue.option:id,payload',
-                    'parentOptionValue.option:id,payload',
+                    'optionValue.option:id,is_active,payload',
+                    'parentOptionValue.option:id,is_active,payload',
                 ])
                 ->first();
-            if (! $optionRow || ! $optionRow->showsOnProductPage()) {
+            if (! $optionRow || ! $optionRow->isVisibleOnStorefront()) {
                 if ($request->expectsJson() || $request->ajax()) {
                     return response()->json([
                         'ok' => false,

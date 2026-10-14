@@ -7,6 +7,7 @@ use App\Models\Settings\Local\TaxRate;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class PriceCatalogQuery
@@ -58,10 +59,16 @@ class PriceCatalogQuery
             $candidates[1]->forceIndex('price_entries_customer_lookup');
         }
 
-        return [
-            'sql' => 'COALESCE('.implode(', ', array_map(static fn (QueryBuilder $q): string => '('.$q->toSql().')', $candidates)).', products.base_price)',
-            'bindings' => array_merge(...array_map(static fn (QueryBuilder $q): array => $q->getBindings(), $candidates)),
-        ];
+        $sql = array_map(static fn (QueryBuilder $q): string => '('.$q->toSql().')', $candidates);
+        $bindings = array_merge(...array_map(static fn (QueryBuilder $q): array => $q->getBindings(), $candidates));
+        $inherited = app(PriceCatalogResolver::class)->inheritedDiscounts()
+            ->expression($catalog, (int) $account->customer_group_id, Carbon::parse($at));
+        if ($inherited) {
+            $sql[] = $inherited['sql'];
+            $bindings = [...$bindings, ...$inherited['bindings']];
+        }
+
+        return ['sql' => 'COALESCE('.implode(', ', $sql).', products.base_price)', 'bindings' => $bindings];
     }
 
     /** @return array{sql:string,bindings:array}|null */

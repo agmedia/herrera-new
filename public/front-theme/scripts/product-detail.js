@@ -467,7 +467,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const setValue = function (value) {
             const numeric = Number.parseInt(String(value), 10);
-            const clamped = Number.isNaN(numeric) ? 1 : Math.min(99, Math.max(1, numeric));
+            const maximum = Number.parseInt(String(input.max || '99'), 10) || 99;
+            const clamped = Number.isNaN(numeric) ? 1 : Math.min(maximum, Math.max(1, numeric));
             input.value = String(clamped);
             input.dispatchEvent(new Event('input', { bubbles: true }));
             input.dispatchEvent(new Event('change', { bubbles: true }));
@@ -500,7 +501,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const normalizedQuantity = function (value) {
             const numeric = Number.parseInt(String(value), 10);
-            return Number.isNaN(numeric) ? 1 : Math.min(99, Math.max(1, numeric));
+            const maximum = Number.parseInt(String(sourceQtyInput ? sourceQtyInput.max : '99'), 10) || 99;
+            return Number.isNaN(numeric) ? 1 : Math.min(maximum, Math.max(1, numeric));
         };
 
         const syncFloatingQuantity = function () {
@@ -633,6 +635,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (ga4ItemId !== '') {
             form.dataset.ga4ItemId = ga4ItemId;
+        }
+    };
+
+    const syncStockDisplay = function (form) {
+        const radio = form.querySelector('input[name="product_option_value_id"]:checked');
+        const select = form.querySelector('select[name="product_option_value_id"]');
+        const selected = radio || (select && !select.disabled && select.value ? select.options[select.selectedIndex] : null);
+        const localStock = Math.max(0, Number.parseInt(String(selected ? selected.dataset.optionStock : form.dataset.productDefaultLocalStock), 10) || 0);
+        const supplierStock = Math.max(0, Number.parseInt(String(selected ? '0' : form.dataset.productDefaultSupplierStock), 10) || 0);
+
+        [['[data-product-local-stock]', localStock], ['[data-product-supplier-stock]', supplierStock]].forEach(function ([selector, quantity]) {
+            document.querySelectorAll(selector).forEach(function (node) {
+                node.textContent = quantity.toLocaleString(document.documentElement.lang || 'hr');
+                node.classList.toggle('text-emerald-700', quantity > 0);
+                node.classList.toggle('text-slate-500', quantity <= 0);
+            });
+        });
+
+        const input = form.querySelector('input[name="quantity"]');
+        if (input) {
+            input.max = String(Math.max(1, Math.min(99, localStock + supplierStock)));
+            input.value = String(Math.min(Number.parseInt(input.max, 10), Math.max(1, Number.parseInt(input.value, 10) || 1)));
+            input.dispatchEvent(new Event('input', { bubbles: true }));
         }
     };
 
@@ -836,11 +861,13 @@ document.addEventListener('DOMContentLoaded', function () {
         initLinkedOptionSelectors(form);
         syncSkuDisplay(form);
         syncPriceDisplay(form);
+        syncStockDisplay(form);
 
         form.querySelectorAll('input[name="product_option_value_id"], select[name="product_option_value_id"], [data-linked-option-primary]').forEach(function (field) {
             field.addEventListener('change', function () {
                 syncSkuDisplay(form);
                 syncPriceDisplay(form);
+                syncStockDisplay(form);
             });
         });
 

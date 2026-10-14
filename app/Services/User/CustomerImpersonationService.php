@@ -95,6 +95,7 @@ class CustomerImpersonationService
             'customer_id' => (int) $customer->id,
             'admin_front' => $request->session()->get('front', []),
             'started_at' => now()->toIso8601String(),
+            'sales_session_id' => app(CustomerCrmService::class)->startSession($customer, $admin)->id,
         ];
 
         // Checkout authorization and cart state belong to the current identity.
@@ -126,6 +127,7 @@ class CustomerImpersonationService
         $admin = User::query()->find((int) ($context['admin_id'] ?? 0));
         $customer = User::query()->find($customerId);
 
+        app(CustomerCrmService::class)->endSession($context);
         $staffImpersonation = app(StaffImpersonationService::class);
         if ($staffImpersonation->isActive($request)) {
             try {

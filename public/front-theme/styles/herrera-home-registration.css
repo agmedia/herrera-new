@@ -1,0 +1,187 @@
+.herrera-storefront .herrera-home-registration {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(36px, 7vw, 128px);
+    margin: 44px 0;
+    padding: clamp(36px, 3.5vw, 56px) 0;
+    clip-path: inset(0 -100vmax);
+}
+
+.herrera-storefront .herrera-home-registration-copy {
+    min-width: 0;
+    max-width: 660px;
+}
+
+.herrera-storefront .herrera-home-registration-eyebrow {
+    margin: 0 0 12px;
+    color: #007c8d;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.5;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+}
+
+.herrera-storefront .herrera-home-registration h2 {
+    max-width: 620px;
+    margin: 0;
+    color: #2e3539;
+    font-size: clamp(28px, 2.8vw, 42px);
+    font-weight: 700;
+    line-height: 1.18;
+    letter-spacing: -.04em;
+}
+
+.herrera-storefront .herrera-home-registration-description {
+    max-width: 540px;
+    margin: 16px 0 0;
+    color: #526970;
+    font-size: 15px;
+    line-height: 1.75;
+}
+
+.herrera-storefront .herrera-home-registration-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px 24px;
+    margin-top: 24px;
+}
+
+.herrera-storefront .herrera-home-registration-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    min-height: 48px;
+    padding: 13px 22px;
+    border: 1px solid #007b8b;
+    border-radius: 6px;
+    background: #007b8b;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.5;
+    text-decoration: none;
+    transition: background-color .18s ease, border-color .18s ease;
+}
+
+.herrera-storefront .herrera-home-registration-primary:hover {
+    border-color: #005f6c;
+    background: #005f6c;
+}
+
+.herrera-storefront .herrera-home-registration-primary svg {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+}
+
+.herrera-storefront .herrera-home-registration-login {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: #007b8b;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.6;
+    text-underline-offset: 4px;
+}
+
+.herrera-storefront .herrera-home-registration-login:hover {
+    text-decoration: underline;
+}
+
+.herrera-storefront .herrera-home-registration a:focus-visible {
+    outline: 2px solid #007b8b;
+    outline-offset: 4px;
+}
+
+.herrera-storefront .herrera-home-registration-note {
+    margin: 14px 0 0;
+    color: #607479;
+    font-size: 11px;
+    line-height: 1.6;
+}
+
+.herrera-storefront .herrera-home-registration-benefits {
+    width: 100%;
+    max-width: 680px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.herrera-storefront .herrera-home-registration-benefits li {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: center;
+    gap: 20px;
+    padding: 20px 0;
+}
+
+.herrera-storefront .herrera-home-registration-benefits li + li {
+    border-top: 1px solid #cce1e5;
+}
+
+.herrera-storefront .herrera-home-registration-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border: 1px solid #cce1e5;
+    border-radius: 10px;
+    background: #ffffff80;
+    color: #007b8b;
+}
+
+.herrera-storefront .herrera-home-registration-icon svg {
+    width: 21px;
+    height: 21px;
+}
+
+.herrera-storefront .herrera-home-registration-benefits h3 {
+    margin: 0;
+    color: #2e3539;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.45;
+    letter-spacing: -.02em;
+}
+
+.herrera-storefront .herrera-home-registration-benefits p {
+    margin: 6px 0 0;
+    color: #526970;
+    font-size: 13px;
+    line-height: 1.65;
+}
+
+@media (max-width: 767px) {
+    .herrera-storefront .herrera-home-registration {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 24px;
+        margin: 32px 0;
+        padding: 32px 0;
+    }
+
+    .herrera-storefront .herrera-home-registration-description {
+        font-size: 14px;
+    }
+
+    .herrera-storefront .herrera-home-registration-actions {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .herrera-storefront .herrera-home-registration-benefits li {
+        gap: 16px;
+        padding: 16px 0;
+    }
+
+    .herrera-storefront .herrera-home-registration-benefits h3 {
+        font-size: 14px;
+    }
+}

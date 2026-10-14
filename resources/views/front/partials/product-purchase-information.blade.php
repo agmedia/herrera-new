@@ -7,6 +7,10 @@
 
 <div class="product-purchase-information" data-product-purchase-information>
     @include('front.partials.legal-warranty-notice', ['warrantyVariant' => 'product'])
+    @if (str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera'))
+        @include('front.partials.herrera-product-specifications')
+    @endif
+    @include('front.partials.product-documents')
     <details class="product-information-panel" open>
         <summary class="product-information-summary">
             <span class="product-information-summary-icon">

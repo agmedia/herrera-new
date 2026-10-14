@@ -95,7 +95,7 @@ class Herrera48HourAvailabilityFilterTest extends TestCase
             ])
             ->assertViewHas('manufacturers', fn ($manufacturers) => $manufacturers->pluck('id')->all() === [$localManufacturer->id])
             ->assertViewHas('subcategories', fn ($categories) => $categories->firstWhere('id', $localCategory->id)->products_count === 1
-                && $categories->firstWhere('id', $supplierCategory->id)->products_count === 0)
+                && ! $categories->contains('id', $supplierCategory->id))
             ->assertDontSee('supplier-finish')->assertDontSee('supplier-material');
 
         $this->get(route('categories.show', ['slug' => 'availability', 'available_only' => 1, 'opt_'.$option->id => $localValue->id]))->assertOk()

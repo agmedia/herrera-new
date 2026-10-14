@@ -123,6 +123,8 @@ class CartService
                 'taxRate',
                 'categories:id,payload',
                 'packages',
+                'optionValues.optionValue.option:id,is_active,payload',
+                'optionValues.parentOptionValue.option:id,is_active,payload',
                 'translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale]),
                 'manufacturer.translations' => fn ($q) => $q->whereIn('locale', [$locale, $fallbackLocale]),
             ])
@@ -151,8 +153,12 @@ class CartService
                     continue;
                 }
                 $option = $optionRows->get((int) ($item['product_option_value_id'] ?? 0));
-                if ($option && (int) $option->product_id !== $productId) {
-                    $option = null;
+                if (($item['product_option_value_id'] ?? null)
+                    && (! $option || (int) $option->product_id !== $productId || ! $option->isVisibleOnStorefront())) {
+                    continue;
+                }
+                if (! $option && $product->hasVisibleOptionRows()) {
+                    continue;
                 }
                 $stock = $option ? (int) $option->stock_qty : $product->availableStockQuantity();
                 $pricingQuantities[$productId] = ($pricingQuantities[$productId] ?? 0)
@@ -171,8 +177,12 @@ class CartService
             }
 
             $optionRow = $optionValueId > 0 ? $optionRows->get($optionValueId) : null;
-            if ($optionRow && (int) $optionRow->product_id !== $productId) {
-                $optionRow = null;
+            if ($optionValueId > 0
+                && (! $optionRow || (int) $optionRow->product_id !== $productId || ! $optionRow->isVisibleOnStorefront())) {
+                continue;
+            }
+            if (! $optionRow && $product->hasVisibleOptionRows()) {
+                continue;
             }
 
             $maxStock = $optionRow ? (int) $optionRow->stock_qty : $product->availableStockQuantity();
@@ -401,7 +411,7 @@ class CartService
         }
 
         $optionRow = $this->resolveProductOptionValue($product, $productOptionValueId);
-        if ($this->requiresOptionSelection($product) && ! $optionRow) {
+        if (((int) $productOptionValueId > 0 || $this->requiresOptionSelection($product)) && ! $optionRow) {
             return false;
         }
 
@@ -452,6 +462,9 @@ class CartService
         }
 
         $optionRow = $this->resolveProductOptionValue($product, $productOptionValueId);
+        if (((int) $productOptionValueId > 0 || $this->requiresOptionSelection($product)) && ! $optionRow) {
+            return false;
+        }
         $stock = $optionRow ? (int) $optionRow->stock_qty : $product->availableStockQuantity();
         if ($stock <= 0) {
             unset($items[$lineKey]);
@@ -593,12 +606,12 @@ class CartService
             ->where('product_id', $product->id)
             ->where('is_active', true)
             ->with([
-                'optionValue.option:id,payload',
-                'parentOptionValue.option:id,payload',
+                'optionValue.option:id,is_active,payload',
+                'parentOptionValue.option:id,is_active,payload',
             ])
             ->first();
 
-        if (! $optionRow || ! $optionRow->showsOnProductPage()) {
+        if (! $optionRow || ! $optionRow->isVisibleOnStorefront()) {
             return null;
         }
 

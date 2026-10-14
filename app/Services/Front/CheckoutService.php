@@ -366,6 +366,9 @@ class CheckoutService
                 'created_by' => $orderActor?->id,
                 'updated_by' => $orderActor?->id,
             ]);
+            if ($delegation) {
+                app(\App\Services\User\CustomerCrmService::class)->recordSessionOrder(request(), $order, $delegation['actor']);
+            }
 
             $index = 0;
             foreach ($lines as $line) {
@@ -411,6 +414,7 @@ class CheckoutService
                             'source' => $line['b2b_source_type'] ?? $line['price_source'] ?? 'base',
                             'catalog_id' => $line['price_catalog_id'] ?? null,
                             'catalog_entry_id' => $line['price_catalog_entry_id'] ?? null,
+                            'rule_id' => $line['b2b_rule_id'] ?? null,
                             'customer_group_id' => $user?->b2bAccount?->customer_group_id,
                             'final' => (bool) ($line['price_is_final'] ?? false),
                             'monetary_precision' => $linePrecision,

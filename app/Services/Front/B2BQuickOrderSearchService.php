@@ -63,10 +63,10 @@ class B2BQuickOrderSearchService
                     ->where('is_active', true)
                     ->orderBy('sort_order')
                     ->orderBy('id'),
-                'optionValues.optionValue.option:id,payload',
+                'optionValues.optionValue.option:id,is_active,payload',
                 'optionValues.optionValue.option.translations' => fn ($query) => $query->whereIn('locale', [$locale, $fallbackLocale]),
                 'optionValues.optionValue.translations' => fn ($query) => $query->whereIn('locale', [$locale, $fallbackLocale]),
-                'optionValues.parentOptionValue.option:id,payload',
+                'optionValues.parentOptionValue.option:id,is_active,payload',
                 'optionValues.parentOptionValue.option.translations' => fn ($query) => $query->whereIn('locale', [$locale, $fallbackLocale]),
                 'optionValues.parentOptionValue.translations' => fn ($query) => $query->whereIn('locale', [$locale, $fallbackLocale]),
             ])
@@ -98,7 +98,7 @@ class B2BQuickOrderSearchService
                 || $this->contains($product->barcode, $normalizedSearch)
                 || $this->contains($name, $normalizedSearch);
             $visibleOptions = $product->optionValues
-                ->filter(static fn (ProductOptionValue $option): bool => $option->showsOnProductPage())
+                ->filter(static fn (ProductOptionValue $option): bool => $option->isVisibleOnStorefront())
                 ->values();
 
             if ($visibleOptions->isNotEmpty()) {
@@ -121,7 +121,7 @@ class B2BQuickOrderSearchService
                 continue;
             }
 
-            if ($this->canSelect($product)) {
+            if ($productMatches && $this->canSelect($product)) {
                 $results->push($this->present($product, null, $user));
             }
 
@@ -156,10 +156,10 @@ class B2BQuickOrderSearchService
 
         if ($option) {
             $option->loadMissing([
-                'optionValue.option:id,payload',
+                'optionValue.option:id,is_active,payload',
                 'optionValue.option.translations' => fn ($query) => $query->whereIn('locale', [$locale, $fallbackLocale]),
                 'optionValue.translations' => fn ($query) => $query->whereIn('locale', [$locale, $fallbackLocale]),
-                'parentOptionValue.option:id,payload',
+                'parentOptionValue.option:id,is_active,payload',
                 'parentOptionValue.option.translations' => fn ($query) => $query->whereIn('locale', [$locale, $fallbackLocale]),
                 'parentOptionValue.translations' => fn ($query) => $query->whereIn('locale', [$locale, $fallbackLocale]),
             ]);
@@ -215,7 +215,7 @@ class B2BQuickOrderSearchService
             return false;
         }
 
-        if ($option && (! $option->is_active || (int) $option->product_id !== (int) $product->getKey() || ! $option->showsOnProductPage())) {
+        if ($option && ((int) $option->product_id !== (int) $product->getKey() || ! $option->isVisibleOnStorefront())) {
             return false;
         }
 

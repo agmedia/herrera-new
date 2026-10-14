@@ -102,6 +102,9 @@
                 @if ($features['catalog_use_attributes'])
                     <a href="{{ route('admin.attributes', ['locale' => $locale]) }}" class="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">{{ __('Atributi') }}</a>
                 @endif
+                @if ($features['catalog_use_options'])
+                    <a href="{{ route('admin.options', ['locale' => $locale]) }}" class="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">{{ __('Opcije') }}</a>
+                @endif
                 @if ($features['catalog_use_manufacturers'])
                     <a href="{{ route('admin.manufacturers', ['locale' => $locale]) }}" class="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">{{ __('Brendovi') }}</a>
                 @endif

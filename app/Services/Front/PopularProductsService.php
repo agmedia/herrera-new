@@ -57,9 +57,9 @@ class PopularProductsService
                 'media', 'taxRate', 'manufacturer.translations', 'categories.translations',
                 'attributes' => ProductMaterialLabel::eagerLoadAttributes($locale, $fallbackLocale),
                 'optionValues' => fn ($query) => $query->where('is_active', true)->orderBy('sort_order')->orderBy('id')->with([
-                    'optionValue.option:id,payload',
+                    'optionValue.option:id,is_active,payload',
                     'optionValue.translations' => fn ($query) => $query->whereIn('locale', $locales),
-                    'parentOptionValue.option:id,payload',
+                    'parentOptionValue.option:id,is_active,payload',
                     'parentOptionValue.translations' => fn ($query) => $query->whereIn('locale', $locales),
                 ]),
             ])

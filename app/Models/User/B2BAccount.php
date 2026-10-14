@@ -46,6 +46,12 @@ class B2BAccount extends Model
         'reviewed_by',
         'payload',
         'quick_order_draft',
+        'assigned_sales_rep_id',
+        'contacted_at',
+        'sales_comment',
+        'proposed_terms',
+        'proposed_by',
+        'proposed_at',
     ];
 
     protected function casts(): array
@@ -61,6 +67,9 @@ class B2BAccount extends Model
             'reviewed_at' => 'datetime',
             'payload' => 'array',
             'quick_order_draft' => 'array',
+            'proposed_terms' => 'array',
+            'contacted_at' => 'datetime',
+            'proposed_at' => 'datetime',
         ];
     }
 
@@ -92,6 +101,21 @@ class B2BAccount extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function assignedSalesRep(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_sales_rep_id');
+    }
+
+    public function proposer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'proposed_by');
+    }
+
+    public function requiresSalesProposal(): bool
+    {
+        return (bool) ($this->payload['approval_workflow_required'] ?? false);
     }
 
     public function scopeApproved(Builder $query): Builder

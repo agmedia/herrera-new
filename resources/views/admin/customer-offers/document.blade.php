@@ -18,17 +18,18 @@ table { width:100%; border-collapse:collapse; table-layout:fixed; }
 .intro { margin:7px 0 12px; font-size:10px; line-height:1.6; }
 .products td { width:50%; vertical-align:top; padding:0 7px 12px 0; }
 .products td+td { padding-left:7px; padding-right:0; }
-.card { border:1px solid #dbe5e8; padding:11px; height:290px; }
+.products tr { page-break-inside:avoid; }
+.card { border:1px solid #dbe5e8; padding:11px; min-height:290px; height:auto; page-break-inside:avoid; }
 .photo { text-align:center; height:135px; margin-bottom:8px; background:#fff; }
 .photo img { max-width:240px; max-height:135px; }
 .photo-empty { color:#82939b; line-height:135px; font-size:10px; }
 .name { font-size:11px; font-weight:bold; line-height:1.45; margin:0 0 4px; }
-.sku { color:#6b7c83; font-size:8px; margin-bottom:5px; }
+.sku { color:#6b7c83; font-size:8px; margin-bottom:5px; overflow-wrap:break-word; }
 .description { font-size:9px; line-height:1.55; margin:5px 0; }
 .option { color:#00869b; font-size:9px; }
 .item-price { border-top:1px solid #e3eaed; margin-top:8px; padding-top:7px; line-height:1.6; }
 .price { color:#00869b; font-size:15px; font-weight:bold; }
-.summary { border-top:2px solid #008aa0; padding-top:9px; margin-top:3px; }
+.summary { border-top:2px solid #008aa0; padding-top:9px; margin-top:3px; page-break-inside:avoid; }
 .summary td { vertical-align:top; }
 .totals { text-align:right; font-size:10px; line-height:1.8; }
 .total { font-size:15px; color:#00869b; font-weight:bold; }
@@ -59,7 +60,7 @@ body { background:#edf3f5; padding:25px; }
 <div class="photo">@if($images[$item->id] ?? null)<img src="{{ $images[$item->id] }}" alt="{{ $item->name }}">@else<span class="photo-empty">{{ __('customer_offers.no_image') }}</span>@endif</div>
 <div class="name">{{ \Illuminate\Support\Str::limit($item->name, 100, '…') }}</div>
 <div class="sku">{{ __('customer_offers.code') }}: {{ $item->sku ?: $item->code }}</div>
-@if($item->option_label)<div class="option">{{ $item->option_label }}</div>@endif
+@if($item->option_label)<div class="option">{{ \Illuminate\Support\Str::limit($item->option_label, 100, '…') }}</div>@endif
 <p class="description">{{ \Illuminate\Support\Str::limit($item->description, 220, '…') }}</p>
 <div class="item-price"><span class="price">{{ number_format((float) $item->unit_net, 4, ',', '.') }} €</span> / {{ $item->unit }} {{ __('customer_offers.excluding_vat') }}<br>
 {{ __('customer_offers.quantity') }}: {{ $item->quantity }} {{ $item->unit }} · {{ __('customer_offers.line_total') }}: <strong>{{ number_format((float) $item->line_net, 2, ',', '.') }} €</strong></div>

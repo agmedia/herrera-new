@@ -16,6 +16,8 @@ use App\Services\Sales\CustomerOfferImage;
 use App\Services\Sales\CustomerOfferPdf;
 use App\Services\Sales\CustomerOfferService;
 use App\Services\Settings\SystemSettingsService;
+use Dompdf\Dompdf;
+use Dompdf\Options;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -162,7 +164,19 @@ class CustomerOffersFeatureTest extends TestCase
         Mail::assertNothingSent();
     }
 
-    public function test_long_descriptions_and_names_stay_on_the_expected_pdf_pages(): void
+    public function test_single_long_product_keeps_its_price_inside_the_card_and_summary_below_it(): void
+    {
+        [$buyer] = $this->buyer();
+        $product = $this->product('Nastavak trapezasti za motiku sistem Click ružičasta VERKATTO VR-7563');
+        $data = $this->input($buyer, $product);
+        $data['title'] = 'Ponuda rasvjete i elektromaterijala';
+        $data['items'][0]['description'] = 'Karakteristike proizvoda: – Koristi se za rahljenje tla, kopanje rupa, orezivanje biljaka i uklanjanje korova – Izrađeno od visokokvalitetnog kaljenog čelika – Opremljena CLICK sustavom koji, kada se koristi s namjenskom drškom, olakšava rad.';
+        $offer = app(CustomerOfferService::class)->saveDraft($data, $this->staff());
+
+        $this->assertPdfLayoutDoesNotOverlap($this->pdfLayout($offer), [1 => 1], 1);
+    }
+
+    public function test_long_descriptions_and_names_keep_four_products_per_page_without_overlapping_the_summary(): void
     {
         [$buyer] = $this->buyer();
         $admin = $this->staff();
@@ -172,8 +186,9 @@ class CustomerOffersFeatureTest extends TestCase
         $data['notes'] = str_repeat('Napomena o ponudi. ', 50);
         $data['items'] = array_fill(0, 8, ['product_id' => $product->id, 'quantity' => 1, 'description' => str_repeat('Dugačak opis. ', 35)]);
         $offer = app(CustomerOfferService::class)->saveDraft($data, $admin);
-        $pdf = app(CustomerOfferPdf::class)->render($offer);
-        $this->assertSame(2, preg_match_all('~/Type\s*/Page\b~', $pdf));
+        $html = app(CustomerOfferPdf::class)->html($offer);
+        $this->assertSame(2, substr_count($html, 'data-offer-page="'));
+        $this->assertPdfLayoutDoesNotOverlap($this->pdfLayout($offer), [1 => 4, 2 => 4], 3);
     }
 
     public function test_explicit_send_attaches_pdf_once_locks_snapshot_and_only_owner_sees_it(): void
@@ -305,6 +320,85 @@ class CustomerOffersFeatureTest extends TestCase
             rmdir($base.'/public/image');
             rmdir($base.'/public');
             rmdir($base);
+        }
+    }
+
+    /** Capture the actual PDF renderer's boxes, rather than trusting HTML page markers. */
+    private function pdfLayout(CustomerOffer $offer): array
+    {
+        $options = new Options;
+        $options->set('isRemoteEnabled', false);
+        $options->set('isPhpEnabled', false);
+        $options->set('isJavascriptEnabled', false);
+        $options->set('defaultFont', 'DejaVu Sans');
+        $options->set('chroot', [storage_path('app'), public_path()]);
+        $pdf = new Dompdf($options);
+        $pdf->setPaper('A4', 'portrait');
+        $layout = ['cards' => [], 'prices' => [], 'summaries' => []];
+        $pdf->setCallbacks([['event' => 'end_frame', 'f' => function ($frame, $canvas) use (&$layout): void {
+            $node = $frame->get_node();
+            if (! $node instanceof \DOMElement) {
+                return;
+            }
+            $classes = preg_split('/\s+/', $node->getAttribute('class'), -1, PREG_SPLIT_NO_EMPTY);
+            foreach (['card' => 'cards', 'item-price' => 'prices', 'summary' => 'summaries'] as $class => $group) {
+                if (! in_array($class, $classes, true)) {
+                    continue;
+                }
+                $box = $frame->get_border_box();
+                $entry = [
+                    'page' => $canvas->get_page_number(),
+                    'left' => $box['x'], 'top' => $box['y'],
+                    'right' => $box['x'] + $box['w'], 'bottom' => $box['y'] + $box['h'],
+                ];
+                if ($group === 'prices') {
+                    $entry['card_id'] = $frame->get_parent()->get_id();
+                }
+                $layout[$group][$frame->get_id()] = $entry;
+            }
+        }]]);
+        $pdf->loadHtml(app(CustomerOfferPdf::class)->html($offer), 'UTF-8');
+        $pdf->render();
+        $layout['page_count'] = $pdf->getCanvas()->get_page_count();
+        $layout['page_width'] = $pdf->getCanvas()->get_width();
+        $layout['page_height'] = $pdf->getCanvas()->get_height();
+
+        return $layout;
+    }
+
+    private function assertPdfLayoutDoesNotOverlap(array $layout, array $cardsPerPage, int $summaryPage): void
+    {
+        $this->assertCount(array_sum($cardsPerPage), $layout['cards']);
+        $this->assertCount(array_sum($cardsPerPage), $layout['prices']);
+        $this->assertCount(1, $layout['summaries']);
+        $this->assertSame($summaryPage, $layout['page_count']);
+        $actualCardsPerPage = array_count_values(array_column($layout['cards'], 'page'));
+        ksort($actualCardsPerPage);
+        $this->assertSame($cardsPerPage, $actualCardsPerPage, 'Each product must appear exactly once, with at most four products on a physical PDF page.');
+
+        foreach ($layout['prices'] as $price) {
+            $this->assertArrayHasKey($price['card_id'], $layout['cards']);
+            $card = $layout['cards'][$price['card_id']];
+            $this->assertSame($card['page'], $price['page']);
+            $this->assertGreaterThanOrEqual($card['left'] - 0.5, $price['left']);
+            $this->assertGreaterThanOrEqual($card['top'] - 0.5, $price['top']);
+            $this->assertLessThanOrEqual($card['right'] + 0.5, $price['right']);
+            $this->assertLessThanOrEqual($card['bottom'] + 0.5, $price['bottom'], 'The complete price and quantity must stay inside the product card.');
+        }
+
+        $summary = reset($layout['summaries']);
+        $this->assertSame($summaryPage, $summary['page']);
+        foreach ($layout['cards'] as $card) {
+            $this->assertGreaterThanOrEqual($card['page'], $summary['page']);
+            if ($card['page'] === $summary['page']) {
+                $this->assertGreaterThanOrEqual($card['bottom'] - 0.5, $summary['top'], 'Totals and terms must start below all product cards on the same page.');
+            }
+        }
+        foreach (array_merge(array_values($layout['cards']), [$summary]) as $box) {
+            $this->assertGreaterThanOrEqual(19, $box['top']);
+            $this->assertGreaterThanOrEqual(22, $box['left']);
+            $this->assertLessThanOrEqual($layout['page_width'] - 22, $box['right']);
+            $this->assertLessThanOrEqual($layout['page_height'] - 19, $box['bottom'], 'Visible content must fit inside the PDF page margins.');
         }
     }
 

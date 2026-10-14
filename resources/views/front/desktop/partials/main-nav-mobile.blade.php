@@ -59,6 +59,7 @@
                 <a href="{{ $item['url'] ?? '#' }}" class="desktop-mobile-menu-row desktop-mobile-menu-row--section flex min-h-[60px] items-center px-4 py-3 text-[16px] font-bold tracking-[-0.01em] hover:bg-slate-50" @if($target) target="{{ $target }}" rel="{{ $rel }}" @endif>{{ $item['label'] }}</a>
             @endif
         @endforeach
+        @include('front.partials.resource-navigation', ['resourceMobile' => true])
     </div>
 @else
     <nav class="desktop-mobile-menu-list overflow-y-auto px-0 text-sm uppercase tracking-[0.03em] text-slate-900">
@@ -69,5 +70,6 @@
         @endif
         <a href="{{ route('faq.index') }}" class="desktop-mobile-menu-row flex min-h-[56px] items-center px-4 py-3 text-[14px] font-semibold hover:bg-slate-50">{{ __('ui.front.desktop.nav.faq') }}</a>
         <a href="{{ route('contact.create') }}" class="desktop-mobile-menu-row flex min-h-[56px] items-center px-4 py-3 text-[14px] font-semibold hover:bg-slate-50">{{ __('ui.front.desktop.nav.contact') }}</a>
+        @include('front.partials.resource-navigation', ['resourceMobile' => true])
     </nav>
 @endif

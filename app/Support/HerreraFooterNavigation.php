@@ -34,6 +34,8 @@ class HerreraFooterNavigation
         $support->push(['label' => __('ui.mobile.menu.contact'), 'url' => route('contact.create')]);
         $company = $links->filter(fn (array $link): bool => ! preg_match('/\/category\/|\/auth\/|\/account\/|\/contact(?:[\s?\/]|$)|placan|plaćan|dostav|povrat|reklam|raskid|shipping|payment|return/i', $link['url'].' '.$link['label']))->values();
         $company->push(['label' => __('herrera.brands_all'), 'url' => route('manufacturers.index')]);
+        $company->push(['label' => __('herrera_resources.catalogs'), 'url' => route('supplier-catalogs.index')]);
+        $company->push(['label' => __('herrera_resources.references'), 'url' => route('references.index')]);
 
         return collect([
             ['title' => __('herrera.footer.business_customers'), 'links' => [

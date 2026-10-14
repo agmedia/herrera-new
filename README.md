@@ -158,10 +158,15 @@ dependencies without development packages. Errors trigger a rollback attempt;
 backups are retained in `/home/herrera/.herrera-staging-backups`.
 
 Deployment applies only the reviewed additive customer workflow/CRM, optional
-product-options and historical CRM payload migrations from 14 October 2026, while staging is in maintenance
+product-options, historical CRM payload, supplier catalogues, reference projects,
+customer offers and their scoped abilities migrations from 14 October 2026, while staging is in maintenance
 mode. It does not run other database migrations, re-import catalog/orders or modify
 production. A file rollback keeps these additive tables and columns to preserve
-any CRM history already recorded.
+any CRM history already recorded. `supplier-catalogs:seed --publish` adds the five
+verified official catalogue links only when their codes do not exist; it never
+downloads the large supplier PDFs or overwrites administrator changes.
+`supplier-catalogs:covers --apply` fills missing covers only for unchanged
+official source links; uploaded or custom covers remain untouched.
 It applies the agreed October B2B settings once through `herrera:apply-quick-fixes`:
 the Herrera social profiles, blog navigation, structured specification filters and
 hiding unavailable products from catalog lists and search. Active product detail
@@ -175,3 +180,28 @@ per-article markers preserve later admin edits. Versioned illustrative covers an
 their ImageGen prompts are stored in `public/assets/blog/herrera`.
 See the [cPanel deployment guide](https://docs.cpanel.net/knowledge-base/web-services/guide-to-git-deployment/)
 for the two-button pull workflow.
+
+## Offers, supplier catalogues and reference projects
+
+- `/admin/customer-offers`: select an approved buyer, add products/variants and
+  quantities, then save a draft. Prices use the buyer's existing B2B rules and
+  promotions. Preview and PDF download do not send mail. Sending is an explicit
+  action; local safe mode and disabled mail transports block delivery. Sent
+  offers are immutable, and an uncertain delivery is locked for review. Sales
+  representatives only access their assigned buyers. Buyers see their sent
+  offers at `/account/customer-offers`.
+- `/admin/content/supplier-catalogs`: upload a PDF/cover or store an external
+  HTTPS catalogue link. The form respects the effective application/PHP upload
+  size limit. Uploaded files are private and served only for published entries.
+  `/katalozi` lists the published catalogues with brand filters.
+- `/admin/content/references`: bilingual project details, draft/scheduled
+  publication and private photo galleries with cover, captions and ordering.
+  `/reference` and `/reference/{slug}` show only published projects with photos.
+  Demo references require the explicitly guarded `herrera:demo-reference`
+  preview command, never an automatic deployment hook. Its `--staging` option
+  accepts only the safe-mode `https://herrera.herrera.hr` installation backed by
+  `herrera_redesign`; the default accepts only the isolated local preview.
+
+The new permissions are registered additively without resetting existing roles
+or explicit denials. New migrations create their own tables and keep existing
+products, customers, prices and orders intact.

@@ -146,7 +146,13 @@ fi
 "$php_bin" artisan migrate --force \
     --path=database/migrations/2026_10_14_090000_add_customer_workflow_and_crm.php \
     --path=database/migrations/2026_10_14_100000_enable_optional_herrera_product_options.php \
-    --path=database/migrations/2026_10_14_110000_add_payload_to_customer_sales_sessions.php
+    --path=database/migrations/2026_10_14_110000_add_payload_to_customer_sales_sessions.php \
+    --path=database/migrations/2026_10_14_120000_create_supplier_catalogs.php \
+    --path=database/migrations/2026_10_14_121000_create_reference_projects.php \
+    --path=database/migrations/2026_10_14_122000_create_customer_offers.php \
+    --path=database/migrations/2026_10_14_123000_register_customer_offer_and_content_abilities.php
+"$php_bin" artisan supplier-catalogs:seed --publish
+"$php_bin" artisan supplier-catalogs:covers --apply
 "$php_bin" artisan config:cache
 "$php_bin" artisan route:cache
 "$php_bin" artisan view:cache

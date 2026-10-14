@@ -210,6 +210,7 @@
                             data-herrera-primary-link
                         >{{ $item['label'] }}</a>
                     @endforeach
+                    @include('front.partials.resource-navigation', ['resourceHerreraPrimary' => true, 'resourceMobile' => false])
                 </nav>
                 @php
                     $herreraCatalogNavigation = collect($mainNavigation)->firstWhere('type', 'catalog')

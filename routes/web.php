@@ -133,6 +133,16 @@ Route::middleware(['front.customer-impersonation', 'front.locale', 'front.device
         Route::get('blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
         Route::get('faq', [FaqController::class, 'index'])->name('faq.index');
 
+        Route::get('katalozi', [\App\Http\Controllers\Front\SupplierCatalogController::class, 'index'])->name('supplier-catalogs.index');
+        Route::get('katalozi/{catalog}/pdf', [\App\Http\Controllers\Front\SupplierCatalogController::class, 'document'])
+            ->whereNumber('catalog')->name('supplier-catalogs.document');
+        Route::get('katalozi/{catalog}/cover', [\App\Http\Controllers\Front\SupplierCatalogController::class, 'cover'])
+            ->whereNumber('catalog')->name('supplier-catalogs.cover');
+        Route::get('reference', [\App\Http\Controllers\Front\ReferenceProjectController::class, 'index'])->name('references.index');
+        Route::get('reference/{slug}', [\App\Http\Controllers\Front\ReferenceProjectController::class, 'show'])->name('references.show');
+        Route::get('reference/{project}/photos/{photo}/{size?}', [\App\Http\Controllers\Front\ReferenceProjectController::class, 'photo'])
+            ->whereNumber('project')->whereNumber('photo')->where('size', 'card|large|original')->name('references.photo');
+
         Route::get('pages/category/{slug}', [PageController::class, 'category'])->name('pages.category');
         Route::get('page/{slug}', [PageController::class, 'show'])->name('pages.show');
 
@@ -245,6 +255,9 @@ Route::middleware(['front.customer-impersonation', 'front.locale', 'front.device
             ->group(function (): void {
                 Route::get('/', [AccountController::class, 'dashboard'])->name('dashboard');
                 Route::get('orders', [AccountController::class, 'orders'])->name('orders');
+                Route::get('customer-offers', [\App\Http\Controllers\Admin\CustomerOfferController::class, 'buyerIndex'])->name('customer-offers.index');
+                Route::get('customer-offers/{offer}/pdf', [\App\Http\Controllers\Admin\CustomerOfferController::class, 'buyerPdf'])
+                    ->whereNumber('offer')->name('customer-offers.pdf');
                 Route::get('orders/{orderNumber}', [AccountController::class, 'showOrder'])
                     ->where('orderNumber', '[A-Za-z0-9\-]+')
                     ->name('orders.show');
@@ -312,6 +325,16 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
             return view('admin.products.edit', compact('product'));
         })->name('products.edit');
         Route::view('orders', 'admin.orders.index')->name('orders');
+        Route::get('customer-offers', [\App\Http\Controllers\Admin\CustomerOfferController::class, 'index'])->name('customer-offers.index');
+        Route::get('customer-offers/create', [\App\Http\Controllers\Admin\CustomerOfferController::class, 'create'])->name('customer-offers.create');
+        Route::get('customer-offers/customers', [\App\Http\Controllers\Admin\CustomerOfferController::class, 'customers'])->name('customer-offers.customers');
+        Route::get('customer-offers/products', [\App\Http\Controllers\Admin\CustomerOfferController::class, 'products'])->name('customer-offers.products');
+        Route::post('customer-offers', [\App\Http\Controllers\Admin\CustomerOfferController::class, 'store'])->name('customer-offers.store');
+        Route::get('customer-offers/{offer}/edit', [\App\Http\Controllers\Admin\CustomerOfferController::class, 'edit'])->whereNumber('offer')->name('customer-offers.edit');
+        Route::put('customer-offers/{offer}', [\App\Http\Controllers\Admin\CustomerOfferController::class, 'update'])->whereNumber('offer')->name('customer-offers.update');
+        Route::get('customer-offers/{offer}/preview', [\App\Http\Controllers\Admin\CustomerOfferController::class, 'preview'])->whereNumber('offer')->name('customer-offers.preview');
+        Route::get('customer-offers/{offer}/pdf', [\App\Http\Controllers\Admin\CustomerOfferController::class, 'pdf'])->whereNumber('offer')->name('customer-offers.pdf');
+        Route::post('customer-offers/{offer}/send', [\App\Http\Controllers\Admin\CustomerOfferController::class, 'send'])->whereNumber('offer')->middleware('throttle:10,1')->name('customer-offers.send');
         Route::get('withdrawals', [ContractWithdrawalController::class, 'index'])->name('withdrawals.index');
         Route::get('withdrawals/{withdrawal}', [ContractWithdrawalController::class, 'show'])->name('withdrawals.show');
         Route::patch('withdrawals/{withdrawal}', [ContractWithdrawalController::class, 'update'])->name('withdrawals.update');
@@ -542,6 +565,10 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
             ->as('content.')
             ->group(function (): void {
                 Route::redirect('/', '/admin/content/blocks')->name('index');
+                Route::view('supplier-catalogs', 'admin.content.supplier-catalogs.index')->name('supplier-catalogs.index');
+                Route::post('supplier-catalogs/{catalog}/upload', \App\Http\Controllers\Admin\SupplierCatalogUploadController::class)
+                    ->whereNumber('catalog')->name('supplier-catalogs.upload');
+                Route::view('references', 'admin.content.references.index')->name('references.index');
                 Route::middleware('catalog.feature:catalog_use_blog')->group(function (): void {
                     Route::view('blog', 'admin.content.blog.index')->name('blog.index');
                     Route::view('blog/create', 'admin.content.blog.create')->name('blog.create');

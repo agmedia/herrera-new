@@ -157,6 +157,19 @@ return [
         'admin.orders.invoice' => [
             'view' => ['sales.orders.invoice.view'],
         ],
+        'admin.customer-offers.send' => [
+            'mutate' => ['sales.offers.send'],
+        ],
+        'admin.customer-offers.create' => [
+            'view' => ['sales.offers.manage'],
+        ],
+        'admin.customer-offers.edit' => [
+            'view' => ['sales.offers.manage'],
+        ],
+        'admin.customer-offers.*' => [
+            'view' => ['sales.offers.view'],
+            'mutate' => ['sales.offers.manage'],
+        ],
         'admin.orders.gls.*' => [
             'view' => ['sales.orders.view'],
             'mutate' => ['sales.orders.update'],
@@ -212,6 +225,16 @@ return [
         'admin.content.blog.create' => [
             'view' => ['content.blog.create'],
             'mutate' => ['content.blog.create'],
+        ],
+        'admin.content.supplier-catalogs.*' => [
+            'view' => ['content.supplier_catalogs.manage'],
+            'mutate' => ['content.supplier_catalogs.manage'],
+            'delete' => ['content.supplier_catalogs.manage'],
+        ],
+        'admin.content.references.*' => [
+            'view' => ['content.references.view'],
+            'mutate' => ['content.references.create', 'content.references.update'],
+            'delete' => ['content.references.delete'],
         ],
         'admin.content.blog.edit' => [
             'view' => ['content.blog.update'],

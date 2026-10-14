@@ -35,10 +35,12 @@ class HerreraHeaderPresentationFeatureTest extends TestCase
 
         $xpath = $this->xpath($response->getContent());
         $links = $xpath->query('//*[@data-herrera-primary-navigation]/a');
-        $this->assertSame(['Brandovi', 'Akcije', 'O nama', 'Kontakt'],
+        $this->assertSame(['Brandovi', 'Akcije', 'O nama', 'Kontakt', 'Katalozi', 'Reference'],
             array_map(fn ($node): string => trim($node->textContent), iterator_to_array($links)));
         $this->assertSame(route('manufacturers.index'), $links->item(0)->getAttribute('href'));
         $this->assertSame(url('/akcije'), $links->item(1)->getAttribute('href'));
+        $this->assertSame(route('supplier-catalogs.index'), $links->item(4)->getAttribute('href'));
+        $this->assertSame(route('references.index'), $links->item(5)->getAttribute('href'));
         $this->assertSame(route('account.b2b.quick-order'), $xpath->query('//*[@data-herrera-quick-order]')->item(0)->getAttribute('href'));
         $this->assertSame(1, $xpath->query('//*[@data-header-search-form]')->count());
     }

@@ -169,3 +169,7 @@
     <a href="{{ route('faq.index') }}" class="inline-flex items-center py-6 hover:text-slate-600"><span class="border-b border-transparent pb-0.5 transition hover:border-slate-400">{{ __('ui.front.desktop.nav.faq') }}</span></a>
     <a href="{{ route('contact.create') }}" class="inline-flex items-center py-6 hover:text-slate-600"><span class="border-b border-transparent pb-0.5 transition hover:border-slate-400">{{ __('ui.front.desktop.nav.contact') }}</span></a>
 @endif
+
+@unless (!empty($herreraCatalogHeader))
+    @include('front.partials.resource-navigation', ['resourceMobile' => false])
+@endunless

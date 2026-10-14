@@ -25,6 +25,12 @@
             'url' => route('account.profile'),
             'active' => $current === 'profile',
         ],
+        [
+            'key' => 'customer_offers',
+            'label' => __('herrera_resources.offers'),
+            'url' => route('account.customer-offers.index'),
+            'active' => $current === 'customer_offers',
+        ],
     ];
 
     $accountUser = auth()->user();

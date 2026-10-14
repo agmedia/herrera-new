@@ -1,0 +1,47 @@
+[
+  {
+    "filename": "braytron-2026.jpg",
+    "source_page": "https://braytron.com/en-gb/catalog/",
+    "source": "User-provided Braytron 2026 Products Catalogue, cover page",
+    "method": "Cover page rendered from the supplied catalogue",
+    "verified_at": "2026-10-14",
+    "bytes": 52204,
+    "sha256": "6ea8b3d5770052de1198504ac2ee9bb0fed596c226253e404e229ead1256a117"
+  },
+  {
+    "filename": "videx-led-2026.jpg",
+    "source_page": "https://videx.com.pl/catalog",
+    "source": "https://videx.com.pl/files/originals/certificates/catalogue-videx-led-2026.pdf",
+    "method": "First page rendered using HTTP byte ranges (692019 bytes received; complete PDF not downloaded)",
+    "verified_at": "2026-10-14",
+    "bytes": 26922,
+    "sha256": "37c8b16edd2a4693418a75230170c49eebd4f6cb256ea1d0c30880f5abda2020"
+  },
+  {
+    "filename": "videx-nota-2026.jpg",
+    "source_page": "https://videx.com.pl/catalog",
+    "source": "https://videx.com.pl/files/originals/certificates/catalogue-videx-nota-2026.pdf",
+    "method": "First page rendered using HTTP byte ranges (441829 bytes received; complete PDF not downloaded)",
+    "verified_at": "2026-10-14",
+    "bytes": 46517,
+    "sha256": "2fe321d79811b531131b8441d692b0f86bd32cddc2f494fee8ff1c523bcdae30"
+  },
+  {
+    "filename": "struhm-2026.jpg",
+    "source_page": "https://www.ideus.pl/Page?aId=600&mId=9",
+    "source": "https://www.ideus.pl/Downloads/Products/Catalogue/STRUHM%20Katalog%202026%20-%20PL%20CZ%20SK%20-%20Medium%20Quality.pdf",
+    "method": "First page rendered using HTTP byte ranges (1074091 bytes received; complete PDF not downloaded)",
+    "verified_at": "2026-10-14",
+    "bytes": 91764,
+    "sha256": "191d873a2ab3e01934c118fbd7c470c769a2838db90d4f91dbe428c4e1f300f5"
+  },
+  {
+    "filename": "dpm-catalogue.jpg",
+    "source_page": "https://dpm.eu/",
+    "source": "https://cdnm.heyzine.com/files/uploaded/v3/d20b149d9a6d51c1e3a5fe91e6c752176c817082-48.pdf-thumb.jpg",
+    "method": "Official ebook og:image thumbnail, resized to700px wide",
+    "verified_at": "2026-10-14",
+    "bytes": 29370,
+    "sha256": "558092a58bcc16467066cc14dd2c3de0f2e8b9c4a1d0fc9b5a975f816aaa2042"
+  }
+]

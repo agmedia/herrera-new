@@ -1,0 +1,10 @@
+<x-admin-layout :title="__('customer_offers.title')">
+<div class="space-y-5">
+<div class="flex flex-wrap items-center justify-between gap-4"><div><h1 class="text-2xl font-semibold">{{ __('customer_offers.title') }}</h1><p class="mt-1 text-sm text-slate-500">{{ __('customer_offers.subtitle') }}</p></div>
+@if(app(\App\Services\Sales\CustomerOfferAccess::class)->can(auth()->user(), 'manage'))<a class="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-semibold text-white" href="{{ route('admin.customer-offers.create') }}">{{ __('customer_offers.create') }}</a>@endif</div>
+<form class="flex gap-2"><input name="search" value="{{ request('search') }}" class="rounded-lg border-slate-300 text-sm" placeholder="{{ __('customer_offers.search_offers') }}"><button class="rounded-lg border px-4 py-2 text-sm">{{ __('customer_offers.search') }}</button></form>
+<div class="overflow-x-auto rounded-xl border border-slate-200 bg-white"><table class="w-full text-left text-sm"><thead class="bg-slate-50 text-slate-500"><tr><th class="p-4">{{ __('customer_offers.offer') }}</th><th class="p-4">{{ __('customer_offers.customer') }}</th><th class="p-4">{{ __('customer_offers.valid_until') }}</th><th class="p-4">{{ __('customer_offers.status_label') }}</th><th class="p-4 text-right">{{ __('customer_offers.net_total') }}</th></tr></thead><tbody>
+@forelse($offers as $offer)<tr class="border-t border-slate-100"><td class="p-4"><a class="font-semibold text-cyan-700 underline" href="{{ route('admin.customer-offers.edit', $offer) }}">{{ $offer->number }}</a><p class="mt-1">{{ $offer->title }}</p></td><td class="p-4">{{ data_get($offer->customer_snapshot, 'company') }}</td><td class="p-4">{{ $offer->valid_until->format('d.m.Y.') }}</td><td class="p-4">{{ __('customer_offers.status.'.$offer->status) }}</td><td class="p-4 text-right font-semibold">{{ number_format((float) $offer->net_total, 2, ',', '.') }} €</td></tr>
+@empty<tr><td colspan="5" class="p-8 text-center text-slate-500">{{ __('customer_offers.empty') }}</td></tr>@endforelse
+</tbody></table></div>{{ $offers->links() }}</div>
+</x-admin-layout>

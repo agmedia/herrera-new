@@ -1203,8 +1203,9 @@
                     $catalogB2bPricesActive = request()->routeIs('admin.b2b-prices*');
                     $catalogOpen = $catalogCategoriesActive || $catalogProductsActive || $catalogAttributesActive || $catalogOptionsActive || $catalogManufacturersActive || $catalogActionsActive || $catalogB2bPricesActive;
                     $salesOrdersActive = request()->routeIs('admin.orders*');
+                    $salesOffersActive = request()->routeIs('admin.customer-offers.*');
                     $salesWithdrawalsActive = request()->routeIs('admin.withdrawals.*');
-                    $salesOpen = $salesOrdersActive || $salesWithdrawalsActive;
+                    $salesOpen = $salesOrdersActive || $salesOffersActive || $salesWithdrawalsActive;
                     $contentBlogActive = request()->routeIs('admin.content.blog.*');
                     $contentPagesActive = request()->routeIs('admin.content.pages.*');
                     $contentFaqsActive = request()->routeIs('admin.content.faqs.*');
@@ -1212,7 +1213,9 @@
                     $contentBlocksActive = request()->routeIs('admin.content.blocks*');
                     $contentNavigationActive = request()->routeIs('admin.content.navigation*');
                     $contentSlotsActive = request()->routeIs('admin.content.slots*');
-                    $contentOpen = $contentBlogActive || $contentPagesActive || $contentFaqsActive || $contentCommentsActive || $contentBlocksActive || $contentNavigationActive || $contentSlotsActive;
+                    $contentCatalogsActive = request()->routeIs('admin.content.supplier-catalogs.*');
+                    $contentReferencesActive = request()->routeIs('admin.content.references.*');
+                    $contentOpen = $contentBlogActive || $contentPagesActive || $contentFaqsActive || $contentCommentsActive || $contentBlocksActive || $contentNavigationActive || $contentSlotsActive || $contentCatalogsActive || $contentReferencesActive;
                     $integrationsEprelActive = request()->routeIs('admin.integrations.eprel.*');
                     $integrationsStockActive = request()->routeIs('admin.integrations.stock.*');
                     $integrationsEracuniActive = request()->routeIs('admin.integrations.eracuni.*');
@@ -1301,6 +1304,8 @@
                         'comments' => $canAdminAbility('content.comments.view'),
                         'blocks' => $canAdminAbility('content.blocks.view'),
                         'navigation' => $canAdminAbility('content.navigation.view'),
+                        'supplier_catalogs' => $canAdminAbility('content.supplier_catalogs.manage'),
+                        'references' => $canAdminAbility('content.references.view'),
                     ];
                     $localSettingResources = array_filter([
                         'payment-methods' => __('admin.layout.menu.payment_methods'),
@@ -1316,6 +1321,7 @@
                     $canViewCatalogSection = in_array(true, $catalogLinks, true);
                     $canViewContentSection = in_array(true, $contentLinks, true);
                     $canViewOrders = $canAdminAbility('sales.orders.view');
+                    $canViewOffers = $canAdminAbility('sales.offers.view');
                     $canManageAdminAppearance = $canAdminAbility('settings.system.admin_appearance.manage');
                     $canManageUserSettings = $canAdminAbility('settings.user.manage');
                     $canViewSystemSettings = $canManageRuntimeTools || $canManageAdminAppearance || $canManageCatalogFeatures || $canManageStoreSettings;
@@ -1591,7 +1597,7 @@
                     </details>
                     @endif
 
-                    @if ($canViewOrders || $canViewWithdrawals)
+                    @if ($canViewOrders || $canViewOffers || $canViewWithdrawals)
                     <details class="group rounded-lg" @if($salesOpen) open @endif>
                         <summary class="sidebar-dropdown-summary flex cursor-pointer list-none items-center justify-between rounded-lg font-medium [&::-webkit-details-marker]:hidden [&::marker]:content-[''] {{ $salesOpen ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100' }}">
                             <span class="flex items-center gap-2">
@@ -1623,6 +1629,11 @@
                                         <span class="sidebar-dot"></span>
                                         <span>{{ __('admin.layout.menu.withdrawals') }}</span>
                                     </span>
+                                </a>
+                            @endif
+                            @if ($canViewOffers)
+                                <a href="{{ route('admin.customer-offers.index') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ $salesOffersActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
+                                    <span class="flex items-center gap-2"><span class="sidebar-dot"></span><span>{{ __('herrera_resources.offers') }}</span></span>
                                 </a>
                             @endif
                         </div>
@@ -1662,6 +1673,16 @@
                                     <span>{{ __('admin.layout.menu.pages') }}</span>
                                 </span>
                             </a>
+                            @endif
+                            @if ($contentLinks['supplier_catalogs'])
+                                <a href="{{ route('admin.content.supplier-catalogs.index') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ $contentCatalogsActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
+                                    <span class="flex items-center gap-2"><span class="sidebar-dot"></span><span>{{ __('herrera_resources.catalogs') }}</span></span>
+                                </a>
+                            @endif
+                            @if ($contentLinks['references'])
+                                <a href="{{ route('admin.content.references.index') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ $contentReferencesActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
+                                    <span class="flex items-center gap-2"><span class="sidebar-dot"></span><span>{{ __('herrera_resources.references') }}</span></span>
+                                </a>
                             @endif
                             @if ($contentLinks['faqs'])
                             <a

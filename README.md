@@ -157,8 +157,8 @@ autoload/configuration/routes/views. Changed Composer locks install their exact
 dependencies without development packages. Errors trigger a rollback attempt;
 backups are retained in `/home/herrera/.herrera-staging-backups`.
 
-Deployment applies only the reviewed additive customer workflow/CRM and optional
-product-options migrations from 14 October 2026, while staging is in maintenance
+Deployment applies only the reviewed additive customer workflow/CRM, optional
+product-options and historical CRM payload migrations from 14 October 2026, while staging is in maintenance
 mode. It does not run other database migrations, re-import catalog/orders or modify
 production. A file rollback keeps these additive tables and columns to preserve
 any CRM history already recorded.

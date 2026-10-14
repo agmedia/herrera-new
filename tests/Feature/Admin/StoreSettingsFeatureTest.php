@@ -108,6 +108,7 @@ class StoreSettingsFeatureTest extends TestCase
             'newsletter' => ['newsletter', ['store_newsletter_provider' => 'database', 'store_newsletter_title' => 'Shop news']],
             'integrations' => ['integrations', ['store_captcha_recaptcha_v3_min_score' => 0.7, 'store_analytics_ga4_measurement_id' => 'G-TEST123']],
             'pricing' => ['pricing', ['store_pricing_prices_include_tax' => true]],
+            'cart' => ['cart', ['store_cart_coupon_enabled' => true]],
             'images' => ['images', ['store_images_use_webp' => false]],
             'products' => ['products', ['store_product_desktop_default_cols' => 5, 'store_product_mobile_default_cols' => 1]],
             'seo' => ['seo', ['store_seo_default_title' => 'Test Shop SEO', 'store_seo_canonical_policy' => 'none']],
@@ -144,6 +145,7 @@ class StoreSettingsFeatureTest extends TestCase
             'email address' => ['email', 'store_email_from_address', 'invalid-address'],
             'SMTP port' => ['email', 'store_email_smtp_port', 70000],
             'newsletter provider' => ['newsletter', 'store_newsletter_provider', 'unknown'],
+            'cart coupon visibility' => ['cart', 'store_cart_coupon_enabled', 'invalid'],
             'captcha score' => ['integrations', 'store_captcha_recaptcha_v3_min_score', 1.5],
             'SEO canonical policy' => ['seo', 'store_seo_canonical_policy', 'external'],
             'schema currency' => ['schema', 'store_schema_product_currency', 'EURO'],
@@ -157,6 +159,40 @@ class StoreSettingsFeatureTest extends TestCase
             'announcement URL with backslash' => ['announcement', 'store_announcement_url', '/\\external.example.com'],
             'product columns' => ['products', 'store_product_desktop_default_cols', 6],
         ];
+    }
+
+    public function test_cart_coupon_visibility_defaults_to_hidden_and_can_be_saved_and_reloaded(): void
+    {
+        $admin = $this->makeUserWithRole('admin');
+        $settings = app(SystemSettingsService::class);
+        $frontSettings = app(FrontStoreSettingsService::class);
+
+        Livewire::actingAs($admin)
+            ->test(StoreSettings::class)
+            ->set('tab', 'cart')
+            ->assertSet('form.store_cart_coupon_enabled', false);
+
+        $this->assertFalse($frontSettings->cart()['coupon_enabled']);
+        $this->assertFalse($frontSettings->all()['cart']['coupon_enabled']);
+
+        foreach ([true, false] as $enabled) {
+            Livewire::actingAs($admin)
+                ->test(StoreSettings::class)
+                ->set('tab', 'cart')
+                ->set('form.store_cart_coupon_enabled', $enabled)
+                ->call('save')
+                ->assertHasNoErrors()
+                ->assertDispatched('notify');
+
+            $this->assertSame($enabled, $settings->get('store_cart_coupon_enabled'));
+            $this->assertSame($enabled, $frontSettings->cart()['coupon_enabled']);
+            $this->assertSame($enabled, $frontSettings->all()['cart']['coupon_enabled']);
+
+            Livewire::actingAs($admin)
+                ->test(StoreSettings::class)
+                ->set('tab', 'cart')
+                ->assertSet('form.store_cart_coupon_enabled', $enabled);
+        }
     }
 
     public function test_admin_can_clear_localized_text_in_the_default_language(): void

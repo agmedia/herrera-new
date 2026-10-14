@@ -215,6 +215,12 @@ return [
     ],
     'settings' => [
         'store' => [
+            'cart' => [
+                'tab' => 'Košarica',
+                'title' => 'Postavke košarice',
+                'coupon_enabled' => 'Prikaži unos kupona u košarici',
+                'coupon_help' => 'Kada je isključeno, gumb i polje za unos kupona skriveni su na desktopu i mobitelu.',
+            ],
             'images' => [
                 'title' => 'Optimizacija slika',
                 'subtitle' => 'Omogući WebP prikaz na storefrontu i generiraj nedostajuće WebP konverzije za postojeći media sadržaj.',

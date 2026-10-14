@@ -40,6 +40,9 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\MessageBag;
+use Illuminate\Support\ViewErrorBag;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Silber\Bouncer\BouncerFacade as Bouncer;
 use Tests\TestCase;
 
@@ -181,6 +184,73 @@ class StorefrontFrontFeatureTest extends TestCase
             ->assertDontSee($cheapSlug)
             ->assertDontSee($otherSlug)
             ->assertDontSee('Back to manufacturers');
+    }
+
+    #[DataProvider('cartCouponVisibilityProvider')]
+    public function test_cart_coupon_visibility_follows_the_store_setting(?bool $enabled, string $userAgent, bool $hasExistingCoupon): void
+    {
+        $this->useEnglishStorefrontLocale();
+
+        if ($enabled !== null) {
+            app(SystemSettingsService::class)->put('store_cart_coupon_enabled', $enabled);
+        }
+
+        [$category] = $this->seedCategory();
+        [$product] = $this->seedProduct($category->id);
+
+        $this->post('/cart/items', [
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ])->assertRedirect();
+
+        if ($hasExistingCoupon) {
+            $this->withSession([
+                'front.cart.coupon_code' => 'EXISTING',
+                'errors' => (new ViewErrorBag)->put('default', new MessageBag(['coupon_code' => 'Coupon error'])),
+            ]);
+        }
+
+        $response = $this->withHeader('User-Agent', $userAgent)
+            ->get('/cart')
+            ->assertOk()
+            ->assertSee('href="'.route('checkout.create').'"', false);
+
+        if ($enabled === true) {
+            $response
+                ->assertSee('data-coupon-wrap', false)
+                ->assertSee('data-coupon-toggle', false)
+                ->assertSee('name="coupon_code"', false)
+                ->assertSee('action="'.route('cart.coupon.apply').'"', false)
+                ->assertSee('front-theme/scripts/cart-coupon-toggle.js', false);
+
+            if ($hasExistingCoupon) {
+                $response
+                    ->assertSee('value="EXISTING"', false)
+                    ->assertSee(__('ui.cart.actions.remove_coupon'));
+            }
+        } else {
+            $response
+                ->assertDontSee('data-coupon-wrap', false)
+                ->assertDontSee('data-coupon-toggle', false)
+                ->assertDontSee('name="coupon_code"', false)
+                ->assertDontSee('action="'.route('cart.coupon.apply').'"', false)
+                ->assertDontSee('front-theme/scripts/cart-coupon-toggle.js', false)
+                ->assertDontSee(__('ui.cart.actions.remove_coupon'));
+        }
+    }
+
+    public static function cartCouponVisibilityProvider(): array
+    {
+        $desktop = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
+        $mobile = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+
+        return [
+            'hidden by default' => [null, $desktop, false],
+            'hidden despite an existing coupon and validation error' => [false, $desktop, true],
+            'hidden on mobile' => [false, $mobile, false],
+            'enabled on desktop with an existing coupon' => [true, $desktop, true],
+            'enabled on mobile' => [true, $mobile, false],
+        ];
     }
 
     public function test_cart_coupon_applies_cart_discount_to_items_only(): void

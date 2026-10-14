@@ -150,6 +150,7 @@ class StoreSettings extends Component
         'store_analytics_purchase_event_enabled' => true,
         'store_analytics_purchase_event_name' => 'purchase',
         'store_pricing_prices_include_tax' => false,
+        'store_cart_coupon_enabled' => false,
 
         'store_seo_default_title' => '',
         'store_seo_default_description' => '',
@@ -450,6 +451,7 @@ class StoreSettings extends Component
             'form.store_analytics_purchase_event_enabled' => ['required', 'boolean'],
             'form.store_analytics_purchase_event_name' => ['nullable', 'string', 'max:64'],
             'form.store_pricing_prices_include_tax' => ['required', 'boolean'],
+            'form.store_cart_coupon_enabled' => ['required', 'boolean'],
 
             'form.store_seo_default_title' => ['nullable', 'string', 'max:191'],
             'form.store_seo_default_description' => ['nullable', 'string', 'max:320'],
@@ -1286,6 +1288,7 @@ class StoreSettings extends Component
                 'integrations' => str_starts_with($key, 'store_captcha_')
                     || str_starts_with($key, 'store_analytics_'),
                 'pricing' => str_starts_with($key, 'store_pricing_'),
+                'cart' => str_starts_with($key, 'store_cart_'),
                 'images' => str_starts_with($key, 'store_images_'),
                 'products' => str_starts_with($key, 'store_product_')
                     || str_starts_with($key, 'store_search_autocomplete_'),

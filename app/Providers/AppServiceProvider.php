@@ -208,6 +208,9 @@ class AppServiceProvider extends ServiceProvider
                         'images' => [
                             'use_webp' => true,
                         ],
+                        'cart' => [
+                            'coupon_enabled' => false,
+                        ],
                         'cookies' => [
                             'enabled' => true,
                             'title' => 'Koristimo kolačiće',

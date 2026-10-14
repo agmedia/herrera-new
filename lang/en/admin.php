@@ -214,6 +214,12 @@ return [
     ],
     'settings' => [
         'store' => [
+            'cart' => [
+                'tab' => 'Cart',
+                'title' => 'Cart settings',
+                'coupon_enabled' => 'Show coupon entry in the cart',
+                'coupon_help' => 'When disabled, the coupon button and input are hidden on desktop and mobile.',
+            ],
             'images' => [
                 'title' => 'Image Optimization',
                 'subtitle' => 'Enable WebP delivery on storefront and generate missing WebP conversions for existing media.',

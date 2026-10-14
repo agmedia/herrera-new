@@ -40,6 +40,7 @@ class StoreSettingsService
             'benefits_bar' => $this->benefitsBar(),
             'images' => $this->images(),
             'product' => $this->product(),
+            'cart' => $this->cart(),
             'cookies' => $this->cookies(),
             'legal' => $this->legalPages(),
             'branding' => $this->branding(),
@@ -120,6 +121,14 @@ class StoreSettingsService
                 ->values()
                 ->all(),
             'filter_panel_settings' => $this->filterPanelSettings(),
+        ];
+    }
+
+    /** @return array{coupon_enabled:bool} */
+    public function cart(): array
+    {
+        return [
+            'coupon_enabled' => (bool) $this->settings->get('store_cart_coupon_enabled', false),
         ];
     }
 

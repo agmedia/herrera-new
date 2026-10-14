@@ -35,6 +35,55 @@ class CustomerOffersFeatureTest extends TestCase
         app(SystemSettingsService::class)->put('store_pricing_prices_include_tax', false, 'bool');
     }
 
+    public function test_create_form_loads_the_runtime_needed_by_its_customer_and_product_picker(): void
+    {
+        $response = $this->actingAs($this->staff())->get(route('admin.customer-offers.create'))->assertOk();
+
+        $this->assertSame(1, preg_match('~<script\b[^>]*\bsrc=["\'][^"\']*/livewire/livewire(?:\.min)?\.js(?:\?[^"\']*)?["\']~', $response->getContent()), 'The plain Blade offer form must load Livewire, which provides its Alpine picker runtime.');
+        $response->assertSee('data-update-uri=', false);
+    }
+
+    public function test_approved_customer_can_be_found_by_exact_oib_with_a_selectable_identity(): void
+    {
+        [$buyer] = $this->buyer('Searchable offer buyer');
+        $buyer->b2bAccount->update(['oib' => '12345678901']);
+
+        $this->actingAs($this->staff())->getJson(route('admin.customer-offers.customers', ['search' => '12345678901']))
+            ->assertOk()
+            ->assertExactJson([['id' => $buyer->id, 'name' => 'Searchable offer buyer', 'email' => $buyer->email]]);
+    }
+
+    public function test_suspended_customer_is_not_returned_by_the_offer_picker(): void
+    {
+        [$buyer] = $this->buyer('Suspended offer buyer');
+        $buyer->b2bAccount->update(['oib' => '12345678901', 'status' => B2BAccount::STATUS_SUSPENDED]);
+
+        $this->actingAs($this->staff())->getJson(route('admin.customer-offers.customers', ['search' => '12345678901']))
+            ->assertOk()->assertExactJson([]);
+    }
+
+    public function test_product_search_returns_the_exact_sku_and_its_minimum_quantity_for_an_approved_buyer(): void
+    {
+        [$buyer] = $this->buyer();
+        $product = $this->product('Searchable lamp');
+        $product->update(['sku' => 'BA13-32823', 'minimum_order_quantity' => 6]);
+        $this->product('Different lamp');
+
+        $this->actingAs($this->staff())->getJson(route('admin.customer-offers.products', ['customer_user_id' => $buyer->id, 'search' => 'BA13-32823']))
+            ->assertOk()->assertJsonCount(1)
+            ->assertJsonPath('0.product_id', $product->id)
+            ->assertJsonPath('0.sku', 'BA13-32823')
+            ->assertJsonPath('0.name', 'Searchable lamp')
+            ->assertJsonPath('0.quantity', 6)
+            ->assertJsonPath('0.product_option_value_id', null);
+    }
+
+    public function test_product_search_requires_a_selected_buyer(): void
+    {
+        $this->actingAs($this->staff())->getJson(route('admin.customer-offers.products', ['search' => 'BA13-32823']))
+            ->assertUnprocessable()->assertJsonValidationErrors('customer_user_id');
+    }
+
     public function test_admin_creates_snapshot_with_final_customer_quantity_prices_without_double_discount(): void
     {
         [$buyer, $group] = $this->buyer();

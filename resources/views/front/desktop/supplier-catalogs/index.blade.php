@@ -29,7 +29,7 @@
             <article class="group flex flex-col overflow-hidden border border-slate-200 bg-white transition-shadow hover:shadow-lg">
                 <a href="{{ $catalog->publicUrl() }}" target="_blank" rel="noopener noreferrer" class="relative flex aspect-[3/4] items-center justify-center overflow-hidden bg-slate-100 p-5" aria-label="{{ $catalog->title }}">
                     @if ($catalog->coverUrl())
-                        <img src="{{ $catalog->coverUrl() }}" alt="{{ $catalog->title }}" loading="lazy" class="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.02]">
+                        <img src="{{ $catalog->coverUrl() }}" alt="{{ $catalog->title }}" loading="lazy" class="h-full w-full bg-white object-contain shadow-sm">
                     @else
                         <div class="relative flex h-full w-full flex-col justify-between overflow-hidden bg-cyan-900 p-6 text-white shadow-md">
                             <div class="absolute -bottom-12 -right-20 h-72 w-40 rotate-45 bg-cyan-600/40" aria-hidden="true"></div>

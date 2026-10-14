@@ -140,6 +140,9 @@ if [[ "$dependencies_changed" == true ]]; then
 else
     "$php_bin" "$composer_bin" dump-autoload --no-dev --optimize --no-interaction --no-scripts
 fi
+# New additive migrations and catalogue seeds must read this release's config,
+# rather than the previous release's cached ACL and supplier definitions.
+"$php_bin" artisan config:clear
 "$php_bin" artisan package:discover --ansi
 # Only these reviewed additive upgrades are part of this release. Keep their
 # schema on a file rollback so no CRM history is deleted.

@@ -16,6 +16,13 @@ return [
     'benefit_history' => 'Ponovite prethodnu narudžbu',
     'categories' => 'Pronađite svoju kategoriju',
     'all_categories' => 'Sve kategorije',
+    'subcategories' => [
+        'back_to_parent' => 'Natrag na :category',
+        'title' => 'Podkategorije',
+        'browse' => 'Pregledajte podkategorije',
+        'previous' => 'Prethodne podkategorije',
+        'next' => 'Sljedeće podkategorije',
+    ],
     'products' => 'Iz našeg asortimana',
     'products_eyebrow' => 'Odabrano iz ponude',
     'popular_products' => 'Najpopularnije u zadnjih 30 dana',

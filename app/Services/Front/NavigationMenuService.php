@@ -3,7 +3,9 @@
 namespace App\Services\Front;
 
 use App\Models\Catalog\Category\Category;
+use App\Models\Catalog\Product\Product;
 use App\Models\Content\Page\InfoPage;
+use App\Services\Catalog\CatalogFeatureService;
 use App\Services\Settings\SystemSettingsService;
 use App\Support\Media\HerreraCategoryImage;
 use App\Support\Media\MediaUrl;
@@ -32,6 +34,7 @@ class NavigationMenuService
     {
         $locale = strtolower(trim($locale));
         $fallbackLocale = strtolower((string) config('app.locale', 'en'));
+        $isHerreraStore = str_contains(strtolower((string) $this->settings->get('store_brand_name', config('app.name', 'AG Shop'))), 'herrera');
         $items = collect($this->configuredItems())
             ->filter(fn ($item): bool => (bool) ($item['is_active'] ?? true))
             ->sortBy(fn ($item): int => (int) ($item['sort_order'] ?? 0))
@@ -47,7 +50,7 @@ class NavigationMenuService
             }
         }
         $cacheKey = hash('sha256', serialize([
-            $locale, $fallbackLocale, request()->getSchemeAndHttpHost(), config('app.url'), $revision, $items->all(),
+            'subcategory-photography-v2', $isHerreraStore, $locale, $fallbackLocale, request()->getSchemeAndHttpHost(), config('app.url'), $revision, $items->all(),
         ]));
 
         if (isset($this->resolvedCache[$cacheKey])) {
@@ -94,13 +97,32 @@ class NavigationMenuService
             ->with([
                 'translations' => fn ($q) => $q
                     ->where('scope', Category::SCOPE_CATALOG)
-                    ->whereIn('locale', [$locale, $fallbackLocale]),
+                    ->whereIn('locale', array_unique([$locale, $fallbackLocale, ...($isHerreraStore ? ['hr'] : [])])),
                 'media' => fn ($q) => $q->whereIn('collection_name', ['category_icon', 'category_banner']),
             ])
             ->orderBy('_lft')
             ->get();
 
         $categoriesById = $categories->keyBy('id');
+        if ($isHerreraStore && $categories->isNotEmpty()
+            && $items->contains(fn ($item): bool => in_array($item['type'] ?? '', ['category', 'catalog'], true))) {
+            // Fetch only populated category IDs once; propagate presence up the loaded tree.
+            $populatedIds = Product::query()
+                ->visibleOnStorefront(app(CatalogFeatureService::class)->hideOutOfStockProducts())
+                ->join('category_product', 'category_product.product_id', '=', 'products.id')
+                ->whereIn('category_product.category_id', $categories->modelKeys())
+                ->distinct()
+                ->pluck('category_product.category_id');
+            $populated = [];
+            foreach ($populatedIds as $id) {
+                while ($id && ! isset($populated[(int) $id]) && ($row = $categoriesById->get((int) $id))) {
+                    $populated[(int) $id] = true;
+                    $id = $row->parent_id;
+                }
+            }
+            $categories = $categories->filter(fn (Category $row): bool => ! $row->parent_id || isset($populated[(int) $row->id]));
+            $categoriesById = $categories->keyBy('id');
+        }
         $childrenByParentId = $categories->groupBy(fn ($category) => (int) ($category->parent_id ?? 0));
 
         $pagesById = InfoPage::query()

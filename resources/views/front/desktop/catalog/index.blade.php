@@ -69,6 +69,13 @@
             ...$catalogNavigationQuery,
         ], static fn ($value): bool => $value !== null && $value !== ''));
     };
+    $catalogParentCategory = $isHerreraCatalog && ! $isShopPage && ! $isManufacturerPage
+        ? ($breadcrumbCategories ?? collect())->firstWhere('id', $category->parent_id)
+        : null;
+    $catalogParentTranslation = $catalogParentCategory
+        ? ($catalogParentCategory->translations->firstWhere('locale', $locale)
+            ?? $catalogParentCategory->translations->firstWhere('locale', $fallbackLocale))
+        : null;
     $mobileDefaultCols = in_array((int) ($storeSettings['product']['mobile_default_cols'] ?? 2), [1, 2], true)
         ? (int) ($storeSettings['product']['mobile_default_cols'] ?? 2)
         : 2;
@@ -253,6 +260,10 @@
         </div>
     </section>
 
+    @if ($isHerreraCatalog && ! $isShopPage && ! $isManufacturerPage && ($subcategoryCards ?? collect())->isNotEmpty())
+        @include('front.partials.herrera-subcategory-carousel', ['carouselCategories' => $subcategoryCards])
+    @endif
+
     @if ($topBlocks->isNotEmpty())
         <section class="storefront-container mb-8 px-3 sm:px-4 lg:px-6">
             @include('components.content-placement', ['items' => $topBlocks])
@@ -305,7 +316,7 @@
                     <form method="GET" action="{{ $catalogBaseUrl }}" class="catalog-mobile-filter-panel" data-mobile-filter-panel id="category-mobile-filter-panel">
                         <input type="hidden" name="q" value="{{ $filters['q'] ?? '' }}">
                         <div class="catalog-mobile-filter-content">
-                        @if ($hasSubcategories && $categoryFilterPanel['visible'])
+                        @if (($hasSubcategories || $catalogParentCategory) && $categoryFilterPanel['visible'])
                             <details class="catalog-mobile-filter-section" @if ($categoryFilterPanel['default_open']) open @endif>
                                 <summary class="catalog-mobile-filter-section-heading">
                                     <span>{{ __('ui.shop.filters.category') }}</span>
@@ -340,6 +351,9 @@
                                         </a>
                                     @endforeach
                                 </nav>
+                                @if ($catalogParentCategory)
+                                    @include('front.partials.herrera-parent-category-link')
+                                @endif
                             </details>
                         @endif
                         @if ($showManufacturers && $manufacturerFilterPanel['visible'])
@@ -647,6 +661,9 @@
                                             </a>
                                         @endforeach
                                     </nav>
+                                    @if ($catalogParentCategory)
+                                        @include('front.partials.herrera-parent-category-link')
+                                    @endif
                                 </details>
                             @endif
 

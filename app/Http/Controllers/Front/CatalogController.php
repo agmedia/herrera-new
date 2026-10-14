@@ -736,13 +736,14 @@ class CatalogController extends Controller
     {
         $locale = app()->getLocale();
         $fallbackLocale = (string) config('app.locale');
+        $isHerreraStore = str_contains(strtolower((string) app(SystemSettingsService::class)->get('store_brand_name', config('app.name', 'AG Shop'))), 'herrera');
         $variant = $this->frontendVariant($request);
         $search = trim((string) $request->query('q', ''));
         $categorySlug = $slug;
         $manufacturerSlug = trim((string) $request->query('manufacturer', ''));
         $sort = (string) $request->query('sort', $search !== '' ? 'relevance' : 'default');
         $availableOnly = $this->normalizeBooleanFilterValue($request->query('available_only'));
-        $this->localAvailabilityOnly = $availableOnly && str_contains(strtolower((string) app(SystemSettingsService::class)->get('store_brand_name', config('app.name', 'AG Shop'))), 'herrera');
+        $this->localAvailabilityOnly = $availableOnly && $isHerreraStore;
         $promoOnly = $this->normalizeBooleanFilterValue($request->query('promo_only'));
         [$priceMin, $priceMax] = $this->normalizedPriceRange(
             $request->query('price_min'),
@@ -1001,27 +1002,45 @@ class CatalogController extends Controller
             )
             : collect();
 
+        // Category navigation remains available when the product/filter panels are hidden.
+        $childCategories = ($isHerreraStore || ($showCategoryFilters && ! $promoOnly))
+            ? $category->children()
+                ->where('scope', Category::SCOPE_CATALOG)
+                ->currentlyVisible()
+                ->with(['translations' => fn ($q) => $q
+                    ->where('scope', Category::SCOPE_CATALOG)
+                    ->whereIn('locale', array_unique([$locale, $fallbackLocale, ...($isHerreraStore ? ['hr'] : [])]))])
+                ->when($isHerreraStore, fn ($q) => $q->with('media'))
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get()
+            : collect();
+
+        if ($isHerreraStore) {
+            // Share one recursive count batch between the carousel and sidebar.
+            $this->withRecursiveCatalogProductCounts(
+                $childCategories,
+                $this->hideOutOfStockProducts() || $availableOnly,
+                $manufacturerId
+            );
+            $childCategories = $childCategories
+                ->filter(fn (Category $child): bool => (int) $child->products_count > 0)
+                ->values();
+        }
+
         if ($showCategoryFilters && $promoOnly) {
             $subcategories = $categories
                 ->where('parent_id', $category->id)
                 ->values();
         } else {
-            $subcategories = $showCategoryFilters
-                ? $category->children()
-                    ->where('scope', Category::SCOPE_CATALOG)
-                    ->currentlyVisible()
-                    ->with(['translations' => fn ($q) => $q
-                        ->where('scope', Category::SCOPE_CATALOG)
-                        ->whereIn('locale', [$locale, $fallbackLocale])])
-                    ->orderBy('sort_order')
-                    ->orderBy('id')
-                    ->get()
-                : collect();
-            $this->withRecursiveCatalogProductCounts(
-                $subcategories,
-                $this->hideOutOfStockProducts() || $availableOnly,
-                $manufacturerId
-            );
+            $subcategories = $showCategoryFilters ? $childCategories : collect();
+            if (! $isHerreraStore) {
+                $this->withRecursiveCatalogProductCounts(
+                    $subcategories,
+                    $this->hideOutOfStockProducts() || $availableOnly,
+                    $manufacturerId
+                );
+            }
         }
 
         $breadcrumbCategories = $category->ancestors()
@@ -1058,6 +1077,7 @@ class CatalogController extends Controller
             'optionFilters' => $this->withSelectedFilters($optionFilters, $selectedOptionFilters),
             'attributeFilters' => $this->withSelectedFilters($attributeFilters, $selectedAttributeFilters),
             'subcategories' => $subcategories,
+            'subcategoryCards' => $isHerreraStore ? $childCategories : collect(),
             'breadcrumbCategories' => $breadcrumbCategories,
             'topBlocks' => $topBlocks,
             'bottomBlocks' => $bottomBlocks,

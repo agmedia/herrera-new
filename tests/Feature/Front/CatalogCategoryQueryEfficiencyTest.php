@@ -98,7 +98,7 @@ class CatalogCategoryQueryEfficiencyTest extends TestCase
         $this->assertSame(1, (int) $this->catalogCategories('cachedShopCatalogCategories', controller: $controller)->firstWhere('id', $otherRoot->id)->products_count);
     }
 
-    public function test_category_children_share_one_count_query_and_keep_empty_children(): void
+    public function test_category_children_share_one_count_query_and_hide_empty_children(): void
     {
         $root = $this->category('child-batch-root');
         $children = collect();
@@ -122,12 +122,13 @@ class CatalogCategoryQueryEfficiencyTest extends TestCase
         }
 
         $subcategories = $response->viewData('subcategories');
-        $this->assertSame([...$children->pluck('id')->all(), $empty->id], $subcategories->pluck('id')->all());
-        $this->assertSame([1, 1, 1, 1, 1, 1, 0], $subcategories->pluck('products_count')->all());
+        $this->assertSame($children->pluck('id')->all(), $subcategories->pluck('id')->all());
+        $this->assertSame([1, 1, 1, 1, 1, 1], $subcategories->pluck('products_count')->all());
+        $this->assertSame($subcategories->pluck('id')->all(), $response->viewData('subcategoryCards')->pluck('id')->all());
         $this->assertCount(1, $countQueries, 'All children must share a recursive count query, even on uncached category pages.');
     }
 
-    public function test_unknown_manufacturer_keeps_empty_child_counts_without_running_an_impossible_count(): void
+    public function test_unknown_manufacturer_hides_empty_children_without_running_an_impossible_count(): void
     {
         $root = $this->category('unknown-brand-root');
         $child = $this->category('unknown-brand-child', $root);
@@ -143,8 +144,8 @@ class CatalogCategoryQueryEfficiencyTest extends TestCase
         }
 
         $this->assertSame(0, $response->viewData('products')->total());
-        $this->assertSame([$child->id], $response->viewData('subcategories')->pluck('id')->all());
-        $this->assertSame([0], $response->viewData('subcategories')->pluck('products_count')->all());
+        $this->assertCount(0, $response->viewData('subcategories'));
+        $this->assertCount(0, $response->viewData('subcategoryCards'));
         $this->assertCount(0, $recursiveQueries);
     }
 

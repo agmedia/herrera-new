@@ -23,6 +23,13 @@ return [
     'benefit_history' => 'Repeat a previous order',
     'categories' => 'Find your category',
     'all_categories' => 'All categories',
+    'subcategories' => [
+        'back_to_parent' => 'Back to :category',
+        'title' => 'Subcategories',
+        'browse' => 'Browse subcategories',
+        'previous' => 'Previous subcategories',
+        'next' => 'Next subcategories',
+    ],
     'products' => 'From our range',
     'products_eyebrow' => 'Selected from our range',
     'popular_products' => 'Most popular in the last 30 days',

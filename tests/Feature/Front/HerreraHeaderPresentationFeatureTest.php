@@ -20,9 +20,10 @@ class HerreraHeaderPresentationFeatureTest extends TestCase
     {
         $this->configure();
         $category = $this->category('rasvjeta');
-        $this->category('unutarnja-rasvjeta', ['parent_id' => $category->id]);
+        $subcategory = $this->category('unutarnja-rasvjeta', ['parent_id' => $category->id]);
         $product = Product::query()->create(['code' => 'HEADER-B2B', 'is_active' => true, 'base_price' => 9876.54]);
         $product->translations()->create(['locale' => 'hr', 'name' => 'Header test product', 'slug' => 'header-test-product']);
+        $product->categories()->attach($subcategory);
         config(['commerce.b2b_only' => true]);
         $response = $this->get(route('home'))->assertOk()
             ->assertSee('data-herrera-header', false)->assertSee('data-herrera-catalog-navigation', false)

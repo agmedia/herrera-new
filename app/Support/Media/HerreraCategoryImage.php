@@ -9,17 +9,12 @@ class HerreraCategoryImage
     public static function url(Category $category, string $locale, string $fallbackLocale, string $storeName): ?string
     {
         if (! str_contains(strtolower(trim($storeName)), 'herrera')
-            || $category->scope !== Category::SCOPE_CATALOG
-            || (int) ($category->parent_id ?? 0) !== 0) {
+            || $category->scope !== Category::SCOPE_CATALOG) {
             return null;
         }
 
         $translations = $category->translations;
         $hrSlug = $translations->firstWhere('locale', 'hr')?->slug;
-        if ($hrSlug === null && $category->exists) {
-            $hrSlug = $category->translations()->where('locale', 'hr')->value('slug');
-        }
-
         foreach (array_unique(array_filter([
             $hrSlug,
             $translations->firstWhere('locale', $locale)?->slug,

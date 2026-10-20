@@ -32,7 +32,7 @@ class GuestStorefrontCacheIntegrationTest extends TestCase
         $this->assertFalse(app(\App\Services\Pricing\B2BAccessService::class)->b2cEnabled());
         $settings->put('store_pricing_b2c_enabled', true);
         $this->assertFalse(app(\App\Services\Front\GuestStorefrontCache::class)->enabled());
-        $this->get(route('home'))->assertOk()->assertHeaderMissing('X-Storefront-Cache');
+        $this->get(route('home'))->assertOk()->assertHeader('X-Storefront-Cache', 'BYPASS');
     }
 
     public function test_real_home_route_hits_cache_and_keeps_private_browser_headers(): void

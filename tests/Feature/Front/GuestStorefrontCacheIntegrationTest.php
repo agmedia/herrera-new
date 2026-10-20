@@ -25,6 +25,16 @@ class GuestStorefrontCacheIntegrationTest extends TestCase
         Cache::store('array')->flush();
     }
 
+    public function test_cold_settings_cache_and_b2c_switch_do_not_reenter_the_query_listener(): void
+    {
+        $settings = app(SystemSettingsService::class);
+        $settings->flush();
+        $this->assertFalse(app(\App\Services\Pricing\B2BAccessService::class)->b2cEnabled());
+        $settings->put('store_pricing_b2c_enabled', true);
+        $this->assertFalse(app(\App\Services\Front\GuestStorefrontCache::class)->enabled());
+        $this->get(route('home'))->assertOk()->assertHeaderMissing('X-Storefront-Cache');
+    }
+
     public function test_real_home_route_hits_cache_and_keeps_private_browser_headers(): void
     {
         $this->get(route('home'))->assertOk()->assertHeader('X-Storefront-Cache', 'MISS');

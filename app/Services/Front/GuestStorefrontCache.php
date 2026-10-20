@@ -53,10 +53,8 @@ class GuestStorefrontCache
 
     public function onQueryExecuted(QueryExecuted $query): void
     {
-        if (! $this->enabled()) {
-            return;
-        }
-
+        // Ignore reads before resolving settings: a cold settings cache reads
+        // the database and would otherwise re-enter this query listener.
         $sql = preg_replace('/^\s*(?:\/\*.*?\*\/\s*)+/s', '', $query->sql) ?? $query->sql;
         if (! preg_match('/^\s*(?:insert(?:\s+or\s+\w+|\s+ignore)?\s+into|replace(?:\s+into)?|update(?:\s+(?:ignore|low_priority))?|delete\s+from|truncate(?:\s+table)?|alter\s+table|create\s+table(?:\s+if\s+not\s+exists)?|drop\s+table(?:\s+if\s+exists)?)\s+(?:[`"]?[a-zA-Z0-9_]+[`"]?\.)?[`"]?([a-zA-Z0-9_]+)/i', $sql, $match)) {
             return;
@@ -67,7 +65,7 @@ class GuestStorefrontCache
         if ($prefix !== '' && str_starts_with($table, $prefix)) {
             $table = substr($table, strlen($prefix));
         }
-        if (! in_array($table, self::PUBLIC_TABLES, true)) {
+        if (! in_array($table, self::PUBLIC_TABLES, true) || ! $this->enabled()) {
             return;
         }
 

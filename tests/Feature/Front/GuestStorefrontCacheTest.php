@@ -37,6 +37,7 @@ class GuestStorefrontCacheTest extends TestCase
         ]);
         Cache::store('array')->flush();
         $settings = Mockery::mock(SystemSettingsService::class);
+        $settings->shouldReceive('get')->with('store_pricing_b2c_enabled', false)->andReturn(false);
         $settings->shouldReceive('getInt')->with('store_product_desktop_default_cols', 4, 4, 5)->andReturn(4);
         app()->instance(SystemSettingsService::class, $settings);
         $this->cache = new GuestStorefrontCache;

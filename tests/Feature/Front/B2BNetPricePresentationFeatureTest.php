@@ -113,6 +113,57 @@ class B2BNetPricePresentationFeatureTest extends TestCase
             ->assertDontSee('data-price-excludes-tax', false)->assertSee('U cijenu je uključen PDV');
     }
 
+    public function test_b2c_is_opt_in_and_guests_and_private_customers_pay_retail_with_vat(): void
+    {
+        [$product, $business] = $this->fixture();
+        $access = app(\App\Services\Pricing\B2BAccessService::class);
+        $this->assertFalse($access->b2cEnabled());
+        $this->assertFalse($access->canViewPrices(null));
+        $this->get(route('front.auth.register'))->assertRedirect(route('front.auth.b2b-register'));
+
+        app(SystemSettingsService::class)->put('store_pricing_b2c_enabled', true);
+        $private = User::factory()->create();
+        $private->customerGroups()->attach($business->b2bAccount->customer_group_id);
+        foreach ([null, $private] as $viewer) {
+            $price = app(ProductPricePresentationService::class)->forProduct($product, $viewer);
+            $this->assertSame(171.86, $price['display_current']);
+            $this->assertTrue($price['display_includes_tax']);
+            $this->assertFalse($price['is_b2b_price']);
+        }
+        $this->get(route('products.show', ['slug' => 'net-contract-product']))->assertOk()
+            ->assertSee('171.86 €')->assertSee('s PDV-om')->assertDontSee('91.23 €');
+        $this->get(route('front.auth.login'))->assertOk()
+            ->assertSee('Registracija privatnog kupca')->assertSee('Registracija tvrtke');
+        $cart = app(CartService::class);
+        $this->assertTrue($cart->add($product));
+        $this->assertSame(171.86, $cart->lines()->first()['display_unit_price']);
+        $this->get(route('cart.index'))->assertOk()->assertSee('171.86');
+
+        $this->actingAs($business);
+        $price = app(ProductPricePresentationService::class)->forProduct($product, $business);
+        $this->assertSame(91.23, $price['display_current']);
+        $this->assertFalse($price['display_includes_tax']);
+        $this->assertTrue($price['is_b2b_price']);
+        $this->assertSame(91.23, $cart->lines()->first()['display_unit_price']);
+    }
+
+    public function test_private_registration_needs_no_company_or_address_and_creates_no_business_account(): void
+    {
+        app(SystemSettingsService::class)->put('store_pricing_b2c_enabled', true);
+        $this->get(route('front.auth.register'))->assertOk()
+            ->assertDontSee('name="address_line_1"', false)->assertDontSee('name="phone"', false);
+        $this->post(route('front.auth.register.store'), [
+            'first_name' => 'Ana', 'last_name' => 'Horvat', 'email' => 'private@example.test',
+            'password' => 'Password123!', 'password_confirmation' => 'Password123!', 'terms_accepted' => 1,
+        ])->assertSessionHasNoErrors()->assertRedirect(route('account.dashboard'));
+        $user = User::query()->where('email', 'private@example.test')->firstOrFail();
+        $this->assertAuthenticatedAs($user);
+        $this->assertNull($user->b2bAccount);
+        $this->assertSame('B2C', $user->commerceCustomerType());
+        $this->assertSame('Ana Horvat', $user->customerDisplayName());
+        $this->assertTrue(app(\App\Services\Pricing\B2BAccessService::class)->canViewPrices($user));
+    }
+
     private function fixture(): array
     {
         $tax = TaxRate::query()->create(['code' => 'vat25', 'name' => 'PDV 25%', 'rate_type' => 'percent', 'rate' => 25, 'is_default' => true, 'is_active' => true]);

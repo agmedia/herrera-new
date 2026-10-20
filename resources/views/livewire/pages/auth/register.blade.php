@@ -18,7 +18,7 @@ new #[Layout('layouts.guest')] class extends Component
 
     public function mount(): void
     {
-        if (config('commerce.b2b_only')) {
+        if (! app(\App\Services\Pricing\B2BAccessService::class)->allowsPrivateCustomers()) {
             $this->redirect(route('front.auth.b2b-register'));
         }
     }
@@ -28,7 +28,7 @@ new #[Layout('layouts.guest')] class extends Component
      */
     public function register(): void
     {
-        if (config('commerce.b2b_only')) {
+        if (! app(\App\Services\Pricing\B2BAccessService::class)->allowsPrivateCustomers()) {
             $this->redirect(route('front.auth.b2b-register'));
 
             return;

@@ -97,7 +97,7 @@ class CartService
             $user?->getAttributes(),
             $account?->getAttributes(), $group?->getAttributes(),
             $user?->relationLoaded('customerGroups') ? $user->customerGroups->map->getAttributes()->all() : null,
-            config('commerce.b2b_only'), config('commerce.b2b_display_net'),
+            config('commerce.b2b_only'), config('commerce.b2b_display_net'), app(B2BAccessService::class)->b2cEnabled(),
             $this->taxPricing->pricesIncludeTax(),
         ]));
         $snapshots = $request->attributes->get(self::RESOLVED_LINES_ATTRIBUTE, []);
@@ -233,7 +233,7 @@ class CartService
             $displayCatalogUnitPrice = (float) $this->taxPricing->grossFromStored($storedBaseUnitPrice, $product);
             $displayLineTotal = round($lineTotal + $lineTaxTotal, 2);
             $taxRateValue = (float) ($resolvedTaxRate?->rate ?? 0);
-            $displayNet = app(B2BAccessService::class)->requiresApprovedAccount() && (bool) config('commerce.b2b_display_net', true);
+            $displayNet = app(B2BAccessService::class)->displaysNet(auth()->user());
             if ($displayNet) {
                 $displayUnitPrice = $unitPrice;
                 $displayBaseUnitPrice = $baseUnitPrice;

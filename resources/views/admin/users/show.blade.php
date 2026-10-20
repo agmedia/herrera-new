@@ -12,7 +12,7 @@
             <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Admin / Users') }}</p>
-                    <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{{ $user->customerDisplayName() }}</h1>
+                    <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{{ $user->customerDisplayName() }} <span class="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{{ $user->commerceCustomerType() }}</span></h1>
                     <p class="mt-2 text-sm text-slate-600">{{ __('Read-only account view with profile, addresses and recent activity.') }}</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">

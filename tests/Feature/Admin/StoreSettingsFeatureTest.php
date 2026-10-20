@@ -107,7 +107,7 @@ class StoreSettingsFeatureTest extends TestCase
             'branding' => ['branding', ['store_brand_name' => 'Test Shop', 'store_footer_email_sales' => 'sales@example.com']],
             'newsletter' => ['newsletter', ['store_newsletter_provider' => 'database', 'store_newsletter_title' => 'Shop news']],
             'integrations' => ['integrations', ['store_captcha_recaptcha_v3_min_score' => 0.7, 'store_analytics_ga4_measurement_id' => 'G-TEST123']],
-            'pricing' => ['pricing', ['store_pricing_prices_include_tax' => true]],
+            'pricing' => ['pricing', ['store_pricing_prices_include_tax' => true, 'store_pricing_b2c_enabled' => true]],
             'cart' => ['cart', ['store_cart_coupon_enabled' => true]],
             'images' => ['images', ['store_images_use_webp' => false]],
             'products' => ['products', ['store_product_desktop_default_cols' => 5, 'store_product_mobile_default_cols' => 1]],

@@ -32,6 +32,7 @@ class GuestStorefrontCache
     {
         return (bool) config('storefront_cache.enabled', false)
             && (bool) config('commerce.b2b_only', true)
+            && ! app(\App\Services\Pricing\B2BAccessService::class)->b2cEnabled()
             && (int) config('storefront_cache.ttl_seconds', 120) > 0;
     }
 

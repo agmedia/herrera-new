@@ -139,8 +139,9 @@
                             @if ($canAssign || $canSegment)<td class="px-3 py-2">@if ($row->account_type === 'customer' && ! $row->can('admin.access') && ! $row->isA('superadmin', 'admin', 'editor', 'order_manager'))<input type="checkbox" wire:model.live="selectedCustomers" value="{{ $row->id }}" aria-label="{{ __('Odaberi kupca') }} {{ $company ?: $row->name }}">@endif</td>@endif
                             <td class="px-3 py-2 text-center font-mono text-xs text-slate-700">{{ $row->id }}</td>
                             <td class="px-3 py-2 text-slate-800" style="min-width: 15rem;">
-                                <a href="{{ route('admin.users.show', ['user' => $row->id]) }}" class="font-semibold text-slate-900 hover:text-cyan-700">{{ $company ?: __('Bez naziva tvrtke') }}</a>
+                                <a href="{{ route('admin.users.show', ['user' => $row->id]) }}" class="font-semibold text-slate-900 hover:text-cyan-700">{{ $row->customerDisplayName() }}</a>
                                 <div class="mt-1 font-mono text-xs text-slate-600">{{ __('OIB') }}: {{ $oib ?: '—' }}</div>
+                                <span class="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{{ $row->commerceCustomerType() }}</span>
                             </td>
                             <td class="px-3 py-2 text-slate-700">
                                 <div class="font-medium">{{ $row->name }}</div>

@@ -83,7 +83,7 @@
                     <div class="mt-3 grid gap-2 text-sm text-slate-700">
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{{ __('Customer') }}</p>
-                            <p class="mt-1 font-medium text-slate-800">{{ $row->customerDisplayName() }}</p>
+                            <p class="mt-1 font-medium text-slate-800">{{ $row->customerDisplayName() }} <span class="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{{ $row->commerceCustomerType() }}</span></p>
                             @if ($row->customerDisplayName() !== $row->customer_name)<p class="text-xs text-slate-500">{{ __('Kontakt') }}: {{ $row->customer_name }}</p>@endif
                             <p class="truncate text-xs text-slate-500">{{ $row->customer_email }}</p>
                         </div>
@@ -165,7 +165,7 @@
                                 <div class="text-xs text-slate-500">{{ $row->items_count }} {{ __('items') }}</div>
                             </td>
                             <td class="px-3 py-2 text-slate-700">
-                                <div class="font-medium">{{ $row->customerDisplayName() }}</div>
+                                <div class="font-medium">{{ $row->customerDisplayName() }} <span class="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{{ $row->commerceCustomerType() }}</span></div>
                             @if ($row->customerDisplayName() !== $row->customer_name)<p class="text-xs text-slate-500">{{ __('Kontakt') }}: {{ $row->customer_name }}</p>@endif
                                 <div class="text-xs text-slate-500">{{ $row->customer_email }}</div>
                             </td>

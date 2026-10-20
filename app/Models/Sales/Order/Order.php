@@ -93,9 +93,19 @@ class Order extends Model
         return $query->whereDoesntHave('status', fn (Builder $status) => OrderStatusClassification::applyCancelledQuery($status));
     }
 
+    public function commerceCustomerType(): string
+    {
+        $type = data_get($this->payload, 'customer_type');
+        if (in_array($type, ['B2B', 'B2C'], true)) {
+            return $type;
+        }
+
+        return trim((string) $this->billing_company) !== '' || $this->user?->b2bAccount !== null ? 'B2B' : 'B2C';
+    }
+
     public function customerDisplayName(): string
     {
-        return trim((string) $this->billing_company) ?: (config('commerce.b2b_only')
+        return trim((string) $this->billing_company) ?: ($this->commerceCustomerType() === 'B2B'
             ? __('Tvrtka bez naziva')
             : (string) $this->customer_name);
     }

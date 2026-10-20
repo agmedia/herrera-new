@@ -138,8 +138,7 @@ class ProductPricePresentationService
             $lowest30DaysGross = (float) $this->taxPricing->grossFromStored($lowest30DaysStored, $product, user: $user);
         }
 
-        $displayNet = app(B2BAccessService::class)->requiresApprovedAccount()
-            && (bool) config('commerce.b2b_display_net', true);
+        $displayNet = app(B2BAccessService::class)->displaysNet($user);
         $currentNet = (float) $this->taxPricing->normalizeNetPrice($storedCurrent, $product, user: $user);
 
         return [

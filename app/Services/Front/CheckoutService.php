@@ -329,6 +329,7 @@ class CheckoutService
                 'payload' => [
                     ...($delegationAudit ? ['customer_impersonation' => $delegationAudit] : []),
                     ...($staffDelegationAudit ? ['staff_impersonation' => $staffDelegationAudit] : []),
+                    'customer_type' => $user?->commerceCustomerType() ?? 'B2C',
                     'placed_from' => 'frontend_checkout',
                     'coupon_code' => (string) ($summary['coupon_code'] ?? ''),
                     'monetary_precision' => $precision,

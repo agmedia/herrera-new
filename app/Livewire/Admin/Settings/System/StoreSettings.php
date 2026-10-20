@@ -149,6 +149,7 @@ class StoreSettings extends Component
         'store_analytics_ga4_measurement_id' => '',
         'store_analytics_purchase_event_enabled' => true,
         'store_analytics_purchase_event_name' => 'purchase',
+        'store_pricing_b2c_enabled' => false,
         'store_pricing_prices_include_tax' => false,
         'store_cart_coupon_enabled' => false,
 
@@ -450,6 +451,7 @@ class StoreSettings extends Component
             'form.store_analytics_ga4_measurement_id' => ['nullable', 'string', 'max:64'],
             'form.store_analytics_purchase_event_enabled' => ['required', 'boolean'],
             'form.store_analytics_purchase_event_name' => ['nullable', 'string', 'max:64'],
+            'form.store_pricing_b2c_enabled' => ['required', 'boolean'],
             'form.store_pricing_prices_include_tax' => ['required', 'boolean'],
             'form.store_cart_coupon_enabled' => ['required', 'boolean'],
 

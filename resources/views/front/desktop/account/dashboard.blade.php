@@ -23,7 +23,7 @@
             @if ($b2bAccount)
                 @php
                     $b2bStatus = \App\Models\User\B2BAccount::statusOptions()[$b2bAccount->status] ?? $b2bAccount->status;
-                    $b2bApproved = $canViewPrices && $b2bAccount->contractIsActive();
+                    $b2bApproved = (app(\App\Services\Pricing\B2BAccessService::class)->b2cEnabled() ? app(\App\Services\Pricing\B2BAccessService::class)->approvedAccount(auth()->user()) !== null : $canViewPrices) && $b2bAccount->contractIsActive();
                 @endphp
                 <section class="border {{ $b2bApproved ? 'border-cyan-200 bg-cyan-50' : 'border-amber-200 bg-amber-50' }} p-5" data-account-status="{{ $b2bApproved ? 'approved' : 'pending' }}">
                     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

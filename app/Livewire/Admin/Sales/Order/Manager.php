@@ -134,7 +134,7 @@ class Manager extends Component
         );
 
         $rows = app(OrderManagerAccess::class)->scopeOrders(Order::query())
-            ->with(['status:id,code,name,color', 'user:id,name,email'])
+            ->with(['status:id,code,name,color', 'user:id,name,email', 'user.b2bAccount:id,user_id'])
             ->withCount('items')
             ->when($this->status !== '', function (Builder $query): void {
                 $statusId = (int) $this->status;

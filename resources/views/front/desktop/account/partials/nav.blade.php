@@ -38,11 +38,12 @@
     $accountUser = auth()->user();
     $accountUser?->loadMissing('b2bAccount');
     $b2bAccess = app(\App\Services\Pricing\B2BAccessService::class);
-    $b2bNavigationAvailable = $b2bAccess->canViewPrices($accountUser)
+    $b2bNavigationAvailable = ($b2bAccess->b2cEnabled() ? $b2bAccess->approvedAccount($accountUser) !== null : $b2bAccess->canViewPrices($accountUser))
         && $accountUser?->b2bAccount?->contractIsActive();
     $showB2BApprovalNotice = $accountUser
         && $b2bAccess->requiresApprovedAccount()
         && ! $b2bNavigationAvailable
+        && (! $b2bAccess->b2cEnabled() || $accountUser->b2bAccount !== null)
         && $accountUser->customerGroups()->exists();
     if ($b2bNavigationAvailable) {
         array_splice($items, 2, 0, [

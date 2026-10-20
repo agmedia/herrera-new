@@ -489,7 +489,7 @@ class ProductController extends Controller
     {
         $countryNames = collect(CountryCatalog::all())->keyBy('code');
         $countryNameKey = str_starts_with($locale, 'hr') ? 'name_hr' : 'name_en';
-        $displayNet = (bool) config('commerce.b2b_only') && (bool) config('commerce.b2b_display_net', true);
+        $displayNet = app(\App\Services\Pricing\B2BAccessService::class)->displaysNet(auth()->user());
         $taxPricing = app(TaxPricingService::class);
 
         return $methods->groupBy(function (ShippingMethod $method): string {

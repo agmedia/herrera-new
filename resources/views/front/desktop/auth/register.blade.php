@@ -60,50 +60,6 @@
                 </div>
 
                 <div>
-                    <label for="auth-register-phone" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.phone') }} <x-front.required-mark /></label>
-                    <input id="auth-register-phone" type="tel" name="phone" value="{{ old('phone') }}" class="w-full px-3 text-sm" autocomplete="tel" required>
-                    @error('phone')
-                        <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div class="md:col-span-2">
-                    <label for="auth-register-address" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.address') }} <x-front.required-mark /></label>
-                    <input id="auth-register-address" type="text" name="address_line_1" value="{{ old('address_line_1') }}" class="w-full px-3 text-sm" autocomplete="street-address" required>
-                    @error('address_line_1')
-                        <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="auth-register-postal-code" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.postal_code') }} <x-front.required-mark /></label>
-                    <input id="auth-register-postal-code" type="text" name="postal_code" value="{{ old('postal_code') }}" class="w-full px-3 text-sm" autocomplete="postal-code" inputmode="numeric" data-address-postal required>
-                    @error('postal_code')
-                        <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="auth-register-city" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.city') }} <x-front.required-mark /></label>
-                    <input id="auth-register-city" type="text" name="city" value="{{ old('city') }}" class="w-full px-3 text-sm" autocomplete="address-level2" data-address-city required>
-                    @error('city')
-                        <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div class="md:col-span-2">
-                    <label for="auth-register-country" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.country') }} <x-front.required-mark /></label>
-                    <select id="auth-register-country" name="country_code" class="w-full px-3 text-sm" autocomplete="country" data-address-country required>
-                        @foreach ($countryOptions as $countryOption)
-                            <option value="{{ $countryOption['code'] }}" @selected(old('country_code', 'HR') === $countryOption['code'])>{{ $countryOption['label'] }}</option>
-                        @endforeach
-                    </select>
-                    @error('country_code')
-                        <p class="mt-2 text-xs font-semibold text-rose-600">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
                     <label for="auth-register-password" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.auth.fields.password') }} <x-front.required-mark /></label>
                     <input id="auth-register-password" type="password" name="password" class="w-full px-3 text-sm" autocomplete="new-password" required>
                     @error('password')

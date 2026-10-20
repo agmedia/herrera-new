@@ -467,7 +467,7 @@
                     <span class="font-semibold text-slate-900">{{ $summary['item_qty'] }}</span>
                 </div>
                 <div class="mt-2 flex items-center justify-between">
-                    <span class="text-slate-600">{{ ((bool) config('commerce.b2b_only') && (bool) config('commerce.b2b_display_net', true)) ? __('ui.b2b.pricing.net_subtotal') : __('ui.checkout.labels.subtotal') }}</span>
+                    <span class="text-slate-600">{{ (app(\App\Services\Pricing\B2BAccessService::class)->displaysNet(auth()->user())) ? __('ui.b2b.pricing.net_subtotal') : __('ui.checkout.labels.subtotal') }}</span>
                     <span class="font-semibold text-slate-900">{{ \App\Support\Currency::format((float) $summary['subtotal']) }}</span>
                 </div>
                 @if ((float) ($summary['discount_total'] ?? 0) > 0)

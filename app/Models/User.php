@@ -146,9 +146,14 @@ class User extends Authenticatable implements HasMedia
         return trim((string) $billing?->company) ?: null;
     }
 
+    public function commerceCustomerType(): string
+    {
+        return $this->b2bAccount !== null || $this->companyName() !== null ? 'B2B' : 'B2C';
+    }
+
     public function customerDisplayName(): string
     {
-        return $this->companyName() ?? ($this->account_type === 'customer' && config('commerce.b2b_only')
+        return $this->companyName() ?? ($this->commerceCustomerType() === 'B2B'
             ? __('Tvrtka bez naziva')
             : (string) $this->name);
     }

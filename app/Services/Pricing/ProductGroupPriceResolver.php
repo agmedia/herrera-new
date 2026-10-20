@@ -35,7 +35,7 @@ class ProductGroupPriceResolver
         }
 
         $access = app(B2BAccessService::class);
-        if ($access->requiresApprovedAccount() && ! $access->canViewPrices($user)) {
+        if ($access->requiresApprovedAccount() && ! $access->approvedAccount($user)) {
             return null;
         }
 

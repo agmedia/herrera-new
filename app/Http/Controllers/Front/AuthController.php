@@ -95,7 +95,7 @@ class AuthController extends Controller
 
     public function showRegister(Request $request): View|RedirectResponse
     {
-        if (app(B2BAccessService::class)->requiresApprovedAccount()) {
+        if (! app(B2BAccessService::class)->allowsPrivateCustomers()) {
             return redirect()->route('front.auth.b2b-register');
         }
 
@@ -313,7 +313,7 @@ class AuthController extends Controller
 
     public function register(Request $request): RedirectResponse
     {
-        if (app(B2BAccessService::class)->requiresApprovedAccount()) {
+        if (! app(B2BAccessService::class)->allowsPrivateCustomers()) {
             return $this->registerB2B($request);
         }
 
@@ -325,11 +325,11 @@ class AuthController extends Controller
                 'first_name' => ['required', 'string', 'max:120'],
                 'last_name' => ['required', 'string', 'max:120'],
                 'email' => ['required', 'email', 'max:191', \Illuminate\Validation\Rule::unique('users', 'email')->where('account_type', 'customer')],
-                'phone' => ['required', 'string', 'max:80'],
-                'address_line_1' => ['required', 'string', 'max:191'],
-                'postal_code' => ['required', 'string', 'max:32'],
-                'city' => ['required', 'string', 'max:120'],
-                'country_code' => ['required', 'string', 'size:2'],
+                'phone' => ['nullable', 'string', 'max:80'],
+                'address_line_1' => ['nullable', 'string', 'max:191'],
+                'postal_code' => ['nullable', 'string', 'max:32'],
+                'city' => ['nullable', 'string', 'max:120'],
+                'country_code' => ['nullable', 'string', 'size:2'],
                 'password' => ['required', 'string', 'confirmed', Password::defaults()],
                 'terms_accepted' => ['accepted'],
                 'recaptcha_token' => [$captchaEnabled ? 'required' : 'nullable', 'string', 'max:4096'],
@@ -376,21 +376,23 @@ class AuthController extends Controller
                 'user_id' => $user->getKey(),
                 'first_name' => trim((string) $validated['first_name']),
                 'last_name' => trim((string) $validated['last_name']),
-                'phone' => trim((string) $validated['phone']),
+                'phone' => trim((string) ($validated['phone'] ?? '')),
             ]);
 
-            UserAddress::query()->create([
-                'user_id' => $user->getKey(),
-                'type' => UserAddress::TYPE_BILLING,
-                'first_name' => trim((string) $validated['first_name']),
-                'last_name' => trim((string) $validated['last_name']),
-                'phone' => trim((string) $validated['phone']),
-                'address_line_1' => trim((string) $validated['address_line_1']),
-                'postal_code' => trim((string) $validated['postal_code']),
-                'city' => trim((string) $validated['city']),
-                'country_code' => strtoupper(trim((string) $validated['country_code'])),
-                'is_default' => true,
-            ]);
+            if (! empty($validated['address_line_1'])) {
+                UserAddress::query()->create([
+                    'user_id' => $user->getKey(),
+                    'type' => UserAddress::TYPE_BILLING,
+                    'first_name' => trim((string) $validated['first_name']),
+                    'last_name' => trim((string) $validated['last_name']),
+                    'phone' => trim((string) ($validated['phone'] ?? '')),
+                    'address_line_1' => trim((string) ($validated['address_line_1'] ?? '')),
+                    'postal_code' => trim((string) ($validated['postal_code'] ?? '')),
+                    'city' => trim((string) ($validated['city'] ?? '')),
+                    'country_code' => strtoupper(trim((string) ($validated['country_code'] ?? ''))),
+                    'is_default' => true,
+                ]);
+            }
 
             Bouncer::assign('customer')->to($user);
             $this->defaultCustomerGroupAssigner->assign($user);

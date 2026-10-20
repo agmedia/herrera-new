@@ -398,6 +398,12 @@
                         <input type="checkbox" wire:model="form.store_pricing_prices_include_tax" class="rounded border-slate-300 text-cyan-700 focus:ring-cyan-500" />
                         {{ __('Product prices include VAT') }}
                     </label>
+                    <label class="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 md:col-span-2">
+                        <input type="checkbox" wire:model="form.store_pricing_b2c_enabled" class="rounded border-slate-300 text-cyan-700 focus:ring-cyan-500" />
+                        {{ __('Omogući prodaju privatnim kupcima (B2C)') }}
+                    </label>
+                    <p class="text-xs text-slate-600 md:col-span-2">{{ __('Omogućuje javne maloprodajne cijene s PDV-om, registraciju privatnih kupaca i kupnju. Odobreni B2B kupci zadržavaju svoje ugovorene cijene.') }}</p>
+                    @error('form.store_pricing_b2c_enabled') <p class="text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
             @endif
 

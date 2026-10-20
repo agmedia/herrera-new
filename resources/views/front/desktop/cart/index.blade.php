@@ -290,7 +290,7 @@
                         <dd class="font-semibold text-slate-900">{{ $summary['item_qty'] }}</dd>
                     </div>
                     <div class="flex items-center justify-between">
-                        <dt class="text-slate-600">{{ ((bool) config('commerce.b2b_only') && (bool) config('commerce.b2b_display_net', true)) ? __('ui.b2b.pricing.net_subtotal') : __('ui.cart.summary.subtotal') }}</dt>
+                        <dt class="text-slate-600">{{ (app(\App\Services\Pricing\B2BAccessService::class)->displaysNet(auth()->user())) ? __('ui.b2b.pricing.net_subtotal') : __('ui.cart.summary.subtotal') }}</dt>
                         <dd class="font-semibold text-slate-900">{{ number_format((float) $summary['subtotal'], 2) }} €</dd>
                     </div>
                     @if ((float) ($summary['discount_total'] ?? 0) > 0)

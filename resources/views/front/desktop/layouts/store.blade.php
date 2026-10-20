@@ -220,10 +220,12 @@
                 <nav class="herrera-catalog-navigation" aria-label="{{ __('herrera.header.categories') }}" data-herrera-catalog-navigation>
                     @include('front.desktop.partials.main-nav', ['mainNavigation' => [$herreraCatalogNavigation], 'herreraCatalogHeader' => true, 'deferCatalogMega' => true])
                 </nav>
+                @if (! app(\App\Services\Pricing\B2BAccessService::class)->b2cEnabled() || app(\App\Services\Pricing\B2BAccessService::class)->approvedAccount(auth()->user()))
                 <a class="herrera-header-quick-order" href="{{ route('account.b2b.quick-order') }}" data-herrera-quick-order>
                     <x-fa-icon :inline="$herreraStorefront" name="list-check" style="regular" />
                     <span>{{ __('herrera.header.quick_order') }}</span>
                 </a>
+                @endif
             @endif
 
             <div id="header-search-panel" class="header-search-panel-shell" data-header-search-panel data-header-search-breakpoint="{{ $herreraStorefront ? '1023' : '1279' }}" @if($herreraStorefront) data-header-search-fullscreen data-header-search-label="{{ __('ui.front.desktop.search') }}" @endif @unless($herreraStorefront) data-header-search-persistent @endunless>
@@ -317,7 +319,7 @@
                 @else
                     <a href="{{ route('front.auth.login') }}" class="inline-flex min-w-[136px] items-center justify-center gap-2 border-r border-slate-200 px-4 text-sm text-slate-700 transition hover:bg-slate-50 hover:text-black">
                         <x-fa-icon :inline="$herreraStorefront" name="user" style="regular" class="h-5 w-5" />
-                        {{ $herreraStorefront ? __('herrera.header.login') : __('ui.front.desktop.account') }}
+                        {{ app(\App\Services\Pricing\B2BAccessService::class)->b2cEnabled() ? __('Prijavi se') : ($herreraStorefront ? __('herrera.header.login') : __('ui.front.desktop.account')) }}
                     </a>
                 @endauth
 
@@ -413,10 +415,12 @@
                     <x-fa-icon :inline="$herreraStorefront" name="arrow-right" />
                 </a>
                 @endif
+                @if (! app(\App\Services\Pricing\B2BAccessService::class)->b2cEnabled() || app(\App\Services\Pricing\B2BAccessService::class)->approvedAccount(auth()->user()))
                 <a href="{{ route('account.b2b.quick-order') }}">
                     <x-fa-icon :inline="$herreraStorefront" name="list-check" style="regular" />
                     <span>{{ __('herrera.header.quick_order') }}</span>
                 </a>
+                @endif
             </div>
         @endif
     </div>

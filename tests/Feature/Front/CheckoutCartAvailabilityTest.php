@@ -214,6 +214,31 @@ class CheckoutCartAvailabilityTest extends TestCase
         $changed->update(['stock_qty' => 2]);
     }
 
+    public function test_b2c_guest_can_complete_checkout_with_vat_and_a_persistent_customer_type(): void
+    {
+        config(['commerce.b2b_only' => true]);
+        app(\App\Services\Settings\SystemSettingsService::class)->put('store_pricing_b2c_enabled', true);
+        $tax = \App\Models\Settings\Local\TaxRate::query()->create([
+            'code' => 'vat25', 'name' => 'PDV', 'rate_type' => 'percent', 'rate' => 25,
+            'is_default' => true, 'is_active' => true,
+        ]);
+        $product = $this->product('B2C-CHECKOUT');
+        $product->update(['tax_rate_id' => $tax->id]);
+        $this->postJson(route('cart.items.store'), ['product_id' => $product->id, 'quantity' => 1])->assertSuccessful();
+        $this->get(route('checkout.create'))->assertOk()->assertSee('s PDV-om');
+        $this->post(route('checkout.store'), $this->checkoutPayload())->assertSessionHasNoErrors()->assertRedirect();
+        $order = \App\Models\Sales\Order\Order::query()->sole();
+        $this->assertSame(12.5, (float) $order->grand_total);
+        $this->assertSame(2.5, (float) $order->tax_total);
+        $this->assertNull($order->user_id);
+        $this->assertSame('B2C', $order->commerceCustomerType());
+        $this->assertSame('B2C', data_get($order->payload, 'customer_type'));
+        app(\App\Services\Settings\SystemSettingsService::class)->put('store_pricing_b2c_enabled', false);
+        $this->assertSame('B2C', $order->fresh()->commerceCustomerType());
+        $this->postJson(route('cart.items.store'), ['product_id' => $product->id, 'quantity' => 1])->assertForbidden();
+        $this->get(route('front.auth.register'))->assertRedirect(route('front.auth.b2b-register'));
+    }
+
     private function product(string $code): Product
     {
         $product = Product::query()->create(['code' => $code, 'sku' => $code, 'base_price' => 10, 'stock_qty' => 100, 'supplier_stock_qty' => 0, 'is_active' => true]);

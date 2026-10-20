@@ -20,14 +20,11 @@
             @if ($hasChildren)
                 <details class="group/nav desktop-mobile-menu-group" data-mobile-menu-accordion @if (($item['type'] ?? '') === 'catalog') data-mobile-menu-catalog @endif>
                     <summary class="desktop-mobile-menu-row desktop-mobile-menu-row--section relative flex min-h-[60px] cursor-pointer list-none items-center px-4 py-3 hover:bg-slate-50">
-                        <a
-                            href="{{ $item['url'] ?? '#' }}"
+                        <span
                             class="desktop-mobile-menu-category-link min-w-0 flex-1 pr-12 text-[16px] font-bold tracking-[-0.01em]"
-                            data-mobile-nav-link
-                            @if($target) target="{{ $target }}" rel="{{ $rel }}" @endif
                         >
                             {{ $item['label'] }}
-                        </a>
+                        </span>
                         <button
                             type="button"
                             class="desktop-mobile-menu-toggle"
@@ -50,6 +47,9 @@
                         </button>
                     </summary>
                     <ul class="desktop-mobile-menu-children text-[13px]">
+                        <li>
+                            <a href="{{ $item['url'] ?? '#' }}" class="desktop-mobile-depth-0 desktop-mobile-menu-row flex min-h-[52px] items-center py-3 font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900" data-mobile-nav-link @if($target) target="{{ $target }}" rel="{{ $rel }}" @endif>{{ __('View All') }}</a>
+                        </li>
                         @foreach ($children as $child)
                             @include('front.desktop.partials.main-nav-mobile-child', ['child' => $child, 'level' => 0])
                         @endforeach

@@ -18,6 +18,33 @@ class CustomerPurchaseStatisticsTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_customer_statistics_cannot_be_switched_to_another_customer(): void
+    {
+        $buyer = User::factory()->create();
+        $other = User::factory()->create();
+        $this->order($buyer, ['grand_total' => 125]);
+        $this->order($other, ['grand_total' => 999]);
+        $this->actingAs($buyer)->get(route('account.statistics', ['user_id' => $other->id, 'dateFrom' => '', 'dateTo' => '']))
+            ->assertOk()->assertViewHas('summary', fn ($summary) => $summary['orders'] === 1 && $summary['order_value'] === 125.0)
+            ->assertViewHas('filters', fn ($filters) => $filters['user_id'] === $buyer->id);
+    }
+
+    public function test_product_search_keeps_customer_scope_and_summary(): void
+    {
+        $buyer = User::factory()->create();
+        $other = User::factory()->create();
+        $first = $this->order($buyer, ['grand_total' => 125]);
+        $second = $this->order($other, ['grand_total' => 999]);
+        $this->item($first, 'GLOVE-A', 2, 100, 25);
+        $this->item($second, 'GLOVE-B', 20, 999, 0);
+        $statistics = app(CustomerPurchaseStatistics::class);
+        $filters = ['user_id' => $buyer->id, 'currency' => 'EUR', 'product_search' => 'GLOVE'];
+        $this->assertCount(1, $statistics->products($filters)->get());
+        $this->assertSame(125.0, $statistics->summary($filters)['order_value']);
+        $filters['product_search'] = 'GLOVE-B';
+        $this->assertCount(0, $statistics->products($filters)->get());
+    }
+
     public function test_summary_separates_currencies_and_excludes_cancelled_orders_while_counting_guests(): void
     {
         $buyer = User::factory()->create();

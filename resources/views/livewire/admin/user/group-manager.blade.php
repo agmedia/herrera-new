@@ -87,6 +87,14 @@
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Description') }}</label>
                         <textarea wire:model="form.description" rows="3" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"></textarea>
                     </div>
+                    @if ($form['classification_type'] === \App\Models\User\CustomerGroup::CLASSIFICATION_GENERAL)
+                    <div style="grid-column: span 12;">
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Osnovni popust grupe (%)') }}</label>
+                        <input type="text" inputmode="decimal" wire:model="form.default_discount_percent" @readonly(! $canManagePricing) placeholder="Npr. 50" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
+                        <p class="mt-1 text-xs text-slate-500">{{ __('Primjenjuje se i na nove artikle kada nema posebnog pravila ili postojeće ugovorene cijene. Prazno znači da osnovni postotni popust nije zadan.') }}</p>
+                        @error('form.default_discount_percent') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
+                    </div>
+                    @endif
                 </div>
 
                 <div class="admin-form-actions flex items-center gap-2 pt-2">
@@ -134,6 +142,7 @@
                                 <td class="px-3 py-2 text-slate-800">{{ $row->code }}</td>
                                 <td class="px-3 py-2 text-slate-800">
                                     <div>{{ $row->name }}</div>
+                                    @if ($row->default_discount_percent !== null)<div class="mt-1 text-xs text-cyan-700">{{ __('Osnovni popust') }}: {{ rtrim(rtrim($row->default_discount_percent, '0'), '.') }} %</div>@endif
                                     @if ($row->isBusinessSegment())<div class="mt-1 text-xs font-semibold text-cyan-700">{{ __($classificationOptions[$row->classificationType()]) }}</div>@endif
                                     @if ($row->description)
                                         <div class="text-xs text-slate-500">{{ $row->description }}</div>

@@ -1171,6 +1171,7 @@ class HerreraOpenCartImportService
             });
         }
         $this->stats['archived_source_records'] = DB::table('herrera_source_records')->count();
+        $this->stats['customer_category_discounts'] = app(HerreraCustomerCategoryDiscountImportService::class)->import();
     }
 
     private function relations(): void

@@ -1,4 +1,24 @@
 (() => {
+    const isTouchPointer = (event) => ['touch', 'pen'].includes(event.pointerType);
+
+    const initCatalogInputMode = () => {
+        if (document.body.dataset.catalogInputInit === '1') {
+            return;
+        }
+        document.body.dataset.catalogInputInit = '1';
+        document.addEventListener('pointerdown', (event) => {
+            document.body.classList.toggle('catalog-touch-navigation', isTouchPointer(event));
+        }, true);
+        document.addEventListener('touchstart', () => {
+            document.body.classList.add('catalog-touch-navigation');
+        }, { passive: true });
+        document.addEventListener('keydown', () => {
+            if (!document.body.classList.contains('desktop-mobile-menu-open')) {
+                document.body.classList.remove('catalog-touch-navigation');
+            }
+        }, true);
+    };
+
     const initStickyHeader = () => {
         const header = document.querySelector('.site-main-header');
         if (!(header instanceof HTMLElement) || header.dataset.stickyHeaderInit === '1') {
@@ -146,6 +166,10 @@
             const hasChildren = (node) => Array.isArray(node?.children) && node.children.length > 0;
 
             const setExpanded = (expanded) => {
+                // The drawer owns the trigger's state during touch navigation.
+                if (document.body.classList.contains('catalog-touch-navigation')) {
+                    return;
+                }
                 if (trigger instanceof HTMLElement) {
                     trigger.setAttribute('aria-expanded', expanded ? 'true' : 'false');
                 }
@@ -347,8 +371,16 @@
                         link.append(renderChevron());
                     }
 
-                    link.addEventListener('pointerenter', () => activateItem(depth, index));
-                    link.addEventListener('focus', () => activateItem(depth, index));
+                    link.addEventListener('pointerenter', (event) => {
+                        if (!isTouchPointer(event)) {
+                            activateItem(depth, index);
+                        }
+                    });
+                    link.addEventListener('focus', () => {
+                        if (!document.body.classList.contains('catalog-touch-navigation')) {
+                            activateItem(depth, index);
+                        }
+                    });
                     link.addEventListener('keydown', (event) => handleItemKeydown(event, depth, index, node));
                     item.append(link);
                     fragment.append(item);
@@ -360,7 +392,12 @@
             renderColumn(0, tree, { label: rootLabel, url: rootUrl });
             resetCascade();
 
-            navGroup?.addEventListener('pointerenter', () => setExpanded(true));
+            navGroup?.addEventListener('pointerenter', (event) => {
+                document.body.classList.toggle('catalog-touch-navigation', isTouchPointer(event));
+                if (!isTouchPointer(event)) {
+                    setExpanded(true);
+                }
+            });
             navGroup?.addEventListener('pointerleave', () => {
                 if (!navGroup.contains(document.activeElement)) {
                     setExpanded(false);
@@ -380,6 +417,7 @@
     };
 
     const init = () => {
+        initCatalogInputMode();
         mountDeferredCatalogMegaMenus();
         initStickyHeader();
         initCatalogMegaMenus();
@@ -394,6 +432,10 @@
         const panel = root.querySelector('[data-mobile-menu-panel]');
         const overlay = root.querySelector('[data-mobile-menu-close]');
         const openButtons = document.querySelectorAll('[data-mobile-menu-open]');
+        const catalogTriggers = document.querySelectorAll('[data-catalog-mega-trigger]');
+        catalogTriggers.forEach((trigger) => {
+            trigger.dataset.catalogMegaControls ||= trigger.getAttribute('aria-controls');
+        });
         const closeButtons = root.querySelectorAll('[data-mobile-menu-close]');
         const accordionSections = root.querySelectorAll('[data-mobile-menu-accordion]');
         const accordionToggleButtons = root.querySelectorAll('[data-mobile-menu-toggle]');
@@ -407,6 +449,10 @@
             root.dataset.menuOpen = '0';
             root.inert = true;
             openButtons.forEach((button) => button.setAttribute('aria-expanded', 'false'));
+            catalogTriggers.forEach((trigger) => {
+                trigger.setAttribute('aria-controls', trigger.dataset.catalogMegaControls);
+                trigger.setAttribute('aria-expanded', 'false');
+            });
             overlay?.classList.remove('opacity-100');
             overlay?.classList.add('opacity-0');
             panel?.classList.add('-translate-x-full');
@@ -552,9 +598,14 @@
             root.dataset.menuOpen = '1';
             root.inert = false;
             openButtons.forEach((button) => button.setAttribute('aria-expanded', 'true'));
+            if (menuOpener?.hasAttribute('data-catalog-mega-trigger')) {
+                menuOpener.setAttribute('aria-controls', panel?.id || 'mobile-navigation');
+                menuOpener.setAttribute('aria-expanded', 'true');
+            }
             resetAccordionSections();
             syncMenuState();
-            if (event?.currentTarget?.hasAttribute('data-mobile-menu-open-categories')) {
+            if (event?.currentTarget?.hasAttribute('data-mobile-menu-open-categories')
+                || event?.currentTarget?.hasAttribute('data-catalog-mega-trigger')) {
                 const catalogSection = root.querySelector('[data-mobile-menu-catalog]');
                 if (catalogSection instanceof HTMLDetailsElement) {
                     resetSectionOpen(catalogSection, true);
@@ -600,11 +651,68 @@
             }
         });
 
+        const bindMenuOpener = (button, touchOnly = false) => {
+            let pointerType = '';
+            let start = null;
+            let moved = false;
+            let lastTouchHandledAt = 0;
+            const trackMovement = (point) => {
+                if (start && point && (Math.abs(point.clientX - start.x) > 12
+                    || Math.abs(point.clientY - start.y) > 12)) {
+                    moved = true;
+                }
+            };
+            button.addEventListener('pointerdown', (event) => {
+                pointerType = event.pointerType;
+                start = { x: event.clientX, y: event.clientY };
+                moved = false;
+            });
+            button.addEventListener('pointermove', trackMovement, { passive: true });
+            button.addEventListener('pointercancel', () => { moved = true; });
+            button.addEventListener('touchstart', (event) => {
+                pointerType = 'touch';
+                const touch = event.touches[0];
+                start = touch ? { x: touch.clientX, y: touch.clientY } : null;
+                moved = false;
+            }, { passive: true });
+            button.addEventListener('touchmove', (event) => trackMovement(event.touches[0]), { passive: true });
+            button.addEventListener('touchcancel', () => {
+                moved = true;
+                start = null;
+                lastTouchHandledAt = Date.now();
+            }, { passive: true });
+            button.addEventListener('touchend', (event) => {
+                trackMovement(event.changedTouches[0]);
+                event.preventDefault();
+                lastTouchHandledAt = Date.now();
+                if (start && !moved) {
+                    document.body.classList.add('catalog-touch-navigation');
+                    openMenu(event);
+                }
+                start = null;
+            }, { passive: false });
+            button.addEventListener('click', (event) => {
+                const touchInput = event.detail !== 0
+                    && isTouchPointer({ pointerType: event.pointerType || pointerType });
+                // Keyboard activation and an attached mouse keep the desktop link.
+                if (touchOnly && (!touchInput || event.detail === 0)) {
+                    return;
+                }
+                if (touchInput && (moved || Date.now() - lastTouchHandledAt < 700)) {
+                    event.preventDefault();
+                    return;
+                }
+                if (touchInput) {
+                    document.body.classList.add('catalog-touch-navigation');
+                }
+                openMenu(event);
+            });
+        };
         openButtons.forEach((button) => {
             button.setAttribute('aria-controls', panel?.id || 'mobile-navigation');
-            button.addEventListener('click', openMenu);
-            button.addEventListener('touchend', openMenu, { passive: false });
+            bindMenuOpener(button);
         });
+        catalogTriggers.forEach((trigger) => bindMenuOpener(trigger, true));
         closeButtons.forEach((button) => button.addEventListener('click', () => closeMenu()));
         accordionSections.forEach((section) => {
             section.addEventListener('toggle', () => {
@@ -629,7 +737,14 @@
         });
         accordionToggleButtons.forEach((button) => {
             let touchStart = null;
+            let touchMoved = false;
             let lastTouchToggleAt = 0;
+            const trackTouchMovement = (touch) => {
+                if (touchStart && touch && (Math.abs(touch.clientX - touchStart.x) > 12
+                    || Math.abs(touch.clientY - touchStart.y) > 12)) {
+                    touchMoved = true;
+                }
+            };
 
             const toggleSection = (event) => {
                 event.preventDefault();
@@ -649,37 +764,42 @@
             };
 
             button.addEventListener('touchstart', (event) => {
+                touchMoved = false;
                 const touch = event.touches[0];
                 touchStart = touch
                     ? { x: touch.clientX, y: touch.clientY }
                     : null;
             }, { passive: true });
 
+            button.addEventListener('touchmove', (event) => trackTouchMovement(event.touches[0]), { passive: true });
+
             button.addEventListener('touchend', (event) => {
                 const touch = event.changedTouches[0];
+                trackTouchMovement(touch);
+                lastTouchToggleAt = Date.now();
+                event.preventDefault();
+                event.stopPropagation();
                 if (!touchStart || !touch) {
                     touchStart = null;
                     return;
                 }
 
-                const movedX = Math.abs(touch.clientX - touchStart.x);
-                const movedY = Math.abs(touch.clientY - touchStart.y);
                 touchStart = null;
 
-                if (movedX > 12 || movedY > 12) {
+                if (touchMoved) {
                     return;
                 }
 
-                lastTouchToggleAt = Date.now();
                 toggleSection(event);
             }, { passive: false });
 
             button.addEventListener('touchcancel', () => {
                 touchStart = null;
+                lastTouchToggleAt = Date.now();
             }, { passive: true });
 
             button.addEventListener('click', (event) => {
-                if (Date.now() - lastTouchToggleAt < 700) {
+                if (event.detail !== 0 && Date.now() - lastTouchToggleAt < 700) {
                     event.preventDefault();
                     event.stopPropagation();
                     return;

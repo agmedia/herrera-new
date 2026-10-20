@@ -820,172 +820,175 @@
             grid-column: 1;
         }
 
-        [data-mobile-menu-root] {
-            position: fixed;
-            inset: 0;
-            width: 100dvw;
-            height: 100dvh;
-            z-index: 9700;
-            --mobile-menu-accent: var(--herrera-action, var(--navigation-highlight-color, #003b75));
-            --mobile-menu-tint: color-mix(in srgb, var(--mobile-menu-accent) 8%, white);
-        }
 
-        [data-mobile-menu-root] > [data-mobile-menu-close] {
-            position: fixed;
-            inset: 0;
-        }
+    }
 
-        [data-mobile-menu-panel] {
-            position: fixed;
-            inset: 0 auto 0 0;
-            width: 100dvw !important;
-            min-width: 100dvw;
-            max-width: none !important;
-            height: 100dvh;
-            max-height: 100dvh;
-            overflow: hidden;
-        }
+    /* Touch navigation uses the same drawer at every tablet width. */
+    [data-mobile-menu-root] {
+        position: fixed;
+        inset: 0;
+        width: 100dvw;
+        height: 100dvh;
+        z-index: 9700;
+        --mobile-menu-accent: var(--herrera-action, var(--navigation-highlight-color, #003b75));
+        --mobile-menu-tint: color-mix(in srgb, var(--mobile-menu-accent) 8%, white);
+    }
 
-        .desktop-mobile-menu-header {
-            min-height: 4.5rem;
-            flex: none;
-            gap: 1rem;
-            padding: max(1rem, env(safe-area-inset-top)) 1rem 1rem;
-        }
+    [data-mobile-menu-root] > [data-mobile-menu-close] {
+        position: fixed;
+        inset: 0;
+    }
 
-        .desktop-mobile-menu-header [data-store-brand-logo] {
-            width: auto;
-            height: 2.5rem;
-            max-width: 10rem;
-        }
+    [data-mobile-menu-panel] {
+        position: fixed;
+        inset: 0 auto 0 0;
+        width: 100dvw !important;
+        min-width: 100dvw;
+        max-width: none !important;
+        height: 100dvh;
+        max-height: 100dvh;
+        overflow: hidden;
+    }
 
-        .desktop-mobile-menu-dismiss {
-            flex: none;
-            border: 0;
-            border-radius: 50%;
-            background: #f1f5f5;
-        }
+    .desktop-mobile-menu-header {
+        min-height: 4.5rem;
+        flex: none;
+        gap: 1rem;
+        padding: max(1rem, env(safe-area-inset-top)) 1rem 1rem;
+    }
 
-        body.desktop-mobile-menu-open #cookie-consent-floating-button {
-            display: none !important;
-            opacity: 0 !important;
-            visibility: hidden !important;
-            pointer-events: none !important;
-        }
+    .desktop-mobile-menu-header [data-store-brand-logo] {
+        width: auto;
+        height: 2.5rem;
+        max-width: 10rem;
+    }
 
-        .desktop-mobile-menu-list {
-            min-height: 0;
-            flex: 1 1 auto;
-            border-top: 0;
-            padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
-            overscroll-behavior: contain;
-            scrollbar-width: thin;
-        }
+    .desktop-mobile-menu-dismiss {
+        flex: none;
+        border: 0;
+        border-radius: 50%;
+        background: #f1f5f5;
+    }
 
-        .desktop-mobile-menu-row {
-            min-width: 0;
-            gap: .75rem;
-            padding-top: .625rem;
-            padding-right: 1rem;
-            padding-bottom: .625rem;
-            border: 0 !important;
-            color: #2d3b40;
-            line-height: 1.4;
-            box-shadow: inset 0 -1px 0 #e9eff0;
-            transition: background-color .15s ease, color .15s ease;
-        }
+    body.desktop-mobile-menu-open #cookie-consent-floating-button {
+        display: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
 
-        .desktop-mobile-menu-row--section {
-            min-height: 3.75rem;
-            font-size: .9375rem;
-            font-weight: 600;
-            letter-spacing: -.01em;
-        }
+    .desktop-mobile-menu-list {
+        min-height: 0;
+        flex: 1 1 auto;
+        border-top: 0;
+        padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+    }
 
-        .desktop-mobile-menu-group[open] > .desktop-mobile-menu-row {
-            background: var(--mobile-menu-tint, #edf6f7);
-            color: var(--mobile-menu-accent);
-        }
+    .desktop-mobile-menu-row {
+        min-width: 0;
+        gap: .75rem;
+        padding-top: .625rem;
+        padding-right: 1rem;
+        padding-bottom: .625rem;
+        border: 0 !important;
+        color: #2d3b40;
+        line-height: 1.4;
+        box-shadow: inset 0 -1px 0 #e9eff0;
+        transition: background-color .15s ease, color .15s ease;
+    }
 
-        .desktop-mobile-menu-category-link {
-            display: flex;
-            min-height: 2.75rem;
-            align-items: center;
-            padding-right: 3rem;
-            white-space: normal;
-        }
+    .desktop-mobile-menu-row--section {
+        min-height: 3.75rem;
+        font-size: .9375rem;
+        font-weight: 600;
+        letter-spacing: -.01em;
+    }
 
-        .desktop-mobile-menu-row--section .desktop-mobile-menu-category-link {
-            font: inherit;
-            letter-spacing: inherit;
-        }
+    .desktop-mobile-menu-group[open] > .desktop-mobile-menu-row {
+        background: var(--mobile-menu-tint, #edf6f7);
+        color: var(--mobile-menu-accent);
+    }
 
-        .desktop-mobile-menu-row:hover {
-            background: #f5f8f8;
-        }
+    .desktop-mobile-menu-category-link {
+        display: flex;
+        min-height: 2.75rem;
+        align-items: center;
+        padding-right: 3rem;
+        white-space: normal;
+    }
 
-        .desktop-mobile-menu-row-active {
-            background: var(--mobile-menu-tint, #edf6f7);
-            box-shadow: inset 3px 0 0 var(--mobile-menu-accent), inset 0 -1px 0 #e9eff0;
-        }
+    .desktop-mobile-menu-row--section .desktop-mobile-menu-category-link {
+        font: inherit;
+        letter-spacing: inherit;
+    }
 
-        .desktop-mobile-menu-link-active {
-            color: var(--mobile-menu-accent) !important;
-            font-weight: 600 !important;
-        }
+    .desktop-mobile-menu-row:hover {
+        background: #f5f8f8;
+    }
 
-        .desktop-mobile-menu-toggle {
-            position: absolute;
-            top: 50%;
-            right: .75rem;
-            z-index: 1;
-            display: inline-flex;
-            width: 2.75rem;
-            height: 2.75rem;
-            align-items: center;
-            justify-content: center;
-            transform: translateY(-50%);
-            touch-action: manipulation;
-            padding: 0;
-            border: 0;
-            border-radius: .625rem;
-            background: #f1f5f5;
-            color: #63787f;
-        }
+    .desktop-mobile-menu-row-active {
+        background: var(--mobile-menu-tint, #edf6f7);
+        box-shadow: inset 3px 0 0 var(--mobile-menu-accent), inset 0 -1px 0 #e9eff0;
+    }
 
-        .desktop-mobile-menu-toggle svg {
-            width: .875rem;
-            height: .875rem;
-        }
+    .desktop-mobile-menu-link-active {
+        color: var(--mobile-menu-accent) !important;
+        font-weight: 600 !important;
+    }
 
-        .desktop-mobile-menu-group[open] > summary > .desktop-mobile-menu-toggle {
-            background: #fff;
-            color: var(--mobile-menu-accent);
-        }
+    .desktop-mobile-menu-toggle {
+        position: absolute;
+        top: 50%;
+        right: .75rem;
+        z-index: 1;
+        display: inline-flex;
+        width: 2.75rem;
+        height: 2.75rem;
+        align-items: center;
+        justify-content: center;
+        transform: translateY(-50%);
+        touch-action: manipulation;
+        padding: 0;
+        border: 0;
+        border-radius: .625rem;
+        background: #f1f5f5;
+        color: #63787f;
+    }
 
-        .desktop-mobile-menu-list :is(a, button, summary):focus-visible,
-        .desktop-mobile-menu-dismiss:focus-visible {
-            outline: 2px solid var(--mobile-menu-accent);
-            outline-offset: -3px;
-            border-radius: .375rem;
-        }
+    .desktop-mobile-menu-toggle svg {
+        width: .875rem;
+        height: .875rem;
+    }
 
-        .desktop-mobile-menu-group,
-        .desktop-mobile-menu-group > summary,
-        .desktop-mobile-menu-group > ul,
-        .desktop-mobile-menu-children > li,
-        .desktop-mobile-menu-children > li > details,
-        .desktop-mobile-menu-children > li > a {
-            border: 0 !important;
-        }
+    .desktop-mobile-menu-group[open] > summary > .desktop-mobile-menu-toggle {
+        background: #fff;
+        color: var(--mobile-menu-accent);
+    }
 
-        .desktop-mobile-menu-children,
-        .desktop-mobile-menu-children li {
-            margin: 0;
-            padding: 0;
-            border: 0;
-            list-style: none;
-        }
+    .desktop-mobile-menu-list :is(a, button, summary):focus-visible,
+    .desktop-mobile-menu-dismiss:focus-visible {
+        outline: 2px solid var(--mobile-menu-accent);
+        outline-offset: -3px;
+        border-radius: .375rem;
+    }
+
+    .desktop-mobile-menu-group,
+    .desktop-mobile-menu-group > summary,
+    .desktop-mobile-menu-group > ul,
+    .desktop-mobile-menu-children > li,
+    .desktop-mobile-menu-children > li > details,
+    .desktop-mobile-menu-children > li > a {
+        border: 0 !important;
+    }
+
+    .desktop-mobile-menu-children,
+    .desktop-mobile-menu-children li {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        list-style: none;
     }
 
     @media (min-width: 1024px) {
@@ -1818,6 +1821,16 @@
         padding-right: 2rem;
         padding-left: 2rem;
     }
+}
+
+[data-mobile-menu-root][data-menu-open="1"] {
+    display: block !important;
+}
+
+.catalog-touch-navigation .site-catalog-mega {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none;
 }
 
 .site-catalog-mega {

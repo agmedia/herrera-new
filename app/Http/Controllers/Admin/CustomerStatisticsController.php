@@ -31,6 +31,7 @@ class CustomerStatisticsController extends Controller
             'search' => ['nullable', 'string', 'max:191'],
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
             'guest_email' => ['nullable', 'string', 'max:191'],
+            'tab' => ['nullable', Rule::in(['shop', 'invoices'])],
         ]);
         if (! empty($validated['user_id'])) {
             app(OrderManagerAccess::class)->assertCustomer(User::query()->findOrFail($validated['user_id']), $admin);
@@ -53,6 +54,22 @@ class CustomerStatisticsController extends Controller
             'guest_email' => trim($validated['guest_email'] ?? ''),
         ];
         $selectedCustomer = $filters['user_id'] ? User::query()->findOrFail($filters['user_id']) : null;
+
+        if (($validated['tab'] ?? 'shop') === 'invoices') {
+            abort_unless($selectedCustomer, 422, 'Odaberite kupca za pregled faktura.');
+            $invoices = collect();
+            $invoiceError = null;
+            try {
+                if (! $filters['dateFrom'] || ! $filters['dateTo']) {
+                    throw new \RuntimeException('Za fakture odaberite početni i završni datum.');
+                }
+                $invoices = app(\App\Services\Integrations\Eracuni\CustomerInvoices::class)->forCustomer($selectedCustomer, $filters);
+            } catch (\RuntimeException $exception) {
+                $invoiceError = $exception->getMessage();
+            }
+
+            return view('admin.users.invoices', compact('filters', 'currencies', 'selectedCustomer', 'invoices', 'invoiceError'));
+        }
 
         return view('admin.users.statistics', [
             'filters' => $filters,

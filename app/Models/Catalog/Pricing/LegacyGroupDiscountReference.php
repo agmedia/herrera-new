@@ -5,7 +5,7 @@ namespace App\Models\Catalog\Pricing;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 
-/** Dokumentacija izvornog pravila, nikada izvršivo pravilo novog cjenika. */
+/** Nepromjenjiva izvorna definicija; provjerene formule služe samo kao rezervni izračun cijene. */
 class LegacyGroupDiscountReference extends Model
 {
     protected $table = 'catalog_legacy_group_discount_references';

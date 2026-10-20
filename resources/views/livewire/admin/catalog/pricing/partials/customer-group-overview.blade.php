@@ -32,14 +32,14 @@
             @endif
         </div>
     </div>
-    <p class="mt-3 text-sm leading-6 text-slate-600">{{ __('Cijene ispod su stvarne spremljene cijene, ne postotak pretpostavljen iz naziva grupe. Prikazana trenutna cijena vrijedi za 1 komad na današnji datum, bez individualnih ugovora kupca.') }}</p>
+    <p class="mt-3 text-sm leading-6 text-slate-600">{{ __('Cijene ispod uključuju postojeće ugovorene cijene i važeća pravila po kategorijama i dobavljačima. Novi artikli automatski dobivaju popust kada zadovoljavaju uvjete pravila. Prikaz vrijedi za 1 komad na današnji datum, bez posebnih popusta pojedinog kupca.') }}</p>
     @if ($catalog->status !== 'draft')<p class="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{{ __('Ovaj cjenik je zaključan. „Uredi ovu grupu” otvara postojeću radnu kopiju ili priprema novu; objavljene cijene ostaju nepromijenjene.') }}</p>@else<p class="mt-3 rounded-lg bg-cyan-50 p-3 text-sm text-cyan-800">{{ __('Uređujete radnu kopiju. Izmjene će vrijediti kupcima tek nakon „Objavi cjenik”.') }}</p>@endif
     @if (! $selectedGroup->is_active)<p class="mt-3 text-sm text-amber-700">{{ __('Grupa je neaktivna; ovo je pregled spremljenih cijena, ne pravo kupca na kupnju.') }}</p>@endif
-    <p class="mt-3 text-xs leading-5 text-slate-500">{{ __('Redoslijed odabira: novo pravilo popusta → akcijska → količinska → individualna → grupna → osnovna cijena. Unutar iste vrste prednost ima manji prioritet, zatim niža cijena; količinski uvjet i datumi moraju biti zadovoljeni. Ručno zadana grupna cijena ima prednost nad uvezenom grupnom cijenom. Popusti se ne zbrajaju.') }}</p>
+    <p class="mt-3 text-xs leading-5 text-slate-500">{{ __('Pravila prate trenutačne kategorije i dobavljača artikla. Cijene se računaju od osnovne cijene cjenika, a popusti se ne zbrajaju. Ako nema posebnih uvjeta, koristi se zadani osnovni popust grupe; postojeće pojedinačno ugovorene cijene ostaju dostupne u izvorima ispod.') }}</p>
 </section>
 
 <section class="admin-panel overflow-hidden" data-group-existing-rules>
-    <div class="p-5"><h3 class="admin-section-title">{{ __('Izvorna pravila starog webshopa') }}</h3><p class="mt-2 text-xs leading-5 text-slate-500">{{ __('Definicije su preuzete iz baze radi pregleda. Stari webshop nije pohranio vezu svake konačne cijene s pravilom; zato su prenesene apsolutne cijene ispod mjerodavne. Pregled definicije sam po sebi ništa ne preračunava.') }}</p></div>
+    <div class="p-5"><h3 class="admin-section-title">{{ __('Izvorna pravila starog webshopa') }}</h3><p class="mt-2 text-xs leading-5 text-slate-500">{{ __('Provjerene izvorne definicije sada obuhvaćaju i nove artikle u odgovarajućim kategorijama. Primjenjuju se kada nema postojeće konačne cijene višeg prioriteta. Predlošci grupnih cijena dopunjuju artikle bez pohranjene grupne cijene. Definicije s nepotpunim poveznicama zadržane su za pregled i ne proširuju opseg popusta.') }}</p></div>
     @if ($legacyReferences->isNotEmpty())
     <div class="overflow-x-auto"><table class="admin-items-table min-w-full text-sm"><thead><tr><th class="p-3 text-left">{{ __('Pravilo / popust') }}</th><th class="p-3 text-left">{{ __('Brandovi / kategorije') }}</th><th class="p-3 text-left">{{ __('Grupe / trajanje') }}</th><th class="p-3 text-right">{{ __('Izmjena') }}</th></tr></thead><tbody>
         @foreach ($legacyReferences as $reference)
@@ -90,7 +90,7 @@
                 <td class="p-3 align-top"><strong>{{ $row['product']->sku ?: $row['product']->code }}</strong><p class="mt-1 text-xs text-slate-500">{{ $row['product']->translations->firstWhere('locale', app()->getLocale())?->name ?? $row['product']->code }}</p>@if (! $row['product']->is_active)<p class="mt-1 text-xs text-amber-700">{{ __('Artikl nije aktivan') }}</p>@endif<button type="button" wire:click="openGroupProduct({{ $row['product']->id }})" class="mt-2 text-xs font-semibold text-cyan-700">{{ __('Cijene ovog artikla u svim grupama') }}</button></td>
                 <td class="p-3 text-right align-top tabular-nums whitespace-nowrap">{{ $row['base_price'] }} EUR</td>
                 <td class="p-3 text-right align-top tabular-nums whitespace-nowrap"><strong>{{ $row['effective_price'] }} EUR</strong>@if ($row['discount_percent'] !== null)<p class="mt-1 text-xs text-slate-500">{{ $row['discount_percent'] }} % {{ __('razlike') }}</p>@endif</td>
-                <td class="p-3 align-top"><p class="font-semibold">{{ $chosen?->discountRule?->name ?? ($kinds[$chosen?->kind ?? 'base'] ?? '—') }}</p>
+                <td class="p-3 align-top"><p class="font-semibold">{{ $row['source_name'] ?? $chosen?->discountRule?->name ?? ($kinds[$chosen?->kind ?? 'base'] ?? '—') }}</p>
                     <details wire:ignore.self class="mt-2" data-group-price-sources><summary class="cursor-pointer text-xs font-semibold text-cyan-700">{{ __('Sve stavke i uvjeti') }} ({{ $row['entries']->count() }})</summary>
                         <div class="mt-2 space-y-3">@foreach ($row['entries'] as $source)
                             <div class="border-l-2 {{ $chosen?->id === $source->id ? 'border-cyan-500' : 'border-slate-200' }} pl-3 text-xs" wire:key="group-source-{{ $source->id }}">

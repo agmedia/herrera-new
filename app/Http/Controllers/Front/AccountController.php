@@ -74,6 +74,34 @@ class AccountController extends Controller
         ]);
     }
 
+    public function statistics(Request $request, \App\Services\Analytics\CustomerPurchaseStatistics $statistics): View
+    {
+        $currencies = $statistics->currencies($request->user()->id);
+        if ($currencies->isEmpty()) {
+            $currencies = collect(['EUR']);
+        }
+        $validated = $request->validate([
+            'dateFrom' => ['nullable', 'date_format:Y-m-d', Rule::when($request->filled('dateTo'), 'before_or_equal:dateTo')],
+            'dateTo' => ['nullable', 'date_format:Y-m-d'],
+            'currency' => ['nullable', Rule::in($currencies->all())],
+            'product_search' => ['nullable', 'string', 'max:191'],
+        ]);
+        $filters = array_merge([
+            'dateFrom' => now()->startOfYear()->toDateString(),
+            'dateTo' => now()->toDateString(),
+            'currency' => $currencies->contains('EUR') ? 'EUR' : $currencies->first(),
+            'product_search' => '',
+        ], $validated, ['user_id' => $request->user()->id]);
+
+        return view($this->frontendView($request, 'account.statistics'), [
+            'filters' => $filters,
+            'currencies' => $currencies,
+            'summary' => $statistics->summary($filters),
+            'trend' => $statistics->monthlyTrend($filters),
+            'products' => $statistics->products($filters)->paginate(15)->withQueryString(),
+        ]);
+    }
+
     public function orders(Request $request): View
     {
         $request->user()->loadMissing('b2bAccount');

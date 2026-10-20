@@ -19,6 +19,7 @@
                 </div>
                 <div class="flex flex-wrap gap-2">
                     @if ($selectedCustomer)
+                        <a href="{{ route('admin.users.statistics', array_merge($customerParameters, ['tab' => 'invoices'])) }}" class="rounded-xl border border-cyan-300 px-4 py-2.5 text-sm font-semibold text-cyan-800">{{ __('Fakture e-Računi') }}</a>
                         <a href="{{ route('admin.users.show', $selectedCustomer) }}" class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">{{ __('Profil kupca') }}</a>
                     @endif
                     <a href="{{ route('admin.users') }}" class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">{{ __('Korisnici') }}</a>

@@ -26,7 +26,7 @@ class PriceCatalogQuery
             return null;
         }
         $at = $this->queryTime ??= now()->format('Y-m-d H:i:s');
-        $groupKinds = [PriceCatalogEntry::GROUP_DISCOUNT, PriceCatalogEntry::QUANTITY];
+        $groupKinds = [PriceCatalogEntry::QUANTITY];
         if (! $excludeSpecial) {
             $groupKinds[] = PriceCatalogEntry::SPECIAL;
         }
@@ -55,17 +55,45 @@ class PriceCatalogQuery
             (clone $candidate)->where('audience_price.kind', PriceCatalogEntry::BASE)
                 ->whereNull('audience_price.user_id')->whereNull('audience_price.customer_group_id'),
         ];
+        app(PriceCatalogResolver::class)->customerDiscounts()->applyLegacyEntryExclusions($candidates[1], $user, 'audience_price');
         if (in_array($candidate->getConnection()->getDriverName(), ['mysql', 'mariadb'], true)) {
             $candidates[1]->forceIndex('price_entries_customer_lookup');
         }
 
-        $sql = array_map(static fn (QueryBuilder $q): string => '('.$q->toSql().')', $candidates);
-        $bindings = array_merge(...array_map(static fn (QueryBuilder $q): array => $q->getBindings(), $candidates));
+        $primaryDefault = app(PrimaryGroupDiscountService::class)->expression($catalog, $account->customerGroup, Carbon::parse($at));
+        $legacyCategory = $excludeSpecial ? null : app(PriceCatalogResolver::class)->legacyDiscounts()
+            ->expression($catalog, (int) $account->customer_group_id, Carbon::parse($at), 'mega_sale');
+        $legacyGroup = app(PriceCatalogResolver::class)->legacyDiscounts()
+            ->expression($catalog, (int) $account->customer_group_id, Carbon::parse($at), 'cigroup_template');
+        $sql = [];
+        $bindings = [];
+        foreach ($candidates as $index => $audienceCandidate) {
+            if ($index === 2 && $legacyCategory) {
+                $sql[] = $legacyCategory['sql'];
+                $bindings = [...$bindings, ...$legacyCategory['bindings']];
+            }
+            if ($index === 3 && $legacyGroup) {
+                $sql[] = $legacyGroup['sql'];
+                $bindings = [...$bindings, ...$legacyGroup['bindings']];
+            }
+            if ($index === 3 && $primaryDefault) {
+                $sql[] = $primaryDefault['sql'];
+                $bindings = [...$bindings, ...$primaryDefault['bindings']];
+            }
+            $sql[] = '('.$audienceCandidate->toSql().')';
+            $bindings = [...$bindings, ...$audienceCandidate->getBindings()];
+        }
         $inherited = app(PriceCatalogResolver::class)->inheritedDiscounts()
             ->expression($catalog, (int) $account->customer_group_id, Carbon::parse($at));
         if ($inherited) {
-            $sql[] = $inherited['sql'];
-            $bindings = [...$bindings, ...$inherited['bindings']];
+            array_unshift($sql, $inherited['sql']);
+            $bindings = [...$inherited['bindings'], ...$bindings];
+        }
+        $customerDiscount = app(PriceCatalogResolver::class)->customerDiscounts()
+            ->expression($catalog, $user, Carbon::parse($at));
+        if ($customerDiscount) {
+            array_unshift($sql, $customerDiscount['sql']);
+            $bindings = [...$customerDiscount['bindings'], ...$bindings];
         }
 
         return ['sql' => 'COALESCE('.implode(', ', $sql).', products.base_price)', 'bindings' => $bindings];
@@ -138,7 +166,14 @@ class PriceCatalogQuery
             ->where('promotion_candidates.minimum_quantity', '<=', 1)
             ->where(fn (QueryBuilder $q) => $q->whereNull('promotion_candidates.starts_at')->orWhere('promotion_candidates.starts_at', '<', $at))
             ->where(fn (QueryBuilder $q) => $q->whereNull('promotion_candidates.ends_at')->orWhere('promotion_candidates.ends_at', '>', $at));
-        $query->whereIn('products.id', $specialProducts);
+        $legacyCategory = app(PriceCatalogResolver::class)->legacyDiscounts()
+            ->expression($catalog, (int) $account->customer_group_id, Carbon::parse($at), 'mega_sale');
+        $query->where(function ($products) use ($specialProducts, $legacyCategory): void {
+            $products->whereIn('products.id', $specialProducts);
+            if ($legacyCategory) {
+                $products->orWhereRaw($legacyCategory['sql'].' IS NOT NULL', $legacyCategory['bindings']);
+            }
+        });
         $query->whereRaw('('.$current['sql'].') < ('.$regular['sql'].') - 0.0001', [...$current['bindings'], ...$regular['bindings']]);
 
         return true;

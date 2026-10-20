@@ -13,6 +13,16 @@
         </div>
     </div>
 
+    <nav class="flex flex-wrap gap-2 border-b border-slate-200 pb-3" aria-label="{{ __('Kartice kupca') }}">
+        <button type="button" wire:click="switchTab('profile')" @class(['rounded-xl px-4 py-2 text-sm font-semibold', 'bg-slate-900 text-white' => $tab === 'profile', 'bg-white text-slate-600 hover:bg-slate-100' => $tab !== 'profile']) aria-current="{{ $tab === 'profile' ? 'page' : 'false' }}">{{ __('Podaci kupca') }}</button>
+        @if ($canViewPricing)
+            <button type="button" wire:click="switchTab('pricing')" @class(['rounded-xl px-4 py-2 text-sm font-semibold', 'bg-slate-900 text-white' => $tab === 'pricing', 'bg-white text-slate-600 hover:bg-slate-100' => $tab !== 'pricing']) aria-current="{{ $tab === 'pricing' ? 'page' : 'false' }}">{{ __('B2B cjenik') }}</button>
+        @endif
+    </nav>
+
+    @if ($tab === 'pricing' && $canViewPricing)
+        <livewire:admin.user.customer-price-manager :user-id="$userId" :key="'customer-pricing-'.$userId" />
+    @else
     <livewire:admin.user.b2b-user-profile-editor :user-id="$userId" :key="'b2b-profile-'.$userId" />
 
     <form wire:submit="save" class="space-y-6">
@@ -261,4 +271,5 @@
             </button>
         </div>
     </form>
+    @endif
 </div>

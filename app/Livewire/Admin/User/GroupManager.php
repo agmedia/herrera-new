@@ -34,6 +34,7 @@ class GroupManager extends Component
         'code' => '',
         'name' => '',
         'description' => '',
+        'default_discount_percent' => '',
         'classification_type' => CustomerGroup::CLASSIFICATION_GENERAL,
         'is_active' => true,
         'is_default' => false,
@@ -67,10 +68,20 @@ class GroupManager extends Component
     public function save()
     {
         $this->authorizeAccess();
+        $storedPercent = $this->editingId ? CustomerGroup::query()->findOrFail($this->editingId)->default_discount_percent : null;
+        if (! $this->canManagePricing()) {
+            abort_if(trim((string) ($this->form['default_discount_percent'] ?? '')) !== (string) ($storedPercent ?? ''), 403);
+        }
+        $this->form['default_discount_percent'] = str_replace(',', '.', trim((string) ($this->form['default_discount_percent'] ?? '')));
         $validated = $this->validate($this->rules());
         $payload = $validated['form'];
 
         if ($payload['classification_type'] !== CustomerGroup::CLASSIFICATION_GENERAL) {
+            if ($payload['default_discount_percent'] !== null && $payload['default_discount_percent'] !== '') {
+                $this->addError('form.default_discount_percent', __('Osnovni popust može imati samo cjenovna grupa.'));
+
+                return null;
+            }
             if ($payload['is_default'] || ($this->editingId && CustomerGroup::query()->whereKey($this->editingId)->where('is_default', true)->exists())) {
                 $this->addError('form.classification_type', __('Djelatnost ili divizija ne može biti zadana cjenovna grupa.'));
 
@@ -96,6 +107,7 @@ class GroupManager extends Component
                     'code' => trim((string) $payload['code']),
                     'name' => trim((string) $payload['name']),
                     'description' => trim((string) ($payload['description'] ?? '')) ?: null,
+                    'default_discount_percent' => $payload['default_discount_percent'] === '' ? null : $payload['default_discount_percent'],
                     'is_active' => (bool) $payload['is_active'],
                     'is_default' => (bool) $payload['is_default'],
                     'sort_order' => (int) $payload['sort_order'],
@@ -118,9 +130,11 @@ class GroupManager extends Component
                     'is_active' => $group->is_active,
                     'is_default' => $group->is_default,
                     'classification_type' => $group->classificationType(),
+                    'default_discount_percent' => $group->default_discount_percent,
                 ])
                 ->log($this->editingId ? 'Customer group updated' : 'Customer group created');
         });
+        app(\App\Services\Pricing\PriceCatalogResolver::class)->forgetActiveCatalog();
 
         $message = $this->editingId ? __('Group updated.') : __('Group created.');
 
@@ -147,6 +161,7 @@ class GroupManager extends Component
             'code' => (string) $group->code,
             'name' => (string) $group->name,
             'description' => (string) ($group->description ?? ''),
+            'default_discount_percent' => (string) ($group->default_discount_percent ?? ''),
             'classification_type' => $group->classificationType(),
             'is_active' => (bool) $group->is_active,
             'is_default' => (bool) $group->is_default,
@@ -242,6 +257,7 @@ class GroupManager extends Component
             ->paginate($perPage, ['*'], self::PAGE_NAME);
 
         return view('livewire.admin.user.group-manager', [
+            'canManagePricing' => $this->canManagePricing(),
             'rows' => $rows,
             'perPage' => $perPage,
             'classificationOptions' => CustomerGroup::classificationOptions(),
@@ -257,6 +273,7 @@ class GroupManager extends Component
             'form.code' => ['required', 'string', 'max:80', Rule::unique('customer_groups', 'code')->ignore($this->editingId)],
             'form.name' => ['required', 'string', 'max:120'],
             'form.description' => ['nullable', 'string'],
+            'form.default_discount_percent' => ['nullable', 'numeric', 'min:0', 'max:100', 'regex:/^\d{1,3}(?:\.\d{1,4})?$/'],
             'form.classification_type' => ['required', Rule::in(array_keys(CustomerGroup::classificationOptions()))],
             'form.is_active' => ['boolean'],
             'form.is_default' => ['boolean'],
@@ -271,6 +288,7 @@ class GroupManager extends Component
             'code' => '',
             'name' => '',
             'description' => '',
+            'default_discount_percent' => '',
             'classification_type' => CustomerGroup::CLASSIFICATION_GENERAL,
             'is_active' => true,
             'is_default' => false,
@@ -294,5 +312,12 @@ class GroupManager extends Component
             $user && (Bouncer::is($user)->an('superadmin') || $user->can('users.groups.manage')),
             403
         );
+    }
+
+    private function canManagePricing(): bool
+    {
+        $actor = auth()->user();
+
+        return (bool) ($actor && ($actor->isA('superadmin') || ($actor->can('admin.access') && $actor->can('catalog.b2b_prices.update'))));
     }
 }

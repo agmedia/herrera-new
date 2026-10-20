@@ -52,6 +52,7 @@ class CustomerGroup extends Model
         'code',
         'name',
         'description',
+        'default_discount_percent',
         'is_active',
         'is_default',
         'sort_order',
@@ -63,6 +64,7 @@ class CustomerGroup extends Model
         'is_default' => 'bool',
         'sort_order' => 'int',
         'payload' => 'array',
+        'default_discount_percent' => 'decimal:4',
     ];
 
     public function users(): BelongsToMany

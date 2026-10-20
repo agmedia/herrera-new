@@ -53,6 +53,7 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
         focus() { document.activeElement = this; }
         append(...children) { this.children.push(...children); }
         replaceChildren(fragment) { this.children = fragment?.children || []; }
+        contains(element) { return element === this || this.children.some((child) => child.contains?.(element)); }
     }
     class Details extends Element {
         constructor(key) {
@@ -96,8 +97,11 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     };
     const catalogMenu = new Element();
     const catalogTrigger = new Element();
+    catalogTrigger.setAttribute('data-catalog-mega-trigger', '');
     catalogTrigger.setAttribute('aria-controls', 'site-main-nav-mega-0');
     catalogTrigger.closest = (selector) => selector === '.group\\/nav' ? catalogNavGroup : null;
+    catalogNavGroup.contains = (element) => element === catalogNavGroup || element === catalogTrigger
+        || catalogMenu.contains(element);
     const catalogTemplate = deferredCatalogMenu ? new Template('site-main-nav-mega-0', catalogMenu) : null;
     const catalogLists = [];
     const catalogColumns = catalogTree ? [0, 1].map(() => {
@@ -207,7 +211,7 @@ function harness({ savedSections = {}, sectionKeys = Object.keys(savedSections),
     });
     return {
         root, header, spacer, window, document, openButton, overlay, drawerClose, sections, storage, links, sectionToggles,
-        catalogTemplate, catalogNavGroup, catalogMenu, catalogColumns,
+        catalogTemplate, catalogNavGroup, catalogMenu, catalogColumns, catalogTrigger,
         catalogLink(depth, index) { return catalogLists[depth]?.children[index]?.children[0]; },
         finishFonts() { fontReadyCallbacks.forEach((callback) => callback()); },
         setMobileViewport(matches) {
@@ -238,6 +242,240 @@ test('a deferred menu without its trigger remains inert', () => {
     assert.deepEqual(page.catalogNavGroup.children, []);
     assert.equal(page.catalogTemplate.removed, false);
     assert.deepEqual(page.catalogTemplate.content.children, [page.catalogMenu]);
+});
+
+test('touch and pen taps on the catalogue trigger open its drawer in both responsive header modes', () => {
+    for (const mobileViewport of [false, true]) {
+        for (const pointerType of ['touch', 'pen']) {
+            const page = harness({ herreraStorefront: true, mobileViewport, sectionKeys: ['catalog', 'rasvjeta'] });
+            page.catalogTrigger.emit('pointerdown', { pointerType });
+            let prevented = false;
+            page.catalogTrigger.emit('click', {
+                detail: 1, currentTarget: page.catalogTrigger,
+                preventDefault() { prevented = true; },
+            });
+            page.flushToggles();
+            assert.equal(prevented, true, `${pointerType}, mobile viewport: ${mobileViewport}`);
+            assert.equal(page.root.dataset.menuOpen, '1');
+            assert.equal(page.root.inert, false);
+            assert.equal(page.document.body.classList.contains('overflow-hidden'), true);
+            assert.deepEqual(page.sections.map((section) => section.open), [true, false]);
+            assert.equal(page.document.activeElement, page.drawerClose);
+            page.document.emit('keydown', { key: 'Escape', preventDefault() {} });
+            assert.equal(page.root.dataset.menuOpen, '0');
+            assert.equal(page.document.activeElement, page.catalogTrigger);
+        }
+    }
+});
+
+test('a pen tap with pointer events alone opens the catalogue drawer', () => {
+    const page = harness({ sectionKeys: ['catalog'] });
+    page.catalogTrigger.emit('pointerdown', { pointerType: 'pen', clientX: 100, clientY: 100 });
+    page.catalogTrigger.emit('pointerup', { pointerType: 'pen', clientX: 100, clientY: 100 });
+    let prevented = false;
+    page.catalogTrigger.emit('click', {
+        detail: 1, currentTarget: page.catalogTrigger,
+        preventDefault() { prevented = true; },
+    });
+    assert.equal(prevented, true);
+    assert.equal(page.root.dataset.menuOpen, '1');
+    assert.equal(page.sections[0].open, true);
+});
+
+test('keyboard activation of the normal drawer opener still works after a swipe', () => {
+    const page = harness();
+    page.openButton.emit('pointerdown', { pointerType: 'touch', clientX: 100, clientY: 100 });
+    page.openButton.emit('pointermove', { pointerType: 'touch', clientX: 130, clientY: 100 });
+    page.openButton.emit('click', {
+        detail: 1, currentTarget: page.openButton, preventDefault() {},
+    });
+    assert.equal(page.root.dataset.menuOpen, '0');
+    let prevented = false;
+    page.openButton.emit('click', {
+        detail: 0, currentTarget: page.openButton,
+        preventDefault() { prevented = true; },
+    });
+    assert.equal(prevented, true);
+    assert.equal(page.root.dataset.menuOpen, '1');
+    assert.equal(page.document.activeElement, page.drawerClose);
+});
+
+test('mouse and keyboard activation preserve the catalogue trigger link', () => {
+    for (const activation of ['mouse', 'keyboard']) {
+        const page = harness({ sectionKeys: ['catalog'] });
+        if (activation === 'mouse') {
+            page.catalogTrigger.emit('pointerdown', { pointerType: 'mouse' });
+        }
+        let prevented = false;
+        page.catalogTrigger.emit('click', {
+            detail: activation === 'keyboard' ? 0 : 1, currentTarget: page.catalogTrigger,
+            preventDefault() { prevented = true; },
+        });
+        assert.equal(prevented, false, activation);
+        assert.equal(page.root.dataset.menuOpen, '0');
+        assert.equal(page.sections[0].open, false);
+    }
+});
+
+test('keyboard and attached mouse activation preserve the catalogue link after a touch interaction', () => {
+    for (const activation of ['mouse', 'keyboard']) {
+        const page = harness({ sectionKeys: ['catalog'] });
+        page.catalogTrigger.emit('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+        page.catalogTrigger.emit('touchend', {
+            changedTouches: [{ clientX: 100, clientY: 100 }], currentTarget: page.catalogTrigger,
+            preventDefault() {},
+        });
+        assert.equal(page.root.dataset.menuOpen, '1');
+        page.drawerClose.emit('click');
+        if (activation === 'mouse') {
+            page.catalogTrigger.emit('pointerdown', { pointerType: 'mouse', clientX: 100, clientY: 100 });
+        }
+        let prevented = false;
+        page.catalogTrigger.emit('click', {
+            detail: activation === 'keyboard' ? 0 : 1, currentTarget: page.catalogTrigger,
+            preventDefault() { prevented = true; },
+        });
+        assert.equal(prevented, false, activation);
+        assert.equal(page.root.dataset.menuOpen, '0');
+    }
+});
+
+test('a canceled touch on the catalogue trigger cannot open the drawer through a later click', () => {
+    const page = harness({ sectionKeys: ['catalog'] });
+    page.catalogTrigger.emit('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+    page.catalogTrigger.emit('touchcancel');
+    let prevented = false;
+    page.catalogTrigger.emit('click', {
+        detail: 1, currentTarget: page.catalogTrigger,
+        preventDefault() { prevented = true; },
+    });
+    assert.equal(prevented, true);
+    assert.equal(page.root.dataset.menuOpen, '0');
+    assert.equal(page.sections[0].open, false);
+});
+
+test('touch and pen pointer movement or cancellation prevents a catalogue tap', () => {
+    for (const pointerType of ['touch', 'pen']) {
+        for (const gesture of ['horizontal', 'vertical', 'cancel']) {
+            const page = harness({ sectionKeys: ['catalog'] });
+            page.catalogTrigger.emit('pointerdown', { pointerType, clientX: 100, clientY: 100 });
+            if (gesture === 'cancel') {
+                page.catalogTrigger.emit('pointercancel', { pointerType });
+            } else {
+                page.catalogTrigger.emit('pointermove', {
+                    pointerType, clientX: gesture === 'horizontal' ? 113 : 100,
+                    clientY: gesture === 'vertical' ? 113 : 100,
+                });
+            }
+            let prevented = false;
+            page.catalogTrigger.emit('click', {
+                detail: 1, currentTarget: page.catalogTrigger,
+                preventDefault() { prevented = true; },
+            });
+            assert.equal(prevented, true, `${pointerType}, ${gesture}`);
+            assert.equal(page.root.dataset.menuOpen, '0');
+            assert.equal(page.sections[0].open, false);
+        }
+    }
+});
+
+test('the catalogue trigger restores its desktop accessibility target after BFCache restoration', () => {
+    const page = harness({ sectionKeys: ['catalog'] });
+    assert.equal(page.catalogTrigger.getAttribute('aria-controls'), 'site-main-nav-mega-0');
+    page.catalogTrigger.emit('pointerdown', { pointerType: 'touch', clientX: 100, clientY: 100 });
+    page.catalogTrigger.emit('click', {
+        detail: 1, currentTarget: page.catalogTrigger, preventDefault() {},
+    });
+    assert.equal(page.catalogTrigger.getAttribute('aria-controls'), 'mobile-navigation');
+    assert.equal(page.catalogTrigger.getAttribute('aria-expanded'), 'true');
+    page.window.emit('pageshow', { persisted: true });
+    assert.equal(page.root.dataset.menuOpen, '0');
+    assert.equal(page.catalogTrigger.getAttribute('aria-controls'), 'site-main-nav-mega-0');
+    assert.equal(page.catalogTrigger.getAttribute('aria-expanded'), 'false');
+    assert.equal(page.catalogTrigger.listeners.get('click').length, 1);
+    page.catalogTrigger.emit('pointerdown', { pointerType: 'touch', clientX: 100, clientY: 100 });
+    page.catalogTrigger.emit('click', {
+        detail: 1, currentTarget: page.catalogTrigger, preventDefault() {},
+    });
+    assert.equal(page.root.dataset.menuOpen, '1');
+    assert.equal(page.catalogTrigger.getAttribute('aria-controls'), 'mobile-navigation');
+});
+
+test('a touch-only catalogue tap opens once and suppresses its synthetic click', () => {
+    const page = harness({ sectionKeys: ['catalog', 'rasvjeta'] });
+    page.catalogTrigger.emit('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+    let prevented = false;
+    page.catalogTrigger.emit('touchend', {
+        changedTouches: [{ clientX: 104, clientY: 106 }], currentTarget: page.catalogTrigger,
+        preventDefault() { prevented = true; }, stopPropagation() {},
+    });
+    page.flushToggles();
+    assert.equal(prevented, true);
+    assert.equal(page.root.dataset.menuOpen, '1');
+    assert.deepEqual(page.sections.map((section) => section.open), [true, false]);
+
+    page.sectionToggles[1].emit('click', { preventDefault() {}, stopPropagation() {} });
+    assert.equal(page.sections[1].open, true);
+    prevented = false;
+    page.catalogTrigger.emit('click', {
+        detail: 1, currentTarget: page.catalogTrigger,
+        preventDefault() { prevented = true; }, stopPropagation() {},
+    });
+    assert.equal(prevented, true);
+    assert.equal(page.root.dataset.menuOpen, '1');
+    assert.equal(page.sections[1].open, true, 'the synthetic click must not reopen and reset the drawer');
+});
+
+test('swiping the catalogue trigger never opens the drawer, even after a synthetic click', () => {
+    for (const movement of [{ clientX: 113, clientY: 100 }, { clientX: 100, clientY: 113 }]) {
+        const page = harness({ sectionKeys: ['catalog'] });
+        page.catalogTrigger.emit('pointerdown', { pointerType: 'touch' });
+        page.catalogTrigger.emit('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+        page.catalogTrigger.emit('touchmove', { touches: [movement] });
+        page.catalogTrigger.emit('touchend', {
+            changedTouches: [movement], currentTarget: page.catalogTrigger,
+            preventDefault() {}, stopPropagation() {},
+        });
+        page.catalogTrigger.emit('click', {
+            detail: 1, currentTarget: page.catalogTrigger,
+            preventDefault() {}, stopPropagation() {},
+        });
+        assert.equal(page.root.dataset.menuOpen, '0');
+        assert.equal(page.sections[0].open, false);
+        assert.equal(page.document.body.classList.contains('overflow-hidden'), false);
+    }
+});
+
+test('moving away and back to the catalogue trigger still counts as a swipe', () => {
+    const page = harness({ sectionKeys: ['catalog'] });
+    page.catalogTrigger.emit('pointerdown', { pointerType: 'touch' });
+    page.catalogTrigger.emit('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+    page.catalogTrigger.emit('touchmove', { touches: [{ clientX: 130, clientY: 100 }] });
+    page.catalogTrigger.emit('touchend', {
+        changedTouches: [{ clientX: 100, clientY: 100 }], currentTarget: page.catalogTrigger,
+        preventDefault() {}, stopPropagation() {},
+    });
+    page.catalogTrigger.emit('click', {
+        detail: 1, currentTarget: page.catalogTrigger,
+        preventDefault() {}, stopPropagation() {},
+    });
+    assert.equal(page.root.dataset.menuOpen, '0');
+});
+
+test('touch hover events cannot expand the desktop menu while mouse hover still does', () => {
+    const page = harness({ catalogTree: [{ label: 'Rasvjeta', url: '/rasvjeta',
+        children: [{ label: 'Unutarnja rasvjeta', url: '/rasvjeta/unutarnja' }] }] });
+    const parent = page.catalogLink(0, 0);
+    page.catalogNavGroup.emit('pointerenter', { pointerType: 'touch' });
+    parent.emit('pointerenter', { pointerType: 'touch' });
+    assert.notEqual(page.catalogTrigger.getAttribute('aria-expanded'), 'true');
+    assert.equal(parent.getAttribute('aria-expanded'), 'false');
+    assert.equal(page.catalogColumns[1].hidden, true);
+    page.catalogNavGroup.emit('pointerenter', { pointerType: 'mouse' });
+    parent.emit('pointerenter', { pointerType: 'mouse' });
+    assert.equal(page.catalogTrigger.getAttribute('aria-expanded'), 'true');
+    assert.equal(parent.getAttribute('aria-expanded'), 'true');
+    assert.equal(page.catalogColumns[1].hidden, false);
 });
 
 test('Herrera mobile uses native sticky without header measurements or class changes', () => {
@@ -375,6 +613,65 @@ test('deliberate category toggling works while every manual reopening starts wit
     assert.equal(page.storage.writes, 0);
 });
 
+test('swiping away and back over an accordion arrow does not toggle it through a synthetic click', () => {
+    const page = harness({ sectionKeys: ['catalog'] });
+    page.open();
+    const arrow = page.sectionToggles[0];
+    arrow.emit('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+    arrow.emit('touchmove', { touches: [{ clientX: 130, clientY: 100 }] });
+    arrow.emit('touchend', {
+        changedTouches: [{ clientX: 100, clientY: 100 }], preventDefault() {}, stopPropagation() {},
+    });
+    assert.equal(page.sections[0].open, false);
+    let prevented = false;
+    arrow.emit('click', {
+        detail: 1, preventDefault() { prevented = true; }, stopPropagation() {},
+    });
+    assert.equal(prevented, true);
+    assert.equal(page.sections[0].open, false);
+});
+
+test('a deliberate touch tap on an accordion arrow toggles exactly once', () => {
+    const page = harness({ sectionKeys: ['catalog'] });
+    page.open();
+    const arrow = page.sectionToggles[0];
+    arrow.emit('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+    arrow.emit('touchend', {
+        changedTouches: [{ clientX: 104, clientY: 106 }], preventDefault() {}, stopPropagation() {},
+    });
+    assert.equal(page.sections[0].open, true);
+    arrow.emit('click', { detail: 1, preventDefault() {}, stopPropagation() {} });
+    assert.equal(page.sections[0].open, true);
+});
+
+test('canceling a touch on an accordion arrow suppresses a later click', () => {
+    const page = harness({ sectionKeys: ['catalog'] });
+    page.open();
+    const arrow = page.sectionToggles[0];
+    arrow.emit('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+    arrow.emit('touchcancel');
+    let prevented = false;
+    arrow.emit('click', {
+        detail: 1, preventDefault() { prevented = true; }, stopPropagation() {},
+    });
+    assert.equal(prevented, true);
+    assert.equal(page.sections[0].open, false);
+});
+
+test('keyboard activation of an accordion arrow works immediately after a swipe', () => {
+    const page = harness({ sectionKeys: ['catalog'] });
+    page.open();
+    const arrow = page.sectionToggles[0];
+    arrow.emit('touchstart', { touches: [{ clientX: 100, clientY: 100 }] });
+    arrow.emit('touchmove', { touches: [{ clientX: 100, clientY: 130 }] });
+    arrow.emit('touchend', {
+        changedTouches: [{ clientX: 100, clientY: 130 }], preventDefault() {}, stopPropagation() {},
+    });
+    assert.equal(page.sections[0].open, false);
+    arrow.emit('click', { detail: 0, preventDefault() {}, stopPropagation() {} });
+    assert.equal(page.sections[0].open, true);
+});
+
 test('ordinary full-page link navigation keeps the outgoing drawer and scroll lock still', () => {
     const page = harness({ hrefs: ['/categories/rasvjeta'] });
     page.open();
@@ -479,7 +776,7 @@ test('desktop ArrowRight enters the first child and reselecting a parent retains
     assert.equal(prevented, true);
     assert.equal(page.document.activeElement, child);
     assert.equal(page.catalogColumns[1].hidden, false);
-    parent.emit('pointerenter');
+    parent.emit('pointerenter', { pointerType: 'mouse' });
     assert.equal(page.catalogLink(1, 0), child);
     assert.equal(parent.getAttribute('aria-expanded'), 'true');
     child.emit('keydown', { key: 'ArrowLeft', preventDefault() {} });

@@ -33,6 +33,8 @@
         ],
     ];
 
+    $items[] = ['key' => 'statistics', 'label' => __('Moja statistika kupnje'), 'url' => route('account.statistics'), 'active' => $current === 'statistics'];
+
     $accountUser = auth()->user();
     $accountUser?->loadMissing('b2bAccount');
     $b2bAccess = app(\App\Services\Pricing\B2BAccessService::class);

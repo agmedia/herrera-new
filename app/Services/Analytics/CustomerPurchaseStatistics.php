@@ -72,6 +72,12 @@ class CustomerPurchaseStatistics
 
         return $this->eligibleOrders($filters)
             ->join('order_items', 'order_items.order_id', '=', 'orders.id')
+            ->when(! empty($filters['product_search']), function (Builder $query) use ($filters) {
+                $term = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $filters['product_search']).'%';
+                $query->where(fn (Builder $items) => $items->whereRaw("order_items.name LIKE ? ESCAPE '!'", [$term])
+                    ->orWhereRaw("order_items.sku LIKE ? ESCAPE '!'", [$term])
+                    ->orWhereRaw("order_items.code LIKE ? ESCAPE '!'", [$term]));
+            })
             ->select('order_items.product_id', 'order_items.product_option_value_id')
             ->selectRaw($identity.' AS historical_identity')
             ->selectRaw('MAX(order_items.name) AS name, MAX(order_items.sku) AS sku, MAX(order_items.code) AS code')

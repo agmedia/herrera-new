@@ -113,7 +113,7 @@ class ProductPricePresentationService
             $storedBase,
         );
         $snapshotSpecial = $groupPrice?->is_final
-            && $groupPrice->source_type === 'price_catalog_special'
+            && in_array($groupPrice->source_type, ['price_catalog_special', 'price_catalog_legacy_category_discount'], true)
             && $groupPrice->previous_price !== null
             && $groupPrice->price < ($groupPrice->previous_price - 0.0001);
         $audienceStoredBase = (float) ($snapshotSpecial ? $groupPrice->previous_price : ($groupPrice?->price ?? $storedBase));

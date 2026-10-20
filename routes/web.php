@@ -255,6 +255,7 @@ Route::middleware(['front.customer-impersonation', 'front.locale', 'front.device
             ->group(function (): void {
                 Route::get('/', [AccountController::class, 'dashboard'])->name('dashboard');
                 Route::get('orders', [AccountController::class, 'orders'])->name('orders');
+                Route::get('statistics', [AccountController::class, 'statistics'])->name('statistics');
                 Route::get('customer-offers', [\App\Http\Controllers\Admin\CustomerOfferController::class, 'buyerIndex'])->name('customer-offers.index');
                 Route::get('customer-offers/{offer}/pdf', [\App\Http\Controllers\Admin\CustomerOfferController::class, 'buyerPdf'])
                     ->whereNumber('offer')->name('customer-offers.pdf');

@@ -17,10 +17,14 @@ class PriceCatalogResolver
 
     private bool $catalogLoaded = false;
 
-    /** @var array<string, array<int, array{entry:?PriceCatalogEntry,regular:?PriceCatalogEntry,inherited:?array}>> */
+    /** @var array<string, array<int, array{entry:?PriceCatalogEntry,regular:?PriceCatalogEntry,inherited:?array,customer_discount:?array,primary_default:?float}>> */
     private array $productBatches = [];
 
     private ?CatalogGroupDiscountInheritance $inheritedDiscounts = null;
+
+    private ?CustomerDiscountService $customerDiscounts = null;
+
+    private ?LegacyCatalogDiscountService $legacyDiscounts = null;
 
     /** @var array<string, array<int, true>> */
     private array $primedProductIds = [];
@@ -32,11 +36,23 @@ class PriceCatalogResolver
         $this->productBatches = [];
         $this->primedProductIds = [];
         $this->inheritedDiscounts = null;
+        $this->customerDiscounts = null;
+        $this->legacyDiscounts = null;
     }
 
     public function inheritedDiscounts(): CatalogGroupDiscountInheritance
     {
         return $this->inheritedDiscounts ??= new CatalogGroupDiscountInheritance;
+    }
+
+    public function customerDiscounts(): CustomerDiscountService
+    {
+        return $this->customerDiscounts ??= new CustomerDiscountService;
+    }
+
+    public function legacyDiscounts(): LegacyCatalogDiscountService
+    {
+        return $this->legacyDiscounts ??= new LegacyCatalogDiscountService;
     }
 
     public function activeCatalog(): ?PriceCatalog
@@ -87,7 +103,7 @@ class PriceCatalogResolver
         $entries = $this->eligibleEntries($catalog, $user, $groupId, $quantity, $at)
             ->whereIn('product_id', $missingIds)->get();
         foreach ($missingIds as $productId) {
-            $this->productBatches[$key][$productId] = ['entry' => null, 'regular' => null, 'inherited' => null];
+            $this->productBatches[$key][$productId] = ['entry' => null, 'regular' => null, 'inherited' => null, 'customer_discount' => null, 'primary_default' => null, 'legacy_category' => null, 'legacy_group' => null];
         }
         foreach ($entries as $entry) {
             $candidate = &$this->productBatches[$key][(int) $entry->product_id];
@@ -97,9 +113,22 @@ class PriceCatalogResolver
             }
             unset($candidate);
         }
-        $unpricedIds = array_values(array_filter($missingIds, fn (int $id) => $this->productBatches[$key][$id]['entry'] === null));
-        foreach ($this->inheritedDiscounts()->forProducts($unpricedIds, $catalog, $groupId, $at) as $productId => $price) {
+        foreach ($this->inheritedDiscounts()->forProducts($missingIds, $catalog, $groupId, $at) as $productId => $price) {
             $this->productBatches[$key][$productId]['inherited'] = $price;
+        }
+        foreach ($this->customerDiscounts()->forProducts($missingIds, $catalog, $user, $at) as $productId => $price) {
+            $this->productBatches[$key][$productId]['customer_discount'] = $price;
+        }
+        foreach (['legacy_category' => 'mega_sale', 'legacy_group' => 'cigroup_template'] as $field => $type) {
+            foreach ($this->legacyDiscounts()->forProducts($missingIds, $catalog, $groupId, $at, $type) as $productId => $price) {
+                $this->productBatches[$key][$productId][$field] = $price;
+            }
+        }
+        $group = app(B2BAccessService::class)->approvedAccount($user)?->customerGroup;
+        if ($group) {
+            foreach (app(PrimaryGroupDiscountService::class)->forProducts($missingIds, $catalog, $group, $at) as $productId => $price) {
+                $this->productBatches[$key][$productId]['primary_default'] = $price;
+            }
         }
     }
 
@@ -130,29 +159,87 @@ class PriceCatalogResolver
             $entry = $candidate['entry'];
             $regular = $candidate['regular'];
             $inherited = $candidate['inherited'];
+            $customerDiscount = $candidate['customer_discount'];
+            $primaryDefault = $candidate['primary_default'];
+            $legacyCategory = $candidate['legacy_category'];
+            $legacyGroup = $candidate['legacy_group'];
         } else {
+            $customerDiscount = $this->customerDiscounts()->forProducts([(int) $product->getKey()], $catalog, $user, $at)[(int) $product->getKey()] ?? null;
             $query = $this->eligibleEntries($catalog, $user, (int) $account->customer_group_id, $quantity, $at)
                 ->where('product_id', $product->getKey());
             $entry = (clone $query)->first();
             $regular = $entry?->kind === PriceCatalogEntry::SPECIAL
                 ? (clone $query)->where('kind', '!=', PriceCatalogEntry::SPECIAL)->first()
                 : null;
-            $inherited = $entry ? null : ($this->inheritedDiscounts()->forProducts([(int) $product->getKey()], $catalog,
-                (int) $account->customer_group_id, $at)[(int) $product->getKey()] ?? null);
+            $inherited = $this->inheritedDiscounts()->forProducts([(int) $product->getKey()], $catalog,
+                (int) $account->customer_group_id, $at)[(int) $product->getKey()] ?? null;
+            $primaryDefault = app(PrimaryGroupDiscountService::class)->forProducts([(int) $product->getKey()], $catalog,
+                $account->customerGroup, $at)[(int) $product->getKey()] ?? null;
+            $legacyCategory = $this->legacyDiscounts()->forProducts([(int) $product->getKey()], $catalog,
+                (int) $account->customer_group_id, $at, 'mega_sale')[(int) $product->getKey()] ?? null;
+            $legacyGroup = $this->legacyDiscounts()->forProducts([(int) $product->getKey()], $catalog,
+                (int) $account->customer_group_id, $at, 'cigroup_template')[(int) $product->getKey()] ?? null;
         }
 
+        if ($customerDiscount !== null) {
+            return new ResolvedB2BPrice(
+                id: $customerDiscount['rule_id'],
+                price: $customerDiscount['price'],
+                source_type: 'price_catalog_customer_discount',
+                customer_group_id: (int) $account->customer_group_id,
+                user_id: (int) $user->getKey(),
+                catalog_id: (int) $catalog->id,
+                rule_id: $customerDiscount['rule_id'],
+                is_final: true,
+            );
+        }
+
+        if ($inherited !== null) {
+            return new ResolvedB2BPrice(
+                id: $inherited['rule_id'],
+                price: $inherited['price'],
+                source_type: 'price_catalog_group_discount',
+                customer_group_id: (int) $account->customer_group_id,
+                catalog_id: (int) $catalog->id,
+                rule_id: $inherited['rule_id'],
+                is_final: true,
+            );
+        }
+
+        // Original source definitions fill gaps only. Existing final actions,
+        // quantity agreements and individual prices remain authoritative.
+        $useLegacyCategory = $legacyCategory !== null && ($entry === null || in_array($entry->kind, [PriceCatalogEntry::GROUP, PriceCatalogEntry::BASE], true));
+        $useLegacyGroup = $legacyGroup !== null && ($entry === null || $entry->kind === PriceCatalogEntry::BASE);
+        if ($useLegacyCategory || $useLegacyGroup) {
+            $legacy = $useLegacyCategory ? $legacyCategory : $legacyGroup;
+
+            return new ResolvedB2BPrice(
+                id: $legacy['reference_id'], price: $legacy['price'],
+                source_type: $useLegacyCategory ? 'price_catalog_legacy_category_discount' : 'price_catalog_legacy_group_discount',
+                customer_group_id: (int) $account->customer_group_id, catalog_id: (int) $catalog->id,
+                rule_id: $legacy['reference_id'], is_final: true,
+                previous_price: $useLegacyCategory
+                    ? (float) ($entry?->kind === PriceCatalogEntry::GROUP ? $entry->price : ($legacyGroup['price'] ?? $primaryDefault ?? $entry?->price ?? $fallback ?? $product->base_price))
+                    : null,
+            );
+        }
+
+        $usePrimaryDefault = $primaryDefault !== null && ($entry === null || $entry->kind === PriceCatalogEntry::BASE);
+
         return new ResolvedB2BPrice(
-            id: (int) ($entry?->id ?? $catalog->id),
-            price: (float) ($entry?->price ?? $inherited['price'] ?? $fallback ?? $product->base_price),
-            source_type: 'price_catalog_'.($entry?->kind ?? ($inherited ? PriceCatalogEntry::GROUP_DISCOUNT : 'base')),
+            id: (int) ($usePrimaryDefault ? $catalog->id : ($entry?->id ?? $catalog->id)),
+            price: $usePrimaryDefault ? $primaryDefault : (float) ($entry?->price ?? $fallback ?? $product->base_price),
+            source_type: 'price_catalog_'.($usePrimaryDefault ? 'primary_group_default' : ($entry?->kind ?? 'base')),
             customer_group_id: (int) $account->customer_group_id,
             user_id: $entry?->kind === PriceCatalogEntry::CUSTOMER ? (int) $user->getKey() : null,
             catalog_id: (int) $catalog->id,
-            catalog_entry_id: $entry ? (int) $entry->id : null,
-            rule_id: $entry?->discount_rule_id ? (int) $entry->discount_rule_id : ($inherited['rule_id'] ?? null),
+            catalog_entry_id: ! $usePrimaryDefault && $entry ? (int) $entry->id : null,
+            rule_id: $entry?->discount_rule_id ? (int) $entry->discount_rule_id : null,
             is_final: true,
             previous_price: $entry?->kind === PriceCatalogEntry::SPECIAL
-                ? (float) ($regular?->price ?? $fallback ?? $product->base_price)
+                ? (float) (($regular === null || $regular->kind === PriceCatalogEntry::BASE)
+                    ? ($legacyGroup['price'] ?? $primaryDefault ?? $regular?->price ?? $fallback ?? $product->base_price)
+                    : $regular->price)
                 : null,
         );
     }
@@ -177,10 +264,13 @@ class PriceCatalogResolver
             ->where(fn (Builder $q) => $q->whereNull('ends_at')->orWhere('ends_at', '>', $at))
             ->where('minimum_quantity', '<=', max(1, $quantity))
             ->where(function (Builder $q) use ($groupId, $user): void {
-                $q->where(fn (Builder $q) => $q->whereIn('kind', [PriceCatalogEntry::GROUP_DISCOUNT, PriceCatalogEntry::SPECIAL, PriceCatalogEntry::QUANTITY, PriceCatalogEntry::GROUP])->where('customer_group_id', $groupId)->whereNull('user_id'))
+                // Compiled rule entries remain an audit snapshot. Current
+                // membership is evaluated by inheritedDiscounts() above.
+                $q->where(fn (Builder $q) => $q->whereIn('kind', [PriceCatalogEntry::SPECIAL, PriceCatalogEntry::QUANTITY, PriceCatalogEntry::GROUP])->where('customer_group_id', $groupId)->whereNull('user_id'))
                     ->orWhere(fn (Builder $q) => $q->where('kind', PriceCatalogEntry::CUSTOMER)->where('user_id', $user->getKey())->whereNull('customer_group_id'))
                     ->orWhere(fn (Builder $q) => $q->where('kind', PriceCatalogEntry::BASE)->whereNull('user_id')->whereNull('customer_group_id'));
             })
+            ->tap(fn (Builder $query) => $this->customerDiscounts()->applyLegacyEntryExclusions($query, $user))
             ->orderByRaw(PriceCatalogEntry::precedenceSql())
             ->orderByRaw(PriceCatalogEntry::manualGroupPrecedenceSql())
             ->orderByRaw("CASE WHEN kind = 'quantity' THEN minimum_quantity ELSE 0 END DESC")

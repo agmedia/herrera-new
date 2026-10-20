@@ -11,10 +11,13 @@ use App\Models\Catalog\Product\Product;
 use App\Models\User;
 use App\Models\User\B2BAccount;
 use App\Models\User\CustomerGroup;
+use App\Services\Front\CartService;
 use App\Services\Pricing\CatalogGroupDiscountService;
+use App\Services\Pricing\PriceCatalogGroupOverview;
 use App\Services\Pricing\PriceCatalogQuery;
 use App\Services\Pricing\PriceCatalogResolver;
 use App\Services\Pricing\PriceCatalogService;
+use App\Services\Settings\SystemSettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -69,7 +72,7 @@ class CatalogGroupDiscountInheritanceTest extends TestCase
         $this->assertNull($resolved->catalog_entry_id);
         $this->assertTrue($resolved->is_final);
         $this->assertPrice(100.0, $wrong, $buyer);
-        $this->assertPrice(100.0, $oldOutside, $buyer);
+        $this->assertPrice(60.0, $oldOutside, $buyer);
         $this->assertPrice(60.0, $existing, $buyer);
         $this->assertPrice(20.48, $new, $this->buyer($this->group()));
         $this->assertSame($before, $catalog->entries()->orderBy('id')->get()->toArray());
@@ -105,7 +108,7 @@ class CatalogGroupDiscountInheritanceTest extends TestCase
         $this->assertSame($firstAtPriority->id, app(PriceCatalogResolver::class)->resolve($new, $buyer)->rule_id);
     }
 
-    public function test_legacy_publications_support_descendant_exclusions_and_conservative_creation_dates(): void
+    public function test_legacy_publications_apply_current_descendants_and_exclusions_regardless_of_creation_date(): void
     {
         [$admin, $catalog, $group, $buyer, $existing] = $this->fixture();
         $parent = $this->category('parent');
@@ -126,8 +129,8 @@ class CatalogGroupDiscountInheritanceTest extends TestCase
         $this->assertPrice(60.0, $new, $buyer);
         $this->assertSame($rule->id, app(PriceCatalogResolver::class)->resolve($new, $buyer)->rule_id);
         $this->assertPrice(100.0, $excluded, $buyer);
-        $this->assertPrice(100.0, $older, $buyer);
-        $this->assertPrice(100.0, $existing, $buyer); // A stored base is never recalculated.
+        $this->assertPrice(60.0, $older, $buyer);
+        $this->assertPrice(60.0, $existing, $buyer);
     }
 
     public function test_exact_category_scope_does_not_inherit_to_child_categories(): void
@@ -145,7 +148,7 @@ class CatalogGroupDiscountInheritanceTest extends TestCase
         $this->assertPrice(100.0, $descendant, $buyer);
     }
 
-    public function test_any_original_absolute_entry_blocks_inheritance_even_when_it_is_not_currently_eligible(): void
+    public function test_existing_prices_do_not_block_a_current_matching_native_rule(): void
     {
         [$admin, $catalog, $group, $buyer] = $this->fixture();
         CatalogGroupDiscountRule::query()->create(['price_catalog_id' => $catalog->id, 'name' => 'Legacy',
@@ -162,11 +165,72 @@ class CatalogGroupDiscountInheritanceTest extends TestCase
         $this->entry($catalog, $inactive, PriceCatalogEntry::GROUP, '33', ['customer_group_id' => $group->id, 'is_active' => false]);
         $this->entry($catalog, $otherAudience, PriceCatalogEntry::GROUP, '22', ['customer_group_id' => $this->group()->id]);
         $this->publishLegacy($catalog, '2026-10-13 09:00:00');
-        $this->assertPrice(77.1234, $customer, $buyer);
-        $this->assertPrice(88.1234, $groupProduct, $buyer);
-        $this->assertPrice(100.0, $expired, $buyer);
-        $this->assertPrice(100.0, $inactive, $buyer);
-        $this->assertPrice(100.0, $otherAudience, $buyer);
+        $this->assertPrice(60.0, $customer, $buyer);
+        $this->assertPrice(60.0, $groupProduct, $buyer);
+        $this->assertPrice(60.0, $expired, $buyer);
+        $this->assertPrice(60.0, $inactive, $buyer);
+        $this->assertPrice(60.0, $otherAudience, $buyer);
+    }
+
+    public function test_category_membership_changes_replace_compiled_prices_and_use_the_catalog_base_in_every_channel(): void
+    {
+        [$admin, $catalog, $group, $buyer, $existing] = $this->fixture();
+        app(SystemSettingsService::class)->put('store_pricing_prices_include_tax', false);
+        $parent = $this->category('moving-parent');
+        $child = $this->category('moving-child', $parent->id);
+        $outside = $this->category('outside');
+        $existing->categories()->attach($child);
+        $existing->update(['stock_qty' => 20]);
+        $this->entry($catalog, $existing, PriceCatalogEntry::SPECIAL, '25', ['customer_group_id' => $group->id]);
+        $laterAssigned = $this->product(['stock_qty' => 20]);
+        $this->entry($catalog, $laterAssigned, PriceCatalogEntry::BASE, '200');
+        $this->entry($catalog, $laterAssigned, PriceCatalogEntry::GROUP, '7', ['customer_group_id' => $this->group()->id]);
+        $rule = $this->rule($catalog, $group, $admin, ['percent' => '60', 'category_ids' => [$parent->id]]);
+        app(PriceCatalogService::class)->activate($catalog, $admin);
+        $compiled = $rule->entries()->where('product_id', $existing->id)->firstOrFail();
+        $existing->update(['base_price' => '999']);
+        $laterAssigned->update(['base_price' => '999']);
+        $laterAssigned->categories()->attach($child);
+        $this->assertPrice(40.0, $existing, $buyer);
+        $this->assertPrice(80.0, $laterAssigned, $buyer);
+        $resolver = app(PriceCatalogResolver::class);
+        $resolver->preloadProducts([$existing, $laterAssigned], $buyer);
+        $this->assertSame(40.0, $resolver->resolve($existing, $buyer)->price);
+        $this->assertSame(80.0, $resolver->resolve($laterAssigned, $buyer)->price);
+        $overview = app(PriceCatalogGroupOverview::class);
+        $rows = $overview->rows($catalog, $group->id, collect([$existing, $laterAssigned]));
+        $this->assertSame('80.0000', $rows[$laterAssigned->id]['effective_price']);
+        $this->assertSame($rule->id, $rows[$laterAssigned->id]['effective_entry']->discount_rule_id);
+        $this->actingAs($buyer);
+        $cart = app(CartService::class);
+        $this->assertTrue($cart->add($laterAssigned, 3));
+        $this->assertSame(80.0, $cart->lines()->sole()['unit_price']);
+        $this->assertSame(240.0, $cart->lines()->sole()['line_total']);
+        $this->assertSame('price_catalog_group_discount', $cart->lines()->sole()['b2b_source_type']);
+
+        $existing->categories()->sync([$outside->id]);
+        $laterAssigned->categories()->sync([$outside->id]);
+        $resolver->forgetActiveCatalog(); // A subsequent request has a fresh batch.
+        $this->assertPrice(25.0, $existing, $buyer);
+        $this->assertPrice(200.0, $laterAssigned, $buyer);
+        $rows = $overview->rows($catalog, $group->id, collect([$existing, $laterAssigned]));
+        $this->assertSame('25.0000', $rows[$existing->id]['effective_price']);
+        $this->assertSame(PriceCatalogEntry::SPECIAL, $rows[$existing->id]['effective_entry']->kind);
+        $this->assertSame('40.0000', $compiled->fresh()->price);
+        $this->assertSame(200.0, $cart->lines()->sole()['unit_price']);
+    }
+
+    public function test_group_overview_includes_new_matching_products_without_any_snapshot_entry(): void
+    {
+        [$admin, $catalog, $group] = $this->fixture();
+        $category = $this->category('new-category');
+        $this->rule($catalog, $group, $admin, ['category_ids' => [$category->id]]);
+        app(PriceCatalogService::class)->activate($catalog, $admin);
+        $new = $this->product();
+        $new->categories()->attach($category);
+        $overview = app(PriceCatalogGroupOverview::class);
+        $this->assertContains($new->id, $overview->products($catalog, $group->id)->pluck('id')->all());
+        $this->assertSame('60.0000', $overview->rows($catalog, $group->id, collect([$new]))[$new->id]['effective_price']);
     }
 
     public function test_batch_inheritance_has_bounded_queries_and_refreshes_the_whole_page_at_a_schedule_boundary(): void
@@ -185,7 +249,7 @@ class CatalogGroupDiscountInheritanceTest extends TestCase
             foreach ($products as $product) {
                 $this->assertSame(100.0, $resolver->resolve($product, $buyer)->price);
             }
-            $this->assertCount(3, DB::getQueryLog()); // Stored entries, rules and one inherited batch.
+            $this->assertCount(4, DB::getQueryLog()); // Stored entries, group rules, inherited batch and cached customer-rule lookup.
             foreach (['09:00:01' => 60.0, '09:00:03' => 100.0] as $time => $price) {
                 $this->travelTo(Carbon::parse('2026-10-14 '.$time));
                 DB::flushQueryLog();

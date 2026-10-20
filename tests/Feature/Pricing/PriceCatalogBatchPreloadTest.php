@@ -148,7 +148,9 @@ class PriceCatalogBatchPreloadTest extends TestCase
         $rule = CatalogGroupDiscountRule::query()->create([
             'price_catalog_id' => $catalog->id, 'name' => 'Boundary', 'percent' => 40,
             'customer_group_ids' => [$group->id], 'manufacturer_ids' => [], 'category_ids' => [], 'excluded_product_ids' => [],
+            'starts_at' => '2026-10-08 12:00:01', 'ends_at' => '2026-10-08 12:00:03',
         ]);
+        $this->entry($catalog, $product, PriceCatalogEntry::BASE, '100');
         $this->entry($catalog, $product, PriceCatalogEntry::SPECIAL, '70', $group);
         $discount = $this->entry($catalog, $product, PriceCatalogEntry::GROUP_DISCOUNT, '60', $group,
             ['discount_rule_id' => $rule->id, 'starts_at' => '2026-10-08 12:00:01', 'ends_at' => '2026-10-08 12:00:03']);
@@ -162,7 +164,8 @@ class PriceCatalogBatchPreloadTest extends TestCase
             $this->assertSame(get_object_vars($direct), get_object_vars($batched));
             $this->assertSame($price, $batched?->price);
             if ($price === 60.0) {
-                $this->assertSame($discount->id, $batched?->catalog_entry_id);
+                $this->assertNull($batched?->catalog_entry_id);
+                $this->assertSame($rule->id, $batched?->rule_id);
             }
         }
     }

@@ -4,12 +4,13 @@ namespace App\Services\Pricing;
 
 use App\Models\Catalog\Category\Category;
 use App\Models\Catalog\Pricing\PriceCatalog;
+use App\Models\Catalog\Pricing\PriceCatalogEntry;
 use App\Models\Catalog\Product\Product;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
-/** Read-only extension of published rules to new products; the published price snapshot stays untouched. */
+/** Evaluates group scopes against current product membership without changing stored catalog entries. */
 class CatalogGroupDiscountInheritance
 {
     private array $rules = [];
@@ -19,33 +20,30 @@ class CatalogGroupDiscountInheritance
     /** @return array{sql:string,bindings:array}|null */
     public function expression(PriceCatalog $catalog, int $groupId, Carbon $at, string $column = 'price'): ?array
     {
-        // A draft is always explicitly rebuilt at publication. Legacy catalogs
-        // without a publication timestamp cannot safely identify new products.
-        $ceiling = $catalog->metadata['publication_product_id_ceiling'] ?? null;
-        if ($catalog->status === PriceCatalog::DRAFT || ($ceiling === null && ! $catalog->activated_at)) {
-            return null;
-        }
         $rules = $this->rules($catalog, $groupId);
         if ($rules === []) {
             return null;
         }
-        $price = 'ROUND(inherited_product.base_price * (100.0 - inherited_rule.percent) / 100.0, 4)';
+        // A catalog base remains the price basis when current category or brand
+        // membership changes. Existing group, special and customer prices are
+        // never used as the basis for another percentage.
+        $base = DB::table('catalog_price_entries as inherited_base')->select('inherited_base.price')
+            ->where('inherited_base.price_catalog_id', $catalog->id)
+            ->whereColumn('inherited_base.product_id', 'inherited_product.id')
+            ->where('inherited_base.kind', PriceCatalogEntry::BASE)->where('inherited_base.is_active', true)
+            ->whereNull('inherited_base.user_id')->whereNull('inherited_base.customer_group_id')
+            ->where('inherited_base.minimum_quantity', '<=', 1)
+            ->where(fn (Builder $q) => $q->whereNull('inherited_base.starts_at')->orWhere('inherited_base.starts_at', '<', $at))
+            ->where(fn (Builder $q) => $q->whereNull('inherited_base.ends_at')->orWhere('inherited_base.ends_at', '>', $at))
+            ->orderBy('inherited_base.priority')->orderBy('inherited_base.price')->orderBy('inherited_base.id')->limit(1);
+        $price = 'ROUND(COALESCE(('.$base->toSql().'), inherited_product.base_price) * (100.0 - inherited_rule.percent) / 100.0, 4)';
         $query = DB::table('catalog_group_discount_rules as inherited_rule')
             ->crossJoin('products as inherited_product')->whereColumn('inherited_product.id', 'products.id')
-            ->selectRaw($column === 'rule_id' ? 'inherited_rule.id' : $price)
+            ->selectRaw($column === 'rule_id' ? 'inherited_rule.id' : $price, $column === 'rule_id' ? [] : $base->getBindings())
             ->where('inherited_rule.price_catalog_id', $catalog->id)
             ->where('inherited_rule.is_active', true)
             ->where(fn (Builder $q) => $q->whereNull('inherited_rule.starts_at')->orWhere('inherited_rule.starts_at', '<=', $at))
             ->where(fn (Builder $q) => $q->whereNull('inherited_rule.ends_at')->orWhere('inherited_rule.ends_at', '>', $at));
-        if ($ceiling !== null) {
-            $query->where('inherited_product.id', '>', (int) $ceiling);
-        } else {
-            $query->where('inherited_product.created_at', '>', $catalog->activated_at);
-        }
-        // Even an expired/inactive or different-audience stored price marks a
-        // product as part of the original snapshot. Never recalculate it.
-        $query->whereNotExists(fn (Builder $q) => $q->selectRaw('1')->from('catalog_price_entries as inherited_snapshot')
-            ->where('inherited_snapshot.price_catalog_id', $catalog->id)->whereColumn('inherited_snapshot.product_id', 'inherited_product.id'));
         $query->where(function (Builder $q) use ($rules): void {
             foreach ($rules as $rule) {
                 $q->orWhere(function (Builder $scope) use ($rule): void {
@@ -62,7 +60,7 @@ class CatalogGroupDiscountInheritance
                     }
                 });
             }
-        })->orderBy('inherited_rule.priority')->orderByRaw($price)->orderBy('inherited_rule.id')->limit(1);
+        })->orderBy('inherited_rule.priority')->orderByRaw($price, $base->getBindings())->orderBy('inherited_rule.id')->limit(1);
 
         return ['sql' => '('.$query->toSql().')', 'bindings' => $query->getBindings()];
     }
@@ -94,7 +92,7 @@ class CatalogGroupDiscountInheritance
     private function rules(PriceCatalog $catalog, int $groupId): array
     {
         $key = $catalog->id.':'.$groupId;
-        if (array_key_exists($key, $this->rules)) {
+        if ($catalog->status !== PriceCatalog::DRAFT && array_key_exists($key, $this->rules)) {
             return $this->rules[$key];
         }
         $rules = $catalog->discountRules()->where('is_active', true)->get()->filter(
@@ -119,6 +117,7 @@ class CatalogGroupDiscountInheritance
                 'category_ids' => $ids, 'excluded_product_ids' => $rule->excluded_product_ids];
         }
 
-        return $this->rules[$key] = $scopes;
+        // Draft previews must see edits made during the same request.
+        return $catalog->status === PriceCatalog::DRAFT ? $scopes : ($this->rules[$key] = $scopes);
     }
 }

@@ -15,11 +15,8 @@
 @if ($children->isNotEmpty())
         <details class="group/subnav desktop-mobile-menu-group" data-mobile-menu-accordion>
             <summary class="{{ $depthClass }} {{ $categoryRowClass }} desktop-mobile-menu-row relative flex min-h-[52px] cursor-pointer list-none items-center py-3 pr-3 text-slate-700 hover:bg-slate-50 hover:text-slate-900">
-                <a
-                    href="{{ $child['url'] ?? '#' }}"
+                <span
                     class="desktop-mobile-menu-category-link min-w-0 flex-1 pr-11 {{ $labelWeightClass }}"
-                    data-mobile-nav-link
-                    @if($target) target="{{ $target }}" rel="{{ $rel }}" @endif
                 >
                     <span class="desktop-mobile-menu-item-main">
                         @if ($imageUrl !== '')
@@ -29,7 +26,7 @@
                         @endif
                         <span class="desktop-mobile-menu-label">{{ $child['label'] ?? '' }}</span>
                     </span>
-                </a>
+                </span>
                 <button
                     type="button"
                     class="desktop-mobile-menu-toggle"
@@ -52,6 +49,9 @@
                 </button>
             </summary>
             <ul class="desktop-mobile-menu-children">
+                <li>
+                    <a href="{{ $child['url'] ?? '#' }}" class="desktop-mobile-depth-{{ min(4, max(0, (int) $level + 1)) }} desktop-mobile-menu-row flex min-h-[52px] items-center py-3 font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900" data-mobile-nav-link @if($target) target="{{ $target }}" rel="{{ $rel }}" @endif>{{ __('View All') }}</a>
+                </li>
                 @foreach ($children as $nestedChild)
                     @include('front.desktop.partials.main-nav-mobile-child', ['child' => $nestedChild, 'level' => $level + 1])
                 @endforeach

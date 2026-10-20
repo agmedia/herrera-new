@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Silber\Bouncer\BouncerFacade as Bouncer;
 use Silber\Bouncer\Database\Role;
@@ -19,6 +20,9 @@ class Form extends Component
 {
     #[Locked]
     public int $userId;
+
+    #[Url(as: 'tab', except: 'profile')]
+    public string $tab = 'profile';
 
     /**
      * @var array<string, mixed>
@@ -75,6 +79,17 @@ class Form extends Component
         $this->authorizeAccess();
         $this->userId = $userId;
         $this->loadUser();
+        $this->switchTab($this->tab);
+    }
+
+    public function switchTab(string $tab): void
+    {
+        $this->authorizeAccess();
+        abort_unless(in_array($tab, ['profile', 'pricing'], true), 404);
+        if ($tab === 'pricing') {
+            app(\App\Services\Pricing\PriceCatalogService::class)->authorize(auth()->user());
+        }
+        $this->tab = $tab;
     }
 
     public function save()
@@ -214,6 +229,7 @@ class Form extends Component
         $this->ensureCanManageTargetUser(User::query()->findOrFail($this->userId));
 
         return view('livewire.admin.user.form', [
+            'canViewPricing' => (bool) (auth()->user()->isA('superadmin') || (auth()->user()->can('admin.access') && auth()->user()->can('catalog.b2b_prices.view'))),
             'canManageSecurity' => ! app(OrderManagerAccess::class)->isRestricted(),
             'roles' => $this->assignableRoles(),
             'customerGroups' => CustomerGroup::query()

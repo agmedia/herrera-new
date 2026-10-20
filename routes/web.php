@@ -557,6 +557,7 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
                 Route::view('eprel/settings', 'admin.integrations.eprel.settings')->name('eprel.settings');
                 Route::view('eprel/catalog', 'admin.integrations.eprel.catalog')->name('eprel.catalog');
                 Route::view('stock', 'admin.integrations.stock.index')->name('stock.index');
+                Route::view('supplier-catalog', 'admin.integrations.supplier-catalog.index')->name('supplier-catalog.index');
                 Route::view('eracuni', 'admin.integrations.eracuni.index')->name('eracuni.index');
                 Route::view('spreadsheet', 'admin.integrations.spreadsheet.index')->name('spreadsheet.index');
                 Route::view('media', 'admin.integrations.media.index')->name('media.index');

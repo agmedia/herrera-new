@@ -157,7 +157,8 @@ fi
     --path=database/migrations/2026_10_20_120000_create_customer_discount_rules.php \
     --path=database/migrations/2026_10_20_130000_add_customer_discount_provenance.php \
     --path=database/migrations/2026_10_20_140000_restore_customer_category_discounts.php \
-    --path=database/migrations/2026_10_20_150000_add_primary_group_default_discount.php
+    --path=database/migrations/2026_10_20_150000_add_primary_group_default_discount.php \
+    --path=database/migrations/2026_10_20_160000_create_supplier_catalog_items.php
 "$php_bin" artisan supplier-catalogs:seed --publish
 "$php_bin" artisan supplier-catalogs:covers --apply
 "$php_bin" artisan config:cache

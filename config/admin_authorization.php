@@ -205,6 +205,10 @@ return [
             'view' => ['integrations.eprel.settings.manage'],
             'mutate' => ['integrations.eprel.settings.manage'],
         ],
+        'admin.integrations.supplier-catalog.index' => [
+            'view' => ['integrations.stock.manage'],
+            'mutate' => ['integrations.stock.manage'],
+        ],
         'admin.integrations.stock.index' => [
             'view' => ['integrations.stock.manage'],
             'mutate' => ['integrations.stock.manage'],

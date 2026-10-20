@@ -1217,11 +1217,12 @@
                     $contentReferencesActive = request()->routeIs('admin.content.references.*');
                     $contentOpen = $contentBlogActive || $contentPagesActive || $contentFaqsActive || $contentCommentsActive || $contentBlocksActive || $contentNavigationActive || $contentSlotsActive || $contentCatalogsActive || $contentReferencesActive;
                     $integrationsEprelActive = request()->routeIs('admin.integrations.eprel.*');
+                    $integrationsSupplierCatalogActive = request()->routeIs('admin.integrations.supplier-catalog.*');
                     $integrationsStockActive = request()->routeIs('admin.integrations.stock.*');
                     $integrationsEracuniActive = request()->routeIs('admin.integrations.eracuni.*');
                     $integrationsSpreadsheetActive = request()->routeIs('admin.integrations.spreadsheet.*');
                     $integrationsMediaActive = request()->routeIs('admin.integrations.media.*');
-                    $integrationsOpen = $integrationsEprelActive || $integrationsStockActive || $integrationsEracuniActive || $integrationsSpreadsheetActive || $integrationsMediaActive;
+                    $integrationsOpen = $integrationsSupplierCatalogActive || $integrationsEprelActive || $integrationsStockActive || $integrationsEracuniActive || $integrationsSpreadsheetActive || $integrationsMediaActive;
                     $canManageEprel = auth()->user() && (
                         auth()->user()->isA('superadmin')
                         || auth()->user()->can('integrations.eprel.settings.manage')
@@ -1744,6 +1745,9 @@
                             </summary>
                             <div class="ml-3 mt-1 space-y-1 border-l border-slate-200 pl-4">
                                 @if ($canManageStock)
+                                    <a href="{{ route('admin.integrations.supplier-catalog.index') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ $integrationsSupplierCatalogActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
+                                        <span class="flex items-center gap-2"><span class="sidebar-dot"></span><span>{{ __('Artikli dobavljača') }}</span></span>
+                                    </a>
                                     <a href="{{ route('admin.integrations.stock.index') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ $integrationsStockActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
                                         <span class="flex items-center gap-2"><span class="sidebar-dot"></span><span>{{ __('Zalihe i cronovi') }}</span></span>
                                     </a>

@@ -103,7 +103,7 @@ rollback() {
     trap - ERR
     set +e
     if [[ "$applied" == true ]]; then
-        rsync -a --chmod=D755,F644 --exclude=.env "$backup_root/old/" "$target_root/"
+        rsync -a --no-owner --no-group --chmod=D755,F644 --exclude=.env "$backup_root/old/" "$target_root/"
         chmod "$target_root_mode" "$target_root"
         while IFS= read -r -d '' file; do
             case "$file" in public/*) continue ;; esac
@@ -112,10 +112,10 @@ rollback() {
         if [[ "$dependencies_changed" == true ]]; then
             (cd "$target_root" && "$php_bin" "$composer_bin" install --no-dev --prefer-dist --no-interaction --optimize-autoloader --no-scripts)
         else
-            rsync -a "$backup_root/vendor-composer/" "$target_root/vendor/composer/"
+            rsync -a --no-owner --no-group "$backup_root/vendor-composer/" "$target_root/vendor/composer/"
             cp -p "$backup_root/vendor-autoload.php" "$target_root/vendor/autoload.php"
         fi
-        rsync -a "$backup_root/bootstrap-cache/" "$target_root/bootstrap/cache/"
+        rsync -a --no-owner --no-group "$backup_root/bootstrap-cache/" "$target_root/bootstrap/cache/"
         (cd "$target_root" && "$php_bin" artisan config:cache && "$php_bin" artisan route:cache && "$php_bin" artisan view:cache && "$php_bin" artisan up)
     fi
     printf '%s\n' "Deployment failed; rollback attempted. Private backup: $backup_root" >&2
@@ -134,7 +134,7 @@ while IFS= read -r -d '' file; do
         install -d -m 755 "$target_root/$parent"
     fi
 done < "$backup_root/changed-files"
-rsync -a --no-implied-dirs --chmod=D755,F644 --from0 --files-from="$backup_root/changed-files" "$stage_root/" "$target_root/"
+rsync -a --no-owner --no-group --no-implied-dirs --chmod=D755,F644 --from0 --files-from="$backup_root/changed-files" "$stage_root/" "$target_root/"
 if [[ "$dependencies_changed" == true ]]; then
     "$php_bin" "$composer_bin" install --no-dev --prefer-dist --no-interaction --optimize-autoloader --no-scripts
 else

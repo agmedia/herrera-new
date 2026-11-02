@@ -124,6 +124,23 @@ the product ID and status; terminal failures use the standard failed-job tooling
 Run the existing manual catalogue lookup to retry an unresolved product. Restart
 long-running workers after deploying code changes.
 
+The registered cPanel staging deployment manages one every-minute cron entry
+marked `HERRERA-STAGING-EPREL-WORKER`. It invokes the tracked
+`scripts/run-staging-eprel-worker.sh`, which uses a nonblocking single-worker
+lock and a shared deployment lock. Each invocation stops when the queue is empty
+or after 50 seconds between articles; an in-flight article may take up to 600
+seconds. Fresh invocations load the deployed release, so this bounded worker
+does not need a separate restart. Unrelated cron entries are preserved and a
+private crontab snapshot is restored if deployment rolls back.
+
+The worker validates the staging URL/database and deployed Git revision, skips
+maintenance or an undeployed checkout, and does nothing while EPREL is disabled
+or unconfigured. Deployment never enables EPREL. Run the tracked worker with
+`--check` to verify its guards and configuration without processing jobs or
+contacting EPREL. With zero queued jobs a normal invocation also makes no EPREL
+requests. Its private log is
+`/home/herrera/.herrera-staging-backups/eprel-worker.log`.
+
 ## Storefront cache
 
 The B2B public catalogue can use a short server-side HTML cache:

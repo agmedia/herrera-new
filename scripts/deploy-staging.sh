@@ -27,6 +27,8 @@ fi
 [[ -x "$php_bin" && -f "$composer_bin" ]] || fail 'PHP 8.4 or Composer is unavailable.'
 command -v rsync >/dev/null || fail 'rsync is unavailable.'
 command -v flock >/dev/null || fail 'flock is unavailable.'
+command -v crontab >/dev/null || fail 'crontab is unavailable.'
+[[ "$(id -un)" == herrera ]] || fail 'Run deployment as the Herrera hosting account.'
 [[ -d "$target_root" && ! -L "$target_root" && -f "$target_root/.env" && ! -L "$target_root/.env" ]] || fail 'The existing isolated staging installation was not found.'
 [[ -f "$target_root/vendor/autoload.php" ]] || fail 'The existing staging dependencies were not found.'
 [[ -z "$(git -C "$source_root" status --porcelain)" ]] || fail 'The cPanel checkout must be clean.'
@@ -62,6 +64,33 @@ mkdir -p "$stage_root" "$backup_root/old"
 cp -p "$target_root/.env" "$backup_root/old/.env"
 : > "$backup_root/changed-files"
 : > "$backup_root/new-files"
+
+# Preserve every unrelated cron byte; only our uniquely marked line is managed.
+snapshot_crontab() {
+    local destination="$1" status
+    if LC_ALL=C crontab -l > "$destination" 2> "$destination.error"; then
+        return 0
+    else
+        status=$?
+        if [[ "$status" == 1 && ! -s "$destination" && "$(cat "$destination.error")" == 'no crontab for herrera' ]]; then
+            : > "$destination.absent"
+            return 0
+        fi
+        printf '%s\n' 'Cannot read the hosting crontab; no cron changes were made.' >&2
+        return 1
+    fi
+}
+snapshot_crontab "$backup_root/crontab.before" || fail 'The hosting crontab could not be backed up.'
+"$php_bin" -r '
+$before=file_get_contents($argv[1]); $after="";
+foreach(preg_split("/(?<=\\n)/",$before) as $line){
+    if(!str_ends_with(rtrim($line,"\r\n")," # HERRERA-STAGING-EPREL-WORKER")){$after.=$line;}
+}
+if($after!=="" && !str_ends_with($after,"\n")){$after.="\n";}
+$after.="* * * * * /bin/bash /home/herrera/repositories/herrera-new/scripts/run-staging-eprel-worker.sh >> /home/herrera/.herrera-staging-backups/eprel-worker.log 2>&1 # HERRERA-STAGING-EPREL-WORKER\n";
+if(file_put_contents($argv[2],$after)===false){exit(1);}
+' "$backup_root/crontab.before" "$backup_root/crontab.after"
+cron_changed=false
 
 # Only tracked source files are copied; deployment data, uploads and symlinks are preserved.
 while IFS= read -r -d '' file; do
@@ -102,6 +131,17 @@ applied=false
 rollback() {
     trap - ERR
     set +e
+    if [[ "$cron_changed" == true ]]; then
+        if snapshot_crontab "$backup_root/crontab.rollback" && cmp -s "$backup_root/crontab.after" "$backup_root/crontab.rollback"; then
+            if [[ -f "$backup_root/crontab.before.absent" ]]; then
+                crontab -r
+            else
+                crontab "$backup_root/crontab.before"
+            fi
+        else
+            printf '%s\n' 'Crontab changed after installation; preserving the newer crontab for review.' >&2
+        fi
+    fi
     if [[ "$applied" == true ]]; then
         rsync -a --no-owner --no-group --chmod=D755,F644 --exclude=.env "$backup_root/old/" "$target_root/"
         chmod "$target_root_mode" "$target_root"
@@ -166,6 +206,18 @@ fi
 "$php_bin" artisan view:cache
 "$php_bin" artisan herrera:apply-quick-fixes
 "$php_bin" -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); app(App\Services\Front\GuestStorefrontCache::class)->invalidate();'
+# Install the bounded worker only after the application release is ready.
+snapshot_crontab "$backup_root/crontab.current"
+if ! cmp -s "$backup_root/crontab.before" "$backup_root/crontab.current" \
+    || [[ -f "$backup_root/crontab.before.absent" && ! -f "$backup_root/crontab.current.absent" ]] \
+    || [[ ! -f "$backup_root/crontab.before.absent" && -f "$backup_root/crontab.current.absent" ]]; then
+    printf '%s\n' 'The hosting crontab changed during deployment; preserving the newer crontab.' >&2
+    false
+fi
+if ! cmp -s "$backup_root/crontab.before" "$backup_root/crontab.after"; then
+    cron_changed=true
+    crontab "$backup_root/crontab.after"
+fi
 "$php_bin" artisan up
 printf '%s\n' "$revision" > "$target_root/.herrera-deploy-revision"
 trap - ERR

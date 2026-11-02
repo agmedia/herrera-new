@@ -11,6 +11,7 @@ use App\Models\Sales\Order\OrderItem;
 use App\Models\User\B2BAccount;
 use App\Services\Front\B2BQuickOrderSearchService;
 use App\Services\Front\CartService;
+use App\Services\Front\CartStaffAccess;
 use App\Services\Pricing\B2BAccessService;
 use App\Services\Pricing\ProductPricePresentationService;
 use Illuminate\Http\JsonResponse;
@@ -196,7 +197,9 @@ class B2BController extends Controller
                 $item = $combinedResolved['item'];
                 $resolved['warning'] = $combinedResolved['warning'];
                 if ($combined > $item['maximum_quantity']) {
-                    $resolved['warning'] = __('Ukupna količina ograničena je raspoloživom zalihom: :quantity.', ['quantity' => $item['quantity']]);
+                    $resolved['warning'] = app(CartStaffAccess::class)->canViewStock($request)
+                        ? __('Ukupna količina ograničena je raspoloživom zalihom: :quantity.', ['quantity' => $item['quantity']])
+                        : __('stock.order_quantity_adjusted');
                 }
             }
             $items[$item['key']] = $item;

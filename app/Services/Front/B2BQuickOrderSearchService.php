@@ -204,7 +204,10 @@ class B2BQuickOrderSearchService
             'has_promotional_discount' => (bool) ($price['has_promotional_discount'] ?? false),
             'minimum_quantity' => $minimum,
             'quantity_step' => $step,
-            'maximum_quantity' => $maximum,
+            // Keep server-side stock limits private; customers receive only the order-entry limit.
+            'maximum_quantity' => app(CartStaffAccess::class)->canViewStock(request())
+                ? $maximum
+                : ($maximum > 0 ? $minimum + (int) floor((999 - $minimum) / $step) * $step : 0),
             'quantity' => $selectedQuantity,
         ];
     }
@@ -261,7 +264,9 @@ class B2BQuickOrderSearchService
         return [
             'item' => $item,
             'warning' => $item['quantity'] !== $quantity
-                ? __('Količina je prilagođena pakiranju i raspoloživoj zalihi: :quantity.', ['quantity' => $item['quantity']])
+                ? (app(CartStaffAccess::class)->canViewStock(request())
+                    ? __('Količina je prilagođena pakiranju i raspoloživoj zalihi: :quantity.', ['quantity' => $item['quantity']])
+                    : __('stock.order_quantity_adjusted'))
                 : null,
         ];
     }

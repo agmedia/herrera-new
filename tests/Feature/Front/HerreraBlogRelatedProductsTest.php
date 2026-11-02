@@ -117,7 +117,8 @@ class HerreraBlogRelatedProductsTest extends TestCase
                 && $product->relationLoaded('optionValues') && $product->relationLoaded('attributes')));
 
         if ($state === 'approved') {
-            $response->assertSee('data-product-card-form', false)->assertSee('data-product-local-stock', false)
+            $response->assertSee('data-product-card-form', false)->assertSee('data-product-delivery-time', false)
+                ->assertDontSee('data-product-local-stock', false)->assertDontSee('data-product-supplier-stock', false)
                 ->assertSee('product-card-current-price', false);
         } else {
             $response->assertDontSee('data-product-card-form', false)->assertDontSee('data-product-local-stock', false)

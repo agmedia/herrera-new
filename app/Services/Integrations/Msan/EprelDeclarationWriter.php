@@ -14,6 +14,8 @@ class EprelDeclarationWriter
 
     public const ORIGIN_CATALOG_BATCH = 'catalog_batch';
 
+    public const ORIGIN_AUTOMATIC_LOOKUP = 'automatic_lookup';
+
     /**
      * @param array{
      *   eprel_registration_number:string,
@@ -34,7 +36,7 @@ class EprelDeclarationWriter
         array $expectedProductIdentity = [],
         ?callable $identityGuard = null,
     ): ProductEnergyDeclaration {
-        if (! in_array($origin, [self::ORIGIN_ADMIN_LOOKUP, self::ORIGIN_MSAN_SYNC, self::ORIGIN_CATALOG_BATCH], true)) {
+        if (! in_array($origin, [self::ORIGIN_ADMIN_LOOKUP, self::ORIGIN_MSAN_SYNC, self::ORIGIN_CATALOG_BATCH, self::ORIGIN_AUTOMATIC_LOOKUP], true)) {
             throw new \InvalidArgumentException('EPREL izvor zapisa nije podržan.');
         }
 
@@ -67,6 +69,9 @@ class EprelDeclarationWriter
             }
             if ($identityGuard && $identityGuard($product) !== true) {
                 throw new EprelMatchConflictException('Identifikacijski podaci artikla promijenjeni su tijekom EPREL dohvata. Pokrenite pretragu ponovno.');
+            }
+            if ($origin === self::ORIGIN_AUTOMATIC_LOOKUP) {
+                $this->assertAutomaticCompatibility($product, $data);
             }
 
             $manualPrimary = $product->energyDeclarations
@@ -115,7 +120,7 @@ class EprelDeclarationWriter
                 ->where('source', ProductEnergyDeclaration::SOURCE_EPREL)
                 ->where('context_code', '!=', $context)
                 ->get();
-            if ($origin === self::ORIGIN_CATALOG_BATCH && $staleEprelDeclarations->isNotEmpty()) {
+            if (in_array($origin, [self::ORIGIN_CATALOG_BATCH, self::ORIGIN_AUTOMATIC_LOOKUP], true) && $staleEprelDeclarations->isNotEmpty()) {
                 throw new EprelMatchConflictException('Artikl već ima različitu službenu deklaraciju; skupni dohvat je neće zamijeniti.');
             }
             if ($origin === self::ORIGIN_MSAN_SYNC
@@ -189,6 +194,16 @@ class EprelDeclarationWriter
                         ?: ($sameOfficialIdentity ? $product->product_information_sheet_url : null),
                     'energy_data_synced_at' => now(),
                 ];
+                if ($origin === self::ORIGIN_AUTOMATIC_LOOKUP) {
+                    // New supplier articles may already carry a label or a
+                    // hand-entered class. Enrich missing data without replacing it.
+                    foreach (array_keys($productUpdates) as $field) {
+                        if (! in_array($field, ['energy_label_required', 'energy_data_synced_at'], true)
+                            && trim((string) $product->{$field}) !== '') {
+                            unset($productUpdates[$field]);
+                        }
+                    }
+                }
             }
             $product->forceFill($productUpdates)->save();
 
@@ -204,5 +219,22 @@ class EprelDeclarationWriter
         ], static fn (string $value): bool => $value !== ''));
 
         return $parts === [] ? null : implode('-', array_unique($parts));
+    }
+
+    private function assertAutomaticCompatibility(Product $product, array $data): void
+    {
+        $officialValues = [
+            'energy_efficiency_class' => $data['energy_class'],
+            'energy_efficiency_scale' => $this->scaleLabel($data['scale_min'], $data['scale_max']),
+            'eprel_registration_number' => $data['eprel_registration_number'],
+            'eprel_product_group' => $data['eprel_product_group'],
+        ];
+        foreach ($officialValues as $field => $official) {
+            $existing = mb_strtoupper(str_replace([' ', '–', '—'], ['', '-', '-'], trim((string) $product->{$field})));
+            $expected = mb_strtoupper(str_replace([' ', '–', '—'], ['', '-', '-'], trim((string) $official)));
+            if ($existing !== '' && $expected !== '' && $existing !== $expected) {
+                throw new EprelMatchConflictException('Postojeći energetski podaci razlikuju se od službenog EPREL zapisa. Potreban je ručni pregled.');
+            }
+        }
     }
 }

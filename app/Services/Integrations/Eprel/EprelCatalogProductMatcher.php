@@ -92,7 +92,7 @@ class EprelCatalogProductMatcher
         return $this->productNames($product)->contains(fn ($name) => preg_match('/^(?:žarulja\s+led\b|(?:led\s+)?(?:(?:stropna|zidna|linearna|panelna|podna|viseća|nadgradna|ugradna)\s+){0,2}svjetiljka\b|ventilator\s+stropni\s+(?:s|sa)\s+(?:osvjetljenjem|rasvjetom)\b)/u', $name) === 1);
     }
 
-    public function match(Product $product, array $expectedCriteria, string $expectedIdentity, ?callable $canWrite = null): array
+    public function match(Product $product, array $expectedCriteria, string $expectedIdentity, ?callable $canWrite = null, string $origin = EprelDeclarationWriter::ORIGIN_CATALOG_BATCH): array
     {
         if (! EprelProductIdentity::matches($product, $expectedIdentity) || ! $this->sameCriteria($this->criteria($product), $expectedCriteria)) {
             throw new EprelMatchConflictException('Šifra, EAN, marka ili kategorija promijenjeni su nakon pokretanja paketa.');
@@ -158,7 +158,7 @@ class EprelCatalogProductMatcher
             return ['status' => 'not_found', 'message' => 'Nije pronađeno potpuno točno podudaranje.'];
         }
         $data = reset($matches);
-        $this->writer->store((int) $product->id, $data, EprelDeclarationWriter::ORIGIN_CATALOG_BATCH, ['product_identity' => $expectedIdentity], function (Product $locked) use ($expectedCriteria, $canWrite): bool {
+        $this->writer->store((int) $product->id, $data, $origin, ['product_identity' => $expectedIdentity], function (Product $locked) use ($expectedCriteria, $canWrite): bool {
             return $locked->is_active && $this->sameCriteria($this->criteria($locked), $expectedCriteria) && (! $canWrite || $canWrite());
         });
 

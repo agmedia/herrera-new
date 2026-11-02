@@ -369,7 +369,7 @@
                 'url' => $currentUrl,
                 'priceCurrency' => strtoupper((string) ($schemaSettings['product_currency'] ?? 'EUR')),
                 'price' => number_format((float) ($schemaPrice['display_current'] ?? $schemaPrice['current_gross']), 2, '.', ''),
-                'availability' => (int) $product->stock_qty > 0
+                'availability' => $product->storefrontIsPurchasable()
                     ? 'https://schema.org/InStock'
                     : 'https://schema.org/OutOfStock',
             ];

@@ -17,6 +17,7 @@ use App\Models\Settings\Local\OrderStatus;
 use App\Models\Settings\Local\PaymentMethod;
 use App\Models\Settings\Local\ShippingMethod;
 use App\Models\Settings\Local\TaxRate;
+use App\Observers\Catalog\ProductEprelObserver;
 use App\Observers\Catalog\ProductGroupPriceObserver;
 use App\Observers\Catalog\ProductOptionValuePriceObserver;
 use App\Observers\Catalog\ProductPriceObserver;
@@ -342,6 +343,7 @@ class AppServiceProvider extends ServiceProvider
         ContentBlockSlot::observe(ContentCacheObserver::class);
 
         Product::observe(ProductPriceObserver::class);
+        Product::observe(ProductEprelObserver::class);
         ProductGroupPrice::observe(ProductGroupPriceObserver::class);
         ProductOptionValue::observe(ProductOptionValuePriceObserver::class);
     }

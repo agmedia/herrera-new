@@ -433,6 +433,7 @@ return [
                     'purpose' => 'Kontrolirani dohvat energetskih podataka za odabrane artikle lokalnog kataloga.',
                     'steps' => [
                         'Prvo spremite EPREL API ključ u EPREL postavkama.',
+                        'Novi aktivni artikli i objavljeni nacrti automatski pokreću pozadinski dohvat ako imaju odgovarajuću EPREL grupu i identifikatore. Postojeće oznake i ručni podaci ostaju sačuvani.',
                         'Odaberite kategorije i provjerite EPREL grupu proizvoda.',
                         'Pregledajte opseg i najprije pokrenite mali probni dohvat.',
                         'Provjerite sažetak podudaranja, nepostojećih zapisa i pogrešaka.',

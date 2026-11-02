@@ -3,6 +3,7 @@
 @php
     $isHerreraProductDetail = str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera');
     $canViewPrices = $canViewPrices ?? app(\App\Services\Pricing\B2BAccessService::class)->canViewPrices(auth()->user());
+    $canViewStock = app(\App\Services\Front\CartStaffAccess::class)->canViewStock(request());
     $translation = $product->translations->firstWhere('locale', $locale)
         ?? $product->translations->firstWhere('locale', $fallbackLocale);
     $compactProductSpecifications = $isHerreraProductDetail
@@ -439,8 +440,16 @@
                 data-ga4-item-category="{{ (string) ($firstCategoryTranslation?->name ?? '') }}"
                 data-ga4-currency="EUR"
                 data-product-base-sku="{{ $productDisplayCode }}"
+                data-product-stock-visible="{{ $canViewStock ? '1' : '0' }}"
+                data-product-default-local-available="{{ ($product->hasVisibleOptionRows() ? $product->hasAvailableOptionRows() : $localStockQuantity > 0) ? '1' : '0' }}"
+                data-product-default-supplier-available="{{ ! $product->hasVisibleOptionRows() && $supplierStockQuantity > 0 ? '1' : '0' }}"
+                data-product-delivery-local="{{ __('stock.local_delivery') }}"
+                data-product-delivery-supplier="{{ __('stock.supplier_delivery') }}"
+                data-product-delivery-unavailable="{{ __('ui.product.unavailable') }}"
+                @if ($canViewStock)
                 data-product-default-local-stock="{{ $localStockQuantity }}"
                 data-product-default-supplier-stock="{{ $supplierStockQuantity }}"
+                @endif
                 data-product-fallback-id="{{ (int) $product->id }}"
                 data-product-name="{{ $translation?->name ?? $product->code }}"
                 data-product-image="{{ (string) (($gallery->first()['full'] ?? '') ?: '') }}"
@@ -515,7 +524,8 @@
                                                 value="{{ $row->id }}"
                                                 data-parent-id="{{ (int) ($row->parent_option_value_id ?? 0) }}"
                                                 data-option-sku="{{ (string) ($row->sku ?: '') }}"
-                                                data-option-stock="{{ max(0, (int) $row->stock_qty) }}"
+                                                data-option-available="{{ (int) $row->stock_qty > 0 ? '1' : '0' }}"
+                                                @if ($canViewStock) data-option-stock="{{ max(0, (int) $row->stock_qty) }}" @endif
                                                 data-option-price-current="{{ $rowPriceData['current'] }}"
                                                 data-option-price-current-value="{{ $rowPriceData['current_value'] }}"
                                                 data-option-price-net="{{ $rowPriceData['current_net'] }}"
@@ -548,7 +558,8 @@
                                             class="sr-only product-size-radio"
                                             data-size-label="{{ $label }}"
                                             data-option-sku="{{ (string) ($row->sku ?: '') }}"
-                                            data-option-stock="{{ max(0, (int) $row->stock_qty) }}"
+                                            data-option-available="{{ (int) $row->stock_qty > 0 ? '1' : '0' }}"
+                                            @if ($canViewStock) data-option-stock="{{ max(0, (int) $row->stock_qty) }}" @endif
                                             data-option-price-current="{{ $rowPriceData['current'] }}"
                                             data-option-price-current-value="{{ $rowPriceData['current_value'] }}"
                                             data-option-price-net="{{ $rowPriceData['current_net'] }}"

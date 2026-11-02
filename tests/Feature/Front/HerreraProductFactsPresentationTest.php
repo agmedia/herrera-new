@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Front;
 
+use App\Models\Catalog\Option\Option;
+use App\Models\Catalog\Option\OptionValue;
 use App\Models\Catalog\Product\CatalogProductSpecification;
 use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Product\ProductEnergyDeclaration;
@@ -14,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Silber\Bouncer\BouncerFacade as Bouncer;
 use Tests\TestCase;
 
 class HerreraProductFactsPresentationTest extends TestCase
@@ -27,16 +30,19 @@ class HerreraProductFactsPresentationTest extends TestCase
         app(SystemSettingsService::class)->put('store_brand_name', 'Herrera');
     }
 
-    public function test_imported_model_and_ean_and_two_private_stock_sources_are_visible_on_cards_and_detail(): void
+    #[DataProvider('devices')]
+    public function test_imported_model_and_ean_and_delivery_time_are_visible_without_stock_quantities(string $userAgent): void
     {
         $product = $this->product();
-        $this->actingAs($this->approvedBuyer());
+        $this->withHeader('User-Agent', $userAgent)->actingAs($this->approvedBuyer());
         foreach ([route('shop.index'), route('products.show', ['slug' => 'facts-product'])] as $url) {
             $html = $this->get($url)->assertOk()->assertSee('Šifra')->assertSee('BT59-00231')
-                ->assertSee('EAN')->assertSee('3850123456789')->assertSee('Dostupnost 48 sati')->assertSee('Dostupnost 14 dana')
+                ->assertSee('EAN')->assertSee('3850123456789')->assertSee('Rok isporuke')->assertSee('48 sati')
+                ->assertDontSee('data-product-local-stock', false)->assertDontSee('data-product-supplier-stock', false)
+                ->assertDontSee('data-product-default-local-stock', false)->assertDontSee('data-product-default-supplier-stock', false)
+                ->assertDontSee('35791')->assertDontSee('98237')->assertDontSee('35.791')->assertDontSee('98.237')
                 ->getContent();
-            $this->assertSame('35.791', $this->textAt($html, 'data-product-local-stock'));
-            $this->assertSame('98.237', $this->textAt($html, 'data-product-supplier-stock'));
+            $this->assertSame('48 sati', $this->textAt($html, 'data-product-delivery-time'));
         }
         $this->assertSame('INTERNAL-SKU', $product->fresh()->sku);
     }
@@ -87,17 +93,21 @@ class HerreraProductFactsPresentationTest extends TestCase
         }
     }
 
-    public function test_supplier_only_product_shows_both_sources_and_a_purchase_control_for_an_approved_buyer(): void
+    public function test_supplier_only_product_shows_delivery_time_and_a_purchase_control_without_quantities(): void
     {
         $product = $this->product();
         $product->update(['stock_qty' => 0, 'supplier_stock_qty' => 47]);
         $this->actingAs($this->approvedBuyer());
         foreach ([route('shop.index'), route('products.show', ['slug' => 'facts-product'])] as $url) {
             $html = $this->get($url)->assertOk()->getContent();
-            $this->assertSame('0', $this->textAt($html, 'data-product-local-stock'));
-            $this->assertSame('47', $this->textAt($html, 'data-product-supplier-stock'));
+            $this->assertSame('14 dana', $this->textAt($html, 'data-product-delivery-time'));
+            $this->assertStringNotContainsString('data-product-local-stock', $html);
+            $this->assertStringNotContainsString('data-product-supplier-stock', $html);
             $this->assertStringContainsString(route('cart.items.store'), $html);
         }
+        $this->get(route('products.show', ['slug' => 'facts-product']))->assertOk()
+            ->assertSee('"availability":"https://schema.org/InStock"', false)
+            ->assertDontSee('inventoryLevel', false);
     }
 
     public function test_imported_energy_attribute_renders_f_on_a_to_g_without_fabricated_document_links(): void
@@ -126,7 +136,8 @@ class HerreraProductFactsPresentationTest extends TestCase
             $html = Blade::render('<x-front.desktop.product-card :product="$product" :flat="$flat" :lined="$lined" />', compact('product', 'flat', 'lined'));
             $this->assertSame('BT59-00231', $this->textAt($html, 'data-product-code'));
             $this->assertSame('3850123456789', $this->textAt($html, 'data-product-ean'));
-            $this->assertSame('98.237', $this->textAt($html, 'data-product-supplier-stock'));
+            $this->assertSame('48 sati', $this->textAt($html, 'data-product-delivery-time'));
+            $this->assertStringNotContainsString('98.237', $html);
             $this->assertStringContainsString('F', $this->elementAt($html, 'data-energy-label-arrow')->textContent);
         }
     }
@@ -159,6 +170,87 @@ class HerreraProductFactsPresentationTest extends TestCase
     public static function deniedStates(): array
     {
         return [['guest'], ['no_account'], ['pending'], ['suspended'], ['inactive_primary_group']];
+    }
+
+    public static function devices(): array
+    {
+        return [['Mozilla/5.0 desktop'], ['Mozilla/5.0 iPhone Mobile']];
+    }
+
+    #[DataProvider('devices')]
+    public function test_authorized_salesperson_sees_stock_during_customer_preview_and_loses_access_when_unassigned(string $userAgent): void
+    {
+        $this->product();
+        $buyer = $this->approvedBuyer();
+        $staff = User::factory()->create(['account_type' => 'staff', 'admin_login_enabled' => true]);
+        Bouncer::assign('order_manager')->to($staff);
+        DB::table('admin_customer_assignments')->insert([
+            'admin_user_id' => $staff->id, 'customer_user_id' => $buyer->id,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->withHeader('User-Agent', $userAgent)->actingAs($staff)
+            ->post(route('admin.users.impersonate', $buyer))->assertRedirect();
+
+        foreach ([route('shop.index'), route('products.show', ['slug' => 'facts-product'])] as $url) {
+            $html = $this->get($url)->assertOk()->getContent();
+            $this->assertSame('35.791', $this->textAt($html, 'data-product-local-stock'));
+            $this->assertSame('98.237', $this->textAt($html, 'data-product-supplier-stock'));
+        }
+        $this->get(route('products.show', ['slug' => 'facts-product']))
+            ->assertSee('data-product-default-local-stock="35791"', false)
+            ->assertSee('data-product-default-supplier-stock="98237"', false);
+        DB::table('admin_customer_assignments')->where('admin_user_id', $staff->id)->delete();
+        $this->get(route('products.show', ['slug' => 'facts-product']))->assertForbidden()
+            ->assertDontSee('data-product-local-stock', false)->assertDontSee('35791');
+    }
+
+    public function test_public_b2c_and_non_sales_staff_see_delivery_without_stock_quantities(): void
+    {
+        config(['commerce.b2b_only' => false]);
+        $this->product();
+        $this->get(route('products.show', ['slug' => 'facts-product']))->assertOk()
+            ->assertSee('data-product-delivery-time', false)->assertDontSee('35791')->assertDontSee('98237');
+        $editor = User::factory()->create(['account_type' => 'staff', 'admin_login_enabled' => true]);
+        Bouncer::assign('editor')->to($editor);
+        $this->actingAs($editor)->get(route('products.show', ['slug' => 'facts-product']))->assertOk()
+            ->assertSee('data-product-delivery-time', false)->assertDontSee('35791')->assertDontSee('98237');
+    }
+
+    public function test_variant_stock_is_not_embedded_in_customer_html(): void
+    {
+        $product = $this->product();
+        $option = Option::query()->create(['code' => 'facts-size', 'type' => 'radio', 'is_active' => true]);
+        $value = OptionValue::query()->create(['option_id' => $option->id, 'code' => 'facts-xl', 'is_active' => true]);
+        $product->optionValues()->create([
+            'option_value_id' => $value->id, 'sku' => 'FACTS-XL', 'mode' => 'variant',
+            'stock_qty' => 4867, 'is_active' => true, 'combination_hash' => hash('sha256', 'facts-xl'),
+        ]);
+        $this->actingAs($this->approvedBuyer())->get(route('products.show', ['slug' => 'facts-product']))->assertOk()
+            ->assertSee('data-option-available="1"', false)->assertDontSee('data-option-stock', false)
+            ->assertDontSee('4867')->assertDontSee('35791')->assertDontSee('98237');
+    }
+
+    public function test_quick_order_hides_stock_limits_in_search_and_saved_draft_but_keeps_them_for_sales_preview(): void
+    {
+        $product = $this->product();
+        $product->update(['stock_qty' => 37, 'supplier_stock_qty' => 53]);
+        $buyer = $this->approvedBuyer();
+        $buyer->b2bAccount->update(['quick_order_draft' => [['product_id' => $product->id, 'quantity' => 2]]]);
+        $this->actingAs($buyer)->getJson(route('account.b2b.quick-order.search', ['q' => 'INTERNAL-SKU']))
+            ->assertOk()->assertJsonPath('items.0.maximum_quantity', 999)
+            ->assertJsonMissingPath('items.0.stock_qty')->assertJsonMissingPath('items.0.supplier_stock_qty');
+        $this->get(route('account.b2b.quick-order'))->assertOk()
+            ->assertViewHas('initialQuickOrderItems', fn ($items) => $items->first()['maximum_quantity'] === 999);
+
+        $staff = User::factory()->create(['account_type' => 'staff', 'admin_login_enabled' => true]);
+        Bouncer::assign('order_manager')->to($staff);
+        DB::table('admin_customer_assignments')->insert([
+            'admin_user_id' => $staff->id, 'customer_user_id' => $buyer->id,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $this->actingAs($staff)->post(route('admin.users.impersonate', $buyer))->assertRedirect();
+        $this->getJson(route('account.b2b.quick-order.search', ['q' => 'INTERNAL-SKU']))
+            ->assertOk()->assertJsonPath('items.0.maximum_quantity', 90);
     }
 
     private function product(): Product

@@ -28,7 +28,7 @@ for (const selectorType of ['radio', 'select']) {
         const field = selectorType === 'radio' ? option : select;
         const form = {
             dataset: {
-                productBaseSku: 'LAMP', productDefaultLocalStock: '5', productDefaultSupplierStock: '4',
+                productBaseSku: 'LAMP', productStockVisible: '1', productDefaultLocalStock: '5', productDefaultSupplierStock: '4',
                 productDefaultPriceCurrent: '10.00 €', productDefaultPriceCurrentValue: '10.00',
             },
             querySelector(selector) {
@@ -77,5 +77,64 @@ for (const selectorType of ['radio', 'select']) {
         assert.equal(stock.textContent, '5');
         assert.equal(supplierStock.textContent, '4');
         assert.equal(quantity.max, '9');
+    });
+}
+
+for (const selectorType of ['radio', 'select']) {
+    test(`${selectorType} customer selection updates delivery without receiving exact stock or constraining quantity to it`, () => {
+        const ready = new Map();
+        const listeners = new Map();
+        let selected = false;
+        const delivery = { textContent: '', classList: { toggle() {} } };
+        const quantity = { value: '8', max: '', dispatchEvent() {} };
+        const option = {
+            dataset: { optionSku: 'LAMP-20W', optionAvailable: '1' },
+            addEventListener(type, listener) { listeners.set(type, listener); },
+        };
+        const select = {
+            disabled: false, selectedIndex: 0, options: [option],
+            get value() { return selected ? '1' : ''; },
+            addEventListener(type, listener) { listeners.set(type, listener); },
+        };
+        const form = {
+            dataset: {
+                productBaseSku: 'LAMP', productStockVisible: '0',
+                productDefaultLocalAvailable: '0', productDefaultSupplierAvailable: '1',
+                productDeliveryLocal: '48 sati', productDeliverySupplier: '14 dana', productDeliveryUnavailable: 'Nedostupno',
+            },
+            querySelector(selector) {
+                if (selector === 'input[name="quantity"]') return quantity;
+                if (selector === 'input[name="product_option_value_id"]:checked') return selectorType === 'radio' && selected ? option : null;
+                if (selector === 'select[name="product_option_value_id"]') return selectorType === 'select' ? select : null;
+                return null;
+            },
+            querySelectorAll() { return [selectorType === 'radio' ? option : select]; },
+            addEventListener() {},
+        };
+        const document = {
+            documentElement: { lang: 'hr' },
+            addEventListener(type, listener) { ready.set(type, listener); },
+            querySelector: (selector) => selector.startsWith('[data-product-detail],') ? form : null,
+            querySelectorAll(selector) {
+                return {
+                    '[data-product-detail-form]': [form],
+                    '[data-product-delivery-time]': [delivery],
+                }[selector] || [];
+            },
+        };
+        vm.runInNewContext(source, { document, window: {}, Event: class {} });
+        ready.get('DOMContentLoaded')();
+        assert.equal(delivery.textContent, '14 dana');
+        assert.equal(quantity.max, '99');
+        selected = true;
+        listeners.get('change')();
+        assert.equal(delivery.textContent, '48 sati');
+        assert.equal(quantity.max, '99');
+        assert.equal(quantity.value, '8');
+        option.dataset.optionAvailable = '0';
+        listeners.get('change')();
+        assert.equal(delivery.textContent, 'Nedostupno');
+        assert.equal(quantity.max, '1');
+        assert.equal(quantity.value, '1');
     });
 }

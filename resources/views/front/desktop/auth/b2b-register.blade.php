@@ -12,6 +12,7 @@
     @php
         $captchaSiteKey = trim((string) ($storeSettings['captcha']['recaptcha_v3_site_key'] ?? ''));
         $captchaEnabled = (bool) ($storeSettings['captcha']['recaptcha_v3_enabled'] ?? false) && $captchaSiteKey !== '';
+        $showShippingAddress = (bool) old('ship_to_different_address', false);
     @endphp
 
     <section class="commerce-hero">
@@ -86,6 +87,67 @@
 
                 <div></div>
 
+                <div class="md:col-span-2">
+                    <input type="hidden" name="ship_to_different_address" value="0">
+                    <label for="b2b-ship-to-different-address" class="inline-flex items-center gap-3 text-sm font-semibold text-slate-700">
+                        <input id="b2b-ship-to-different-address" type="checkbox" name="ship_to_different_address" value="1" @checked($showShippingAddress) data-b2b-shipping-toggle aria-controls="b2b-shipping-address" aria-expanded="{{ $showShippingAddress ? 'true' : 'false' }}" @error('ship_to_different_address') aria-invalid="true" aria-describedby="b2b-shipping-toggle-error" @enderror>
+                        {{ __('ui.checkout.options.ship_to_different_address') }}
+                    </label>
+                    @error('ship_to_different_address')
+                        <p id="b2b-shipping-toggle-error" class="mt-2 text-xs font-semibold text-rose-600" aria-live="polite">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <fieldset id="b2b-shipping-address" class="border-t border-slate-200 pt-4 md:col-span-2" data-address-scope="shipping" data-b2b-shipping-fields @disabled(! $showShippingAddress) @if (! $showShippingAddress) hidden @endif>
+                    <legend class="px-1 text-lg font-bold text-slate-900">{{ __('ui.checkout.sections.shipping') }}</legend>
+                    <div class="grid gap-4 md:grid-cols-2">
+                        @php
+                            $shippingFields = [
+                                ['shipping_first_name', __('ui.account.fields.first_name'), 'shipping given-name', true],
+                                ['shipping_last_name', __('ui.account.fields.last_name'), 'shipping family-name', true],
+                                ['shipping_phone', __('ui.account.fields.phone'), 'shipping tel', false],
+                                ['shipping_address_line_1', __('ui.account.fields.address_line_1'), 'shipping address-line1', true],
+                                ['shipping_address_line_2', __('ui.account.fields.address_line_2'), 'shipping address-line2', false],
+                                ['shipping_postal_code', __('ui.account.fields.postal_code'), 'shipping postal-code', true],
+                                ['shipping_city', __('ui.account.fields.city'), 'shipping address-level2', true],
+                            ];
+                        @endphp
+
+                        @foreach ($shippingFields as $field)
+                            <div class="{{ $field[0] === 'shipping_address_line_1' ? 'md:col-span-2' : '' }}">
+                                <label for="b2b-{{ $field[0] }}" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $field[1] }} <x-front.required-mark :required="$field[3]" /></label>
+                                <input
+                                    id="b2b-{{ $field[0] }}"
+                                    type="{{ $field[0] === 'shipping_phone' ? 'tel' : 'text' }}"
+                                    name="{{ $field[0] }}"
+                                    value="{{ is_scalar(old($field[0])) ? old($field[0]) : '' }}"
+                                    autocomplete="{{ $field[2] }}"
+                                    class="w-full px-3 text-sm @error($field[0]) border-rose-500 @enderror"
+                                    @if($field[0] === 'shipping_postal_code') data-address-postal inputmode="numeric" @endif
+                                    @if($field[0] === 'shipping_city') data-address-city @endif
+                                    @required($field[3])
+                                    @error($field[0]) aria-invalid="true" aria-describedby="b2b-{{ $field[0] }}-error" @enderror
+                                >
+                                @error($field[0])
+                                    <p id="b2b-{{ $field[0] }}-error" class="mt-2 text-xs font-semibold text-rose-600" aria-live="polite">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        @endforeach
+
+                        <div>
+                            <label for="b2b-shipping-country" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('ui.account.fields.country_code') }} <x-front.required-mark /></label>
+                            <select id="b2b-shipping-country" name="shipping_country_code" autocomplete="shipping country" class="w-full px-3 text-sm @error('shipping_country_code') border-rose-500 @enderror" required data-address-country @error('shipping_country_code') aria-invalid="true" aria-describedby="b2b-shipping-country-error" @enderror>
+                                @foreach ($countryOptions as $countryOption)
+                                    <option value="{{ $countryOption['code'] }}" @selected(old('shipping_country_code', old('country_code', 'HR')) === $countryOption['code'])>{{ $countryOption['label'] }}</option>
+                                @endforeach
+                            </select>
+                            @error('shipping_country_code')
+                                <p id="b2b-shipping-country-error" class="mt-2 text-xs font-semibold text-rose-600" aria-live="polite">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </div>
+                </fieldset>
+
                 <div>
                     <label for="b2b-password" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Lozinka') }} <x-front.required-mark /></label>
                     <input id="b2b-password" type="password" name="password" class="w-full px-3 text-sm @error('password') border-rose-500 @enderror" autocomplete="new-password" required @error('password') aria-invalid="true" aria-describedby="b2b-password-error" @enderror>
@@ -144,4 +206,21 @@
 
 @push('scripts')
     <script defer src="{{ asset('front-theme/scripts/address-autofill.js') }}?v={{ filemtime(public_path('front-theme/scripts/address-autofill.js')) }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const toggle = document.querySelector('[data-b2b-shipping-toggle]');
+            const fields = document.querySelector('[data-b2b-shipping-fields]');
+
+            if (!toggle || !fields) return;
+
+            const syncShippingAddress = function () {
+                fields.hidden = !toggle.checked;
+                fields.disabled = !toggle.checked;
+                toggle.setAttribute('aria-expanded', toggle.checked ? 'true' : 'false');
+            };
+
+            toggle.addEventListener('change', syncShippingAddress);
+            syncShippingAddress();
+        });
+    </script>
 @endpush

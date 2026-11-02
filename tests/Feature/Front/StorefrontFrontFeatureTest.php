@@ -313,7 +313,7 @@ class StorefrontFrontFeatureTest extends TestCase
             'quantity' => 3,
         ])
             ->assertRedirect()
-            ->assertSessionHas('warning', __('ui.cart.status.adjusted_with_stock', ['stock' => 1]))
+            ->assertSessionHas('warning', __('stock.quantity_adjusted'))
             ->assertSessionMissing('status');
 
         $line = app(\App\Services\Front\CartService::class)->raw();
@@ -633,7 +633,7 @@ class StorefrontFrontFeatureTest extends TestCase
         ]);
     }
 
-    public function test_front_registration_collects_and_saves_the_complete_default_address(): void
+    public function test_front_registration_keeps_the_form_simple_and_saves_an_optional_address(): void
     {
         Bouncer::role()->firstOrCreate(['name' => 'customer'], ['title' => 'Customer']);
         $termsUrl = $this->seedTermsPage();
@@ -662,19 +662,16 @@ class StorefrontFrontFeatureTest extends TestCase
 
         $this->get('/auth/register')
             ->assertOk()
-            ->assertSee('data-address-autofill', false)
-            ->assertSee('data-address-scope="billing"', false)
-            ->assertSee('name="phone"', false)
-            ->assertSee('name="address_line_1"', false)
-            ->assertSee('name="postal_code"', false)
-            ->assertSee('data-address-postal', false)
-            ->assertSee('name="city"', false)
-            ->assertSee('data-address-city', false)
-            ->assertSee('name="country_code"', false)
-            ->assertSee('data-address-country', false)
+            ->assertSee('name="first_name"', false)
+            ->assertSee('name="last_name"', false)
+            ->assertSee('name="email"', false)
+            ->assertDontSee('name="phone"', false)
+            ->assertDontSee('name="address_line_1"', false)
+            ->assertDontSee('name="postal_code"', false)
+            ->assertDontSee('name="city"', false)
+            ->assertDontSee('name="country_code"', false)
             ->assertSee('name="terms_accepted"', false)
             ->assertSee('href="'.$termsUrl.'"', false)
-            ->assertSee('front-theme/scripts/address-autofill.js', false)
             ->assertDontSee('name="address_line_2"', false);
 
         $this->get($termsUrl)

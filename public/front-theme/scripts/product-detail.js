@@ -642,10 +642,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const radio = form.querySelector('input[name="product_option_value_id"]:checked');
         const select = form.querySelector('select[name="product_option_value_id"]');
         const selected = radio || (select && !select.disabled && select.value ? select.options[select.selectedIndex] : null);
+        const stockVisible = form.dataset.productStockVisible === '1';
+        const localAvailable = (selected ? selected.dataset.optionAvailable : form.dataset.productDefaultLocalAvailable) === '1';
+        const supplierAvailable = !selected && form.dataset.productDefaultSupplierAvailable === '1';
         const localStock = Math.max(0, Number.parseInt(String(selected ? selected.dataset.optionStock : form.dataset.productDefaultLocalStock), 10) || 0);
         const supplierStock = Math.max(0, Number.parseInt(String(selected ? '0' : form.dataset.productDefaultSupplierStock), 10) || 0);
 
-        [['[data-product-local-stock]', localStock], ['[data-product-supplier-stock]', supplierStock]].forEach(function ([selector, quantity]) {
+        (stockVisible ? [['[data-product-local-stock]', localStock], ['[data-product-supplier-stock]', supplierStock]] : []).forEach(function ([selector, quantity]) {
             document.querySelectorAll(selector).forEach(function (node) {
                 node.textContent = quantity.toLocaleString(document.documentElement.lang || 'hr');
                 node.classList.toggle('text-emerald-700', quantity > 0);
@@ -653,9 +656,20 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         });
 
+        document.querySelectorAll('[data-product-delivery-time]').forEach(function (node) {
+            node.textContent = localAvailable
+                ? form.dataset.productDeliveryLocal
+                : (supplierAvailable ? form.dataset.productDeliverySupplier : form.dataset.productDeliveryUnavailable);
+            node.classList.toggle('text-emerald-700', localAvailable || supplierAvailable);
+            node.classList.toggle('text-slate-500', !localAvailable && !supplierAvailable);
+        });
+
         const input = form.querySelector('input[name="quantity"]');
         if (input) {
-            input.max = String(Math.max(1, Math.min(99, localStock + supplierStock)));
+            // Customers receive a fixed input limit; actual availability is validated on the server.
+            input.max = stockVisible
+                ? String(Math.max(1, Math.min(99, localStock + supplierStock)))
+                : (localAvailable || supplierAvailable ? '99' : '1');
             input.value = String(Math.min(Number.parseInt(input.max, 10), Math.max(1, Number.parseInt(input.value, 10) || 1)));
             input.dispatchEvent(new Event('input', { bubbles: true }));
         }

@@ -45,7 +45,10 @@ class AssignedProductOptionsFeatureTest extends TestCase
         $this->get(route('products.show', ['slug' => 'testna-svjetiljka']))->assertOk()
             ->assertSee('Snaga')->assertSee('20 W')
             ->assertSee('data-option-sku="LAMP-20W"', false)
-            ->assertSee('data-option-stock="3"', false)
+            ->assertSee('data-option-available="1"', false)
+            ->assertDontSee('data-option-stock', false)
+            ->assertDontSee('data-product-default-local-stock', false)
+            ->assertDontSee('data-product-default-supplier-stock', false)
             ->assertDontSee('Odaberite veličinu');
 
         $cart = app(CartService::class);

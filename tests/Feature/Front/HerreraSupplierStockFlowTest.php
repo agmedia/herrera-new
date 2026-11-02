@@ -79,7 +79,7 @@ class HerreraSupplierStockFlowTest extends TestCase
         $this->actingAs($customer)->getJson(route('account.b2b.quick-order.search', ['q' => 'SUPPLIER']))
             ->assertOk()->assertJsonCount(1, 'items')
             ->assertJsonPath('items.0.product_id', $product->id)
-            ->assertJsonPath('items.0.maximum_quantity', 38);
+            ->assertJsonPath('items.0.maximum_quantity', 999);
         $this->app['auth']->forgetGuards();
         $this->getJson(route('account.b2b.quick-order.search', ['q' => 'SUPPLIER']))->assertUnauthorized();
     }

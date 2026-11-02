@@ -58,11 +58,14 @@ class CustomerAccountQuickOrderFeatureTest extends TestCase
         ])->assertOk()->assertJsonCount(1, 'items')->assertJsonCount(4, 'errors')
             ->assertJsonPath('items.0.product_id', $product->id)
             ->assertJsonPath('items.0.quantity', 11)
-            ->assertJsonPath('items.0.maximum_quantity', 11)
+            ->assertJsonPath('items.0.maximum_quantity', 998)
             ->assertJsonPath('items.0.is_b2b_price', true)
             ->assertJsonPath('items.0.display_includes_tax', false)
             ->assertJsonPath('errors.0.line', 4)->assertJsonPath('errors.1.identifier', $soldOut->code);
         $this->assertGreaterThan(0, count($response->json('warnings')));
+        foreach ($response->json('warnings') as $warning) {
+            $this->assertSame(__('stock.order_quantity_adjusted'), $warning['message']);
+        }
         $this->assertEmpty($buyer->b2bAccount->fresh()->quick_order_draft);
         $this->assertEmpty(app(CartService::class)->lines());
     }
@@ -78,7 +81,7 @@ class CustomerAccountQuickOrderFeatureTest extends TestCase
             ->assertJsonPath('items.0.product_option_value_id', $variant->id)
             ->assertJsonPath('items.0.quantity', 3)
             ->assertJsonPath('items.1.product_id', $supplier->id)
-            ->assertJsonPath('items.1.maximum_quantity', 9)
+            ->assertJsonPath('items.1.maximum_quantity', 999)
             ->assertJsonPath('errors.0.identifier', 'SHIRT');
     }
 

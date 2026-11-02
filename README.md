@@ -100,6 +100,30 @@ NABAVA_NET_STOREFRONT_URL=https://www.example.hr
 
 Nabava.net can access it using `?username=...&password=...`. Keep the credentials in the server environment and never commit them to the repository.
 
+## Automatic EPREL lookup
+
+When EPREL is enabled and its API key is configured, creating an active product
+or publishing an inactive draft schedules an exact energy-data lookup after the
+product transaction commits. This includes products imported from supplier XML.
+Ineligible products, missing identifiers, manual declarations and fully documented
+products are skipped. Existing energy fields and document links are preserved;
+missing data is filled only after an exact official match. Conflicting matches
+remain available for manual review through the existing EPREL tools.
+
+The dedicated database queue requires a supervised worker on each installation:
+
+```bash
+php artisan queue:work eprel --queue=eprel --timeout=600 --sleep=3 --tries=3
+```
+
+The general/default queue worker does not process this queue. Automatic lookups
+share the catalogue request quota, defer when throttled and expire after six
+hours. Transient errors have at most three failed attempts; authentication
+rejections fail immediately. Normal outcomes and conflicts are logged with only
+the product ID and status; terminal failures use the standard failed-job tooling.
+Run the existing manual catalogue lookup to retry an unresolved product. Restart
+long-running workers after deploying code changes.
+
 ## Storefront cache
 
 The B2B public catalogue can use a short server-side HTML cache:

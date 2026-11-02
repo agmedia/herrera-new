@@ -158,9 +158,9 @@ class CartController extends Controller
         $quantityWasStockAdjusted = (int) $validated['quantity'] > $availableStock && $availableStock > 0;
         $message = $ok
             ? __('ui.cart.status.updated')
-            : ($quantityWasStockAdjusted
+            : ($quantityWasStockAdjusted && app(CartStaffAccess::class)->canViewStock($request)
                 ? __('ui.cart.status.adjusted_with_stock', ['stock' => $availableStock])
-                : __('ui.cart.status.adjusted'));
+                : ($quantityWasStockAdjusted ? __('stock.quantity_adjusted') : __('ui.cart.status.adjusted')));
 
         return $ok
             ? back()->with('status', $message)

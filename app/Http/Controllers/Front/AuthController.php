@@ -212,6 +212,15 @@ class AuthController extends Controller
                 'postal_code' => ['required', 'string', 'max:32'],
                 'city' => ['required', 'string', 'max:120'],
                 'country_code' => ['required', 'string', 'size:2'],
+                'ship_to_different_address' => ['nullable', 'boolean'],
+                'shipping_first_name' => ['exclude_unless:ship_to_different_address,1', 'required', 'string', 'max:120'],
+                'shipping_last_name' => ['exclude_unless:ship_to_different_address,1', 'required', 'string', 'max:120'],
+                'shipping_phone' => ['exclude_unless:ship_to_different_address,1', 'nullable', 'string', 'max:80'],
+                'shipping_address_line_1' => ['exclude_unless:ship_to_different_address,1', 'required', 'string', 'max:191'],
+                'shipping_address_line_2' => ['exclude_unless:ship_to_different_address,1', 'nullable', 'string', 'max:191'],
+                'shipping_postal_code' => ['exclude_unless:ship_to_different_address,1', 'required', 'string', 'max:32'],
+                'shipping_city' => ['exclude_unless:ship_to_different_address,1', 'required', 'string', 'max:120'],
+                'shipping_country_code' => ['exclude_unless:ship_to_different_address,1', 'required', 'string', 'size:2'],
                 'password' => ['required', 'string', Password::defaults()],
                 'password_confirmation' => ['required', 'string', 'same:password'],
                 'terms_accepted' => ['accepted'],
@@ -235,6 +244,15 @@ class AuthController extends Controller
                 'postal_code' => __('poštanski broj'),
                 'city' => __('grad'),
                 'country_code' => __('država'),
+                'ship_to_different_address' => __('ui.checkout.options.ship_to_different_address'),
+                'shipping_first_name' => __('ui.checkout.sections.shipping').': '.__('ui.account.fields.first_name'),
+                'shipping_last_name' => __('ui.checkout.sections.shipping').': '.__('ui.account.fields.last_name'),
+                'shipping_phone' => __('ui.checkout.sections.shipping').': '.__('ui.account.fields.phone'),
+                'shipping_address_line_1' => __('ui.checkout.sections.shipping').': '.__('ui.account.fields.address_line_1'),
+                'shipping_address_line_2' => __('ui.checkout.sections.shipping').': '.__('ui.account.fields.address_line_2'),
+                'shipping_postal_code' => __('ui.checkout.sections.shipping').': '.__('ui.account.fields.postal_code'),
+                'shipping_city' => __('ui.checkout.sections.shipping').': '.__('ui.account.fields.city'),
+                'shipping_country_code' => __('ui.checkout.sections.shipping').': '.__('ui.account.fields.country_code'),
                 'password' => __('lozinka'),
                 'password_confirmation' => __('potvrda lozinke'),
                 'terms_accepted' => __('ui.auth.fields.terms'),
@@ -282,6 +300,24 @@ class AuthController extends Controller
                 'country_code' => strtoupper((string) $validated['country_code']),
                 'is_default' => true,
             ]);
+
+            if ($validated['ship_to_different_address'] ?? false) {
+                UserAddress::query()->create([
+                    'user_id' => $user->getKey(),
+                    'type' => UserAddress::TYPE_SHIPPING,
+                    'first_name' => trim((string) $validated['shipping_first_name']),
+                    'last_name' => trim((string) $validated['shipping_last_name']),
+                    'company' => trim((string) $validated['company_name']),
+                    'oib' => trim((string) $validated['oib']),
+                    'phone' => trim((string) ($validated['shipping_phone'] ?? $validated['phone'])),
+                    'address_line_1' => trim((string) $validated['shipping_address_line_1']),
+                    'address_line_2' => $validated['shipping_address_line_2'] ?? null,
+                    'postal_code' => trim((string) $validated['shipping_postal_code']),
+                    'city' => trim((string) $validated['shipping_city']),
+                    'country_code' => strtoupper((string) $validated['shipping_country_code']),
+                    'is_default' => true,
+                ]);
+            }
 
             B2BAccount::query()->create([
                 'user_id' => $user->getKey(),

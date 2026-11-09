@@ -288,6 +288,71 @@ class EracuniCompanySalesClientTest extends TestCase
         $this->assertNull($exception->getPrevious());
     }
 
+    public function test_delivery_headers_are_hydrated_once_and_positive_lines_block_clearance(): void
+    {
+        $header = $this->row();
+        unset($header['Items']);
+        $this->deliveryFeed($header, $this->row(['Items' => [['productCode' => 'HYDRATED', 'quantity' => 3]]]));
+
+        $result = $this->client()->fetch('2026-11-06', '2026-11-06');
+
+        $this->assertTrue($result['complete']);
+        $this->assertSame(['HYDRATED'], $result['recent_product_codes']);
+        $this->assertSame(9, $result['request_count']);
+        Http::assertSentCount(9);
+        $this->assertCount(1, Http::recorded(fn (Request $request) => str_ends_with($request->url(), '/DeliveryNoteGet')));
+        Http::assertSent(fn (Request $request) => str_ends_with($request->url(), '/DeliveryNoteGet') && $request->data() === ['documentID' => 'INV-1']);
+    }
+
+    public function test_full_matching_issued_zero_total_note_can_omit_optional_empty_items(): void
+    {
+        $empty = $this->row([
+            'status' => 'IssuedInvoice', 'totalNetAmount' => '0.00', 'totalAmountInDomCurr' => 0,
+            'totalDiscount' => '0', 'superDiscountAmount' => 0, 'totalVatAmountNormalRate' => 0,
+            'totalVatBaseAmountInDomCurrNormalRate' => '0.00', 'returnFeeForPackagingAmount' => 0,
+        ]);
+        unset($empty['Items']);
+        $this->deliveryFeed($empty, $empty);
+
+        $result = $this->client()->fetch('2026-11-06', '2026-11-06');
+
+        $this->assertTrue($result['complete']);
+        $this->assertSame([], $result['recent_product_codes']);
+        $this->assertSame(1, $result['document_count']);
+        $this->assertSame(9, $result['request_count']);
+    }
+
+    public function test_hydration_rejects_wrong_identity_date_partial_or_malformed_nonempty_notes(): void
+    {
+        $header = $this->row();
+        unset($header['Items']);
+        foreach ([
+            ['documentID' => 'WRONG'], ['date' => '2026-11-05'],
+            ['Items' => null], ['Items' => ['invalid' => ['quantity' => 1]]],
+        ] as $invalid) {
+            $this->deliveryFeed($header, $this->row($invalid));
+            $this->assertFails(null, fn () => $this->client()->fetch('2026-11-06', '2026-11-06'));
+        }
+        foreach ([
+            ['totalNetAmount' => 1], ['totalAmountInDomCurr' => 1], ['totalVatAmountNormalRate' => 1],
+            ['totalDiscount' => null], ['totalNetAmount' => 'not-numeric'], ['status' => 'Unknown'],
+        ] as $invalid) {
+            $detail = $this->row(array_replace(['status' => 'IssuedInvoice', 'totalNetAmount' => 0, 'totalAmountInDomCurr' => 0], $invalid));
+            unset($detail['Items']);
+            $this->deliveryFeed($header, $detail);
+            $this->assertFails(null, fn () => $this->client()->fetch('2026-11-06', '2026-11-06'));
+        }
+        $this->deliveryFeed($header, $this->row(), ['complete' => false]);
+        $this->assertFails(null, fn () => $this->client()->fetch('2026-11-06', '2026-11-06'));
+    }
+
+    private function deliveryFeed(array $header, array $detail, array $getMetadata = []): void
+    {
+        $this->feed(fn (Request $request) => Http::response(['response' => str_ends_with($request->url(), '/DeliveryNoteGet')
+            ? array_replace(['result' => $detail], $getMetadata)
+            : ['result' => str_ends_with($request->url(), '/DeliveryNoteList') ? [$header] : []]]));
+    }
+
     private function feed(callable $callback): void
     {
         Http::swap(new \Illuminate\Http\Client\Factory);

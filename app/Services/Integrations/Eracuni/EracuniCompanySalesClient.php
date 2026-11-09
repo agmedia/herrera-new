@@ -26,6 +26,8 @@ class EracuniCompanySalesClient
 
     private array $lastRequestContext = [];
 
+    private array $hydratedDeliveryNotes = [];
+
     /**
      * Positive lines from any pass conservatively exclude an article from clearance,
      * including an unbilled delivery or a cancelled/draft sale. No PII is returned.
@@ -46,6 +48,7 @@ class EracuniCompanySalesClient
         $base = $this->baseUrl($connection);
         $this->requestCount = 0;
         $this->lastRequestContext = [];
+        $this->hydratedDeliveryNotes = [];
         $this->deadline = hrtime(true) + self::MAX_FETCH_SECONDS * 1_000_000_000;
         $codes = $documents = [];
 
@@ -108,6 +111,9 @@ class EracuniCompanySalesClient
                 throw new RuntimeException('e-Računi je vratio dokument bez valjanog identifikatora ili datuma.');
             }
             $this->date($row['date']);
+            if ($method === 'DeliveryNoteList' && (! isset($row['Items']) || ! is_array($row['Items']) || ! array_is_list($row['Items']))) {
+                $row = $this->hydrateDeliveryNote($row, $base, $connection);
+            }
             foreach (['dateOfSupply', 'dateOfSupplyFrom', 'dateOfSupplyUntil'] as $field) {
                 if (isset($row[$field]) && $row[$field] !== '') {
                     if (! is_string($row[$field])) {
@@ -161,7 +167,7 @@ class EracuniCompanySalesClient
     }
 
     /** @return array{0: array<int, array<string, mixed>>, 1: bool} */
-    private function request(string $url, array $parameters, array $connection): array
+    private function request(string $url, array $parameters, array $connection, bool $singleDocument = false): array
     {
         if ($this->deadline > 0 && hrtime(true) >= $this->deadline) {
             throw new RuntimeException('Provjera ukupne prodaje nije dovršena u dopuštenom vremenu.');
@@ -232,6 +238,12 @@ class EracuniCompanySalesClient
             }
         }
         $rows = $envelope['result'] ?? $envelope;
+        if ($singleDocument && is_array($rows) && ! array_is_list($rows)) {
+            $rows = [$rows];
+        }
+        if ($singleDocument && (! is_array($rows) || count($rows) !== 1 || ! is_array($rows[0] ?? null))) {
+            throw new RuntimeException('e-Računi nije vratio jednu potpunu otpremnicu.');
+        }
         if (! is_array($rows) || ! array_is_list($rows) || count($rows) > 100000) {
             throw new RuntimeException('e-Računi nije vratio popis prodajnih dokumenata.');
         }
@@ -248,6 +260,69 @@ class EracuniCompanySalesClient
         }
 
         return [$rows, $truncated];
+    }
+
+    private function hydrateDeliveryNote(array $header, string $base, array $connection): array
+    {
+        $key = 'document:'.(string) $header['documentID'];
+        if (isset($this->hydratedDeliveryNotes[$key])) {
+            $document = $this->hydratedDeliveryNotes[$key];
+        } else {
+            [$rows, $truncated] = $this->request($base.'/DeliveryNoteGet', ['documentID' => (string) $header['documentID']], $connection, true);
+            if ($truncated || count($rows) !== 1) {
+                throw new RuntimeException('e-Računi nije potvrdio potpuni dohvat otpremnice.');
+            }
+            $document = $rows[0];
+        }
+        if (! $this->validIdentifier($document['documentID'] ?? null, 160)
+            || (string) $document['documentID'] !== (string) $header['documentID']
+            || ($document['date'] ?? null) !== $header['date']) {
+            throw new RuntimeException('Potpuna otpremnica ne odgovara identifikatoru i datumu zadanog dokumenta.');
+        }
+        if (! array_key_exists('Items', $document) && $this->confirmedEmptyDeliveryNote($document)) {
+            // Items is optional in the documented full DeliveryNote object. The
+            // actual ERP omits it on issued, zero-total documents with no lines.
+            $document['Items'] = [];
+        }
+        if (! isset($document['Items']) || ! is_array($document['Items']) || ! array_is_list($document['Items'])) {
+            throw new RuntimeException('Pojedinačni dohvat otpremnice nije vratio potpune stavke.');
+        }
+        // Keep only fields needed by the classifier, not buyer details or prices.
+        $document = array_intersect_key($document, array_flip(['documentID', 'date', 'dateOfSupply', 'dateOfSupplyFrom', 'dateOfSupplyUntil', 'issuedTimestamp', 'Items']));
+        $document['Items'] = array_map(static fn ($item) => is_array($item)
+            ? array_intersect_key($item, array_flip(['position', 'productCode', 'productName', 'productBarCode', 'productCatalogueCode', 'quantity']))
+            : $item, $document['Items']);
+        $this->hydratedDeliveryNotes[$key] = $document;
+
+        return $document;
+    }
+
+    private function confirmedEmptyDeliveryNote(array $document): bool
+    {
+        if (! in_array($document['status'] ?? null, ['Draft', 'IssuedInvoice'], true)) {
+            return false;
+        }
+        foreach (['totalNetAmount', 'totalAmountInDomCurr'] as $field) {
+            if (! array_key_exists($field, $document) || ! $this->numericZero($document[$field])) {
+                return false;
+            }
+        }
+        foreach ($document as $field => $value) {
+            if (in_array($field, ['superDiscountAmount', 'returnFeeForPackagingAmount'], true)
+                || preg_match('/^total(?:Discount|.*Amount)/D', $field)) {
+                if (! $this->numericZero($value)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private function numericZero(mixed $value): bool
+    {
+        return ! is_bool($value) && is_scalar($value) && is_numeric($value)
+            && is_finite((float) $value) && (float) $value === 0.0;
     }
 
     private function explicitNoDocuments(int $status, string $body, string $method): bool

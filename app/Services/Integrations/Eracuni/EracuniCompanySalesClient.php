@@ -101,6 +101,7 @@ class EracuniCompanySalesClient
             'issued' => ['issuedTimestampFrom' => $from->startOfDay()->format('Y-m-d H:i:s'), 'issuedTimestampTo' => $until->endOfDay()->format('Y-m-d H:i:s')],
         };
         [$rows, $truncated] = $this->request($base.'/'.$method, $parameters, $connection);
+        $needsSplit = $truncated || count($rows) >= self::LIMIT;
         foreach ($rows as $row) {
             unset($this->lastRequestContext['document_id'], $this->lastRequestContext['line_position']);
             if (is_array($row) && $this->validIdentifier($row['documentID'] ?? null, 160)) {
@@ -153,7 +154,12 @@ class EracuniCompanySalesClient
             $documentKey = $method.':'.(string) $row['documentID'];
             $documents[$documentKey] = max($documents[$documentKey] ?? 0, $unlinkedLineCount);
         }
-        if ($truncated || count($rows) >= self::LIMIT) {
+        // Only the compact identity sets are needed by child ranges. Keeping a
+        // parent's 500 complete invoices here multiplies the JSON memory peak
+        // at each level of recursion; foreach variables retain the last row too.
+        unset($rows, $row, $item);
+        gc_collect_cycles();
+        if ($needsSplit) {
             unset($this->lastRequestContext['document_id'], $this->lastRequestContext['line_position']);
             if ($from->isSameDay($until)) {
                 throw new RuntimeException('e-Računi je dosegnuo dnevno ograničenje dokumenata. Potpuni obuhvat nije dokazan.');
@@ -169,6 +175,9 @@ class EracuniCompanySalesClient
     /** @return array{0: array<int, array<string, mixed>>, 1: bool} */
     private function request(string $url, array $parameters, array $connection, bool $singleDocument = false): array
     {
+        // Laravel/Guzzle promises can form cycles after a completed request.
+        // Release those before allocating the next response and decoded array.
+        gc_collect_cycles();
         if ($this->deadline > 0 && hrtime(true) >= $this->deadline) {
             throw new RuntimeException('Provjera ukupne prodaje nije dovršena u dopuštenom vremenu.');
         }
@@ -176,6 +185,7 @@ class EracuniCompanySalesClient
             throw new RuntimeException('Provjera ukupne prodaje premašila je sigurno ograničenje dohvata.');
         }
         $this->lastRequestContext['request_count'] = $this->requestCount;
+        $memoryBudgetExceeded = false;
         try {
             $response = Cache::lock('herrera-eracuni-api', 180)->block(10, function () use ($url, $parameters, $connection) {
                 if (! app()->runningUnitTests()) {
@@ -202,16 +212,27 @@ class EracuniCompanySalesClient
                     Cache::put('herrera-eracuni-api-next-request', microtime(true) + 1, 180);
                 }
             });
-            if (! $response->successful() && $this->explicitNoDocuments($response->status(), $response->body(), basename($url))) {
+            $status = $response->status();
+            $body = $response->body();
+            unset($response);
+            gc_collect_cycles();
+            if ($status >= 400 && $this->explicitNoDocuments($status, $body, basename($url))) {
                 return [[], false];
             }
-            if (! $response->successful() || trim($response->body()) === '' || strlen($response->body()) > 50 * 1024 * 1024) {
+            if ($status < 200 || $status >= 300 || trim($body) === '' || strlen($body) > 50 * 1024 * 1024) {
                 throw new RuntimeException;
             }
-            $data = json_decode($response->body(), true, 512, JSON_THROW_ON_ERROR);
+            if (! $this->decodeFitsMemoryBudget($body)) {
+                $memoryBudgetExceeded = true;
+                throw new RuntimeException;
+            }
+            $data = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+            unset($body);
         } catch (Throwable) {
             // Transport exceptions can contain authentication data or a private URL.
-            throw new RuntimeException('Dohvat ukupne prodaje iz e-Računa nije uspio. Ništa nije potvrđeno.');
+            throw new RuntimeException($memoryBudgetExceeded
+                ? 'Odgovor e-Računa prevelik je za raspoloživu memoriju. Potpuni obuhvat nije potvrđen.'
+                : 'Dohvat ukupne prodaje iz e-Računa nije uspio. Ništa nije potvrđeno.');
         }
         if (! is_array($data)) {
             throw new RuntimeException('e-Računi nije vratio valjanu evidenciju prodaje.');
@@ -260,6 +281,25 @@ class EracuniCompanySalesClient
         }
 
         return [$rows, $truncated];
+    }
+
+    private function decodeFitsMemoryBudget(string $body): bool
+    {
+        $limit = trim((string) ini_get('memory_limit'));
+        if ($limit === '-1' || ! preg_match('/^(\d+)\s*([KMG]?)$/iD', $limit, $parts)) {
+            return true;
+        }
+        $bytes = (int) $parts[1] * (1024 ** match (strtoupper($parts[2] ?? '')) {
+            'G' => 3, 'M' => 2, 'K' => 1, default => 0,
+        });
+        // JSON arrays, hash buckets, keys and values cost more than wire bytes.
+        // Count syntax conservatively (also inside text) without another decoded
+        // copy. Live usage excludes freed allocator blocks reusable by this call.
+        $estimatedDecode = strlen($body) + substr_count($body, ':') * 96
+            + (substr_count($body, '{') + substr_count($body, '[')) * 128
+            + substr_count($body, ',') * 48;
+
+        return $estimatedDecode <= $bytes - memory_get_usage() - 16 * 1024 * 1024;
     }
 
     private function hydrateDeliveryNote(array $header, string $base, array $connection): array

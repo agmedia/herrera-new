@@ -19,6 +19,8 @@ class CompanySalesClearanceSync
 
     public const STATE_KEY = 'catalog_clearance_company_sales_sync';
 
+    private const PRODUCT_CHUNK_SIZE = 50;
+
     public function state(): array
     {
         return (array) app(SystemSettingsService::class)->get(self::STATE_KEY, []);
@@ -49,6 +51,7 @@ class CompanySalesClearanceSync
                 $stage = 'stock';
                 $stock = app(StockFeedClient::class)->fetch('eracuni');
                 $warehouse = $this->warehouse($stock);
+                unset($stock);
                 $recent = [];
                 foreach ($sales['recent_product_codes'] as $code) {
                     if (! is_string($code) || trim($code) === '' || mb_strlen($code) > 160) {
@@ -56,6 +59,7 @@ class CompanySalesClearanceSync
                     }
                     $recent['code:'.trim($code)] = true;
                 }
+                unset($sales['recent_product_codes']);
                 if (today()->toDateString() !== $asOf) {
                     throw new RuntimeException('Tijekom dohvata promijenio se datum. Ponovite dnevnu provjeru.');
                 }
@@ -63,54 +67,65 @@ class CompanySalesClearanceSync
                 $stage = 'snapshot';
                 $result = Cache::lock('catalog:automatic-clearance', 600)->block(1, function () use ($warehouse, $recent, $fingerprint, $from, $asOf, $apply, $actorId): array {
                     return DB::transaction(function () use ($warehouse, $recent, $fingerprint, $from, $asOf, $apply, $actorId): array {
-                        $products = Product::query()->select(['id', 'code', 'payload', 'stock_qty', 'updated_at'])->orderBy('id')->get();
                         $identities = [];
-                        foreach ($products as $product) {
-                            foreach ($this->codes($product) as $code) {
-                                $identities['code:'.$code][$product->id] = true;
+                        Product::query()->select(['id', 'code', 'payload'])->chunkById(self::PRODUCT_CHUNK_SIZE, function ($products) use ($warehouse, &$identities): void {
+                            foreach ($products as $product) {
+                                foreach ($this->codes($product) as $code) {
+                                    $key = 'code:'.$code;
+                                    if (! isset($warehouse[$key])) {
+                                        continue;
+                                    }
+                                    // Only warehouse identities matter. Zero marks a
+                                    // collision without retaining every matching ID.
+                                    if (! isset($identities[$key])) {
+                                        $identities[$key] = $product->id;
+                                    } elseif ($identities[$key] !== $product->id) {
+                                        $identities[$key] = 0;
+                                    }
+                                }
                             }
-                        }
+                        });
                         $observed = [];
                         $zeroStock = [];
                         $counts = ['observed' => 0, 'recent' => 0, 'unproven' => 0, 'invalidated' => 0];
-                        foreach ($products as $product) {
-                            if ((int) $product->stock_qty <= 0) {
-                                continue;
-                            }
-                            $codes = $this->codes($product);
-                            $matches = array_values(array_filter($codes, fn (string $code): bool => isset($warehouse['code:'.$code])));
-                            if (count($matches) !== 1 || count($identities['code:'.$matches[0]] ?? []) !== 1) {
-                                $counts['unproven']++;
+                        Product::query()->select(['id', 'code', 'payload', 'stock_qty', 'updated_at'])->where('stock_qty', '>', 0)
+                            ->chunkById(self::PRODUCT_CHUNK_SIZE, function ($products) use ($warehouse, $identities, $recent, $fingerprint, $from, $asOf, $apply, $actorId, &$observed, &$zeroStock, &$counts): void {
+                                foreach ($products as $product) {
+                                    $codes = $this->codes($product);
+                                    $matches = array_values(array_filter($codes, fn (string $code): bool => isset($warehouse['code:'.$code])));
+                                    if (count($matches) !== 1 || ($identities['code:'.$matches[0]] ?? 0) !== $product->id) {
+                                        $counts['unproven']++;
 
-                                continue;
-                            }
-                            if ($warehouse['code:'.$matches[0]] === 0) {
-                                $zeroStock[$product->id] = $this->productFingerprint($product);
-                                $counts['unproven']++;
+                                        continue;
+                                    }
+                                    if ($warehouse['code:'.$matches[0]] === 0) {
+                                        $zeroStock[$product->id] = $this->productFingerprint($product);
+                                        $counts['unproven']++;
 
-                                continue;
-                            }
-                            if (array_any($codes, fn (string $code): bool => isset($recent['code:'.$code]))) {
-                                $counts['recent']++;
+                                        continue;
+                                    }
+                                    if (array_any($codes, fn (string $code): bool => isset($recent['code:'.$code]))) {
+                                        $counts['recent']++;
 
-                                continue;
-                            }
-                            if ($apply) {
-                                $locked = Product::query()->whereKey($product->id)->lockForUpdate()->first();
-                                if (! $locked || (int) $locked->stock_qty <= 0 || $this->codes($locked) !== $codes) {
-                                    $counts['unproven']++;
+                                        continue;
+                                    }
+                                    if ($apply) {
+                                        $locked = Product::query()->whereKey($product->id)->lockForUpdate()->first();
+                                        if (! $locked || (int) $locked->stock_qty <= 0 || $this->codes($locked) !== $codes) {
+                                            $counts['unproven']++;
 
-                                    continue;
+                                            continue;
+                                        }
+                                        ProductClearance::query()->updateOrCreate(['product_id' => $product->id], [
+                                            'source' => self::SOURCE, 'source_fingerprint' => $fingerprint,
+                                            'coverage_from' => $from, 'snapshot_date' => $asOf, 'last_outgoing_at' => null,
+                                            'confirmed_company_scope' => true, 'imported_by' => $actorId,
+                                        ]);
+                                    }
+                                    $counts['observed']++;
+                                    $observed[] = $product->id;
                                 }
-                                ProductClearance::query()->updateOrCreate(['product_id' => $product->id], [
-                                    'source' => self::SOURCE, 'source_fingerprint' => $fingerprint,
-                                    'coverage_from' => $from, 'snapshot_date' => $asOf, 'last_outgoing_at' => null,
-                                    'confirmed_company_scope' => true, 'imported_by' => $actorId,
-                                ]);
-                            }
-                            $counts['observed']++;
-                            $observed[] = $product->id;
-                        }
+                            });
                         if ($apply) {
                             $counts['invalidated'] = ProductClearance::query()->where('status', 'observed')
                                 ->whereIn('source', [self::SOURCE, 'eracuni_company_export'])->where('confirmed_company_scope', true)
@@ -182,9 +197,11 @@ class CompanySalesClearanceSync
 
     private function codes(Product $product): array
     {
+        $payload = $product->payload;
+
         return array_values(array_unique(array_filter(array_map(static fn ($value): string => is_string($value) || is_int($value) ? trim((string) $value) : '', [
-            data_get($product->payload, 'eracuni.productCode'), data_get($product->payload, 'opencart.model'),
-            data_get($product->payload, 'ideus_csv.model'), $product->code,
+            data_get($payload, 'eracuni.productCode'), data_get($payload, 'opencart.model'),
+            data_get($payload, 'ideus_csv.model'), $product->code,
         ]), static fn (string $code): bool => $code !== '' && mb_strlen($code) <= 160)));
     }
 }

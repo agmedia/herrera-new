@@ -15,6 +15,7 @@ use App\Services\Integrations\Stock\StockSyncSettingsService;
 use App\Services\Settings\SystemSettingsService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
@@ -46,6 +47,57 @@ class CompanySalesClearanceSyncTest extends TestCase
         $this->assertSame($beforeProduct, $product->fresh()->toArray());
         $this->assertSame($beforeEvidence, $old->fresh()->toArray());
         $this->assertDatabaseCount('product_clearances', 1);
+        $this->assertDatabaseCount('catalog_product_group_prices', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_large_payload_catalogue_stays_bounded_and_preserves_cross_chunk_identity_and_snapshot_rules(): void
+    {
+        $shadowed = $this->product('EARLY', ['payload' => ['eracuni' => ['productCode' => 'SHARED']]]);
+        $largeMetadata = str_repeat('x', 128 * 1024);
+        $paddingPayload = json_encode(['unused_import_metadata' => $largeMetadata], JSON_THROW_ON_ERROR);
+        for ($batch = 0; $batch < 12; $batch++) {
+            $rows = [];
+            for ($offset = 0; $offset < 50; $offset++) {
+                $code = 'PADDING-'.($batch * 50 + $offset);
+                $rows[] = ['code' => $code, 'sku' => $code, 'base_price' => 100, 'is_active' => true, 'stock_qty' => 0, 'payload' => $paddingPayload];
+            }
+            DB::table('products')->insert($rows);
+        }
+        unset($rows, $paddingPayload);
+        $this->product('LATE-DUPLICATE', ['stock_qty' => 0, 'payload' => ['eracuni' => ['productCode' => 'SHARED']]]);
+        $eligible = $this->product('ELIGIBLE', ['payload' => ['eracuni' => ['productCode' => 'ERP-ELIGIBLE'], 'unused_import_metadata' => $largeMetadata]]);
+        $recent = $this->product('RECENT', ['payload' => ['eracuni' => ['productCode' => 'ERP-RECENT'], 'opencart' => ['model' => 'RECENT-ALIAS'], 'unused_import_metadata' => $largeMetadata]]);
+        $zero = $this->product('ZERO', ['payload' => ['eracuni' => ['productCode' => 'ERP-ZERO'], 'unused_import_metadata' => $largeMetadata]]);
+        $omitted = $this->observe($this->product('OMITTED'));
+        unset($largeMetadata);
+        $this->sources([
+            ['identifier' => 'SHARED', 'quantity' => 20],
+            ['identifier' => 'ERP-ELIGIBLE', 'quantity' => 20],
+            ['identifier' => 'ERP-RECENT', 'quantity' => 20],
+            ['identifier' => 'ERP-ZERO', 'quantity' => 0],
+        ], ['recent_product_codes' => ['RECENT-ALIAS']], 2);
+        $service = app(CompanySalesClearanceSync::class);
+        gc_collect_cycles();
+        memory_reset_peak_usage();
+        $memoryBefore = memory_get_usage(true);
+
+        $preview = $service->run();
+
+        $this->assertLessThan(24 * 1024 * 1024, memory_get_peak_usage(true) - $memoryBefore, 'The 75 MB catalogue payload must be processed in bounded chunks.');
+        $this->assertSame(1, $preview['observed']);
+        $this->assertSame(1, $preview['recent']);
+        $this->assertSame($service->productFingerprint($zero), $preview['zero_stock_product_proofs'][$zero->id]);
+        $this->assertTrue($omitted->fresh()->confirmed_company_scope);
+        $this->assertDatabaseCount('product_clearances', 1);
+
+        $service->run(true);
+
+        $this->assertTrue(ProductClearance::query()->where('product_id', $eligible->id)->sole()->confirmed_company_scope);
+        $this->assertFalse($omitted->fresh()->confirmed_company_scope);
+        foreach ([$shadowed, $recent, $zero] as $excluded) {
+            $this->assertDatabaseMissing('product_clearances', ['product_id' => $excluded->id]);
+        }
         $this->assertDatabaseCount('catalog_product_group_prices', 0);
         Http::assertNothingSent();
     }

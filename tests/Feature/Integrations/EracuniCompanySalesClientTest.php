@@ -9,6 +9,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Mockery;
 use RuntimeException;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 class EracuniCompanySalesClientTest extends TestCase
@@ -344,6 +345,50 @@ class EracuniCompanySalesClientTest extends TestCase
         }
         $this->deliveryFeed($header, $this->row(), ['complete' => false]);
         $this->assertFails(null, fn () => $this->client()->fetch('2026-11-06', '2026-11-06'));
+    }
+
+    public function test_large_recursive_responses_complete_in_a_128mb_process_and_keep_parent_activity(): void
+    {
+        $process = $this->memoryFixture();
+
+        $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput().$process->getOutput());
+        $result = json_decode(trim($process->getOutput()), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertTrue($result['complete']);
+        $this->assertSame('128M', $result['memory_limit']);
+        $this->assertSame(22, $result['request_count']);
+        $this->assertSame(3508, $result['document_count']);
+        $this->assertSame(15, $result['code_count']);
+        $this->assertTrue($result['parent_code_kept']);
+        $this->assertGreaterThan(8 * 1024 * 1024, $result['largest_body_bytes']);
+        $this->assertLessThan(112 * 1024 * 1024, $result['peak_memory_bytes']);
+    }
+
+    public function test_an_oversized_decode_fails_cleanly_without_a_fatal_or_proving_absence(): void
+    {
+        $process = $this->memoryFixture('oversized');
+
+        $this->assertSame(2, $process->getExitCode(), $process->getErrorOutput().$process->getOutput());
+        $result = json_decode(trim($process->getOutput()), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertFalse($result['complete']);
+        $this->assertSame(1, $result['request_count']);
+        $this->assertSame('128M', $result['memory_limit']);
+        $this->assertStringContainsString('raspoloživu memoriju', $result['reason']);
+        $this->assertGreaterThan(20 * 1024 * 1024, $result['largest_body_bytes']);
+        $this->assertLessThan(128 * 1024 * 1024, $result['peak_memory_bytes']);
+        $this->assertStringNotContainsString('Fatal error', $process->getErrorOutput().$process->getOutput());
+    }
+
+    private function memoryFixture(?string $mode = null): Process
+    {
+        $arguments = [PHP_BINARY, '-d', 'memory_limit=128M', base_path('tests/Fixtures/Integrations/eracuni_company_sales_memory.php')];
+        if ($mode !== null) {
+            $arguments[] = $mode;
+        }
+        $process = new Process($arguments, base_path(), ['APP_ENV' => 'testing', 'CACHE_STORE' => 'array']);
+        $process->setTimeout(30);
+        $process->run();
+
+        return $process;
     }
 
     private function deliveryFeed(array $header, array $detail, array $getMetadata = []): void

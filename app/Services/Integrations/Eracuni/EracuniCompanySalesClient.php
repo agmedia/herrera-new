@@ -24,6 +24,8 @@ class EracuniCompanySalesClient
 
     private int $deadline = 0;
 
+    private array $lastRequestContext = [];
+
     /**
      * Positive lines from any pass conservatively exclude an article from clearance,
      * including an unbilled delivery or a cancelled/draft sale. No PII is returned.
@@ -43,17 +45,25 @@ class EracuniCompanySalesClient
         $connection = $this->settings->connection('eracuni');
         $base = $this->baseUrl($connection);
         $this->requestCount = 0;
+        $this->lastRequestContext = [];
         $this->deadline = hrtime(true) + self::MAX_FETCH_SECONDS * 1_000_000_000;
         $codes = $documents = [];
 
-        foreach (self::SOURCES as $method) {
-            $passes = ['document', 'supply'];
-            if ($method !== 'DeliveryNoteList') {
-                $passes[] = 'issued';
+        try {
+            foreach (self::SOURCES as $method) {
+                $passes = ['document', 'supply'];
+                if ($method !== 'DeliveryNoteList') {
+                    $passes[] = 'issued';
+                }
+                foreach ($passes as $pass) {
+                    $this->collect($method, $pass, $from, $until, $base, $connection, $codes, $documents);
+                }
             }
-            foreach ($passes as $pass) {
-                $this->collect($method, $pass, $from, $until, $base, $connection, $codes, $documents);
+        } catch (RuntimeException $exception) {
+            if (get_class($exception) !== RuntimeException::class) {
+                throw $exception;
             }
+            throw new EracuniCompanySalesException($exception->getMessage(), $this->lastRequestContext);
         }
 
         $productCodes = array_values($codes);
@@ -78,6 +88,10 @@ class EracuniCompanySalesClient
 
     private function collect(string $method, string $pass, CarbonImmutable $from, CarbonImmutable $until, string $base, array $connection, array &$codes, array &$documents): void
     {
+        $this->lastRequestContext = [
+            'method' => $method, 'pass' => $pass,
+            'from' => $from->toDateString(), 'to' => $until->toDateString(),
+        ];
         $parameters = match ($pass) {
             'document' => ['dateFrom' => $from->toDateString(), 'dateTo' => $until->toDateString()],
             'supply' => ['dateOfSupplyFrom' => $from->toDateString(), 'dateOfSupplyTo' => $until->toDateString()],
@@ -85,6 +99,10 @@ class EracuniCompanySalesClient
         };
         [$rows, $truncated] = $this->request($base.'/'.$method, $parameters, $connection);
         foreach ($rows as $row) {
+            unset($this->lastRequestContext['document_id'], $this->lastRequestContext['line_position']);
+            if (is_array($row) && $this->validIdentifier($row['documentID'] ?? null, 160)) {
+                $this->lastRequestContext['document_id'] = (string) $row['documentID'];
+            }
             if (! is_array($row) || ! $this->validIdentifier($row['documentID'] ?? null, 160)
                 || ! isset($row['date']) || ! is_string($row['date'])) {
                 throw new RuntimeException('e-Računi je vratio dokument bez valjanog identifikatora ili datuma.');
@@ -103,7 +121,10 @@ class EracuniCompanySalesClient
                 throw new RuntimeException('e-Računi nije vratio potpune stavke dokumenata.');
             }
             $unlinkedLineCount = 0;
-            foreach ($row['Items'] as $item) {
+            foreach ($row['Items'] as $index => $item) {
+                $position = is_array($item) ? ($item['position'] ?? null) : null;
+                $this->lastRequestContext['line_position'] = (is_int($position) || (is_string($position) && ctype_digit($position)))
+                    && (int) $position > 0 && (int) $position <= 1000000 ? (int) $position : $index + 1;
                 if (! is_array($item) || ! isset($item['quantity']) || is_bool($item['quantity'])
                     || ! is_scalar($item['quantity']) || ! is_numeric($item['quantity'])
                     || ! is_finite((float) $item['quantity'])) {
@@ -127,6 +148,7 @@ class EracuniCompanySalesClient
             $documents[$documentKey] = max($documents[$documentKey] ?? 0, $unlinkedLineCount);
         }
         if ($truncated || count($rows) >= self::LIMIT) {
+            unset($this->lastRequestContext['document_id'], $this->lastRequestContext['line_position']);
             if ($from->isSameDay($until)) {
                 throw new RuntimeException('e-Računi je dosegnuo dnevno ograničenje dokumenata. Potpuni obuhvat nije dokazan.');
             }
@@ -147,6 +169,7 @@ class EracuniCompanySalesClient
         if (++$this->requestCount > self::MAX_REQUESTS) {
             throw new RuntimeException('Provjera ukupne prodaje premašila je sigurno ograničenje dohvata.');
         }
+        $this->lastRequestContext['request_count'] = $this->requestCount;
         try {
             $response = Cache::lock('herrera-eracuni-api', 180)->block(10, function () use ($url, $parameters, $connection) {
                 if (! app()->runningUnitTests()) {

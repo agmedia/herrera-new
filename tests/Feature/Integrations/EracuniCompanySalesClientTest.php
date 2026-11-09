@@ -3,6 +3,7 @@
 namespace Tests\Feature\Integrations;
 
 use App\Services\Integrations\Eracuni\EracuniCompanySalesClient;
+use App\Services\Integrations\Eracuni\EracuniCompanySalesException;
 use App\Services\Integrations\Stock\StockSyncSettingsService;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -233,6 +234,58 @@ class EracuniCompanySalesClientTest extends TestCase
             $this->assertFails(null, fn () => $this->client()->fetch($from, $until));
         }
         Http::assertNothingSent();
+    }
+
+    public function test_typed_failure_locates_the_document_and_line_without_retaining_data_or_exception_chain(): void
+    {
+        $this->feed(fn () => Http::response(['response' => ['result' => [$this->row(['Items' => [
+            ['productCode' => '00123', 'quantity' => 1],
+            ['position' => 77, 'productName' => 'private-product', 'quantity' => 1],
+        ]])]]]));
+        try {
+            $this->client()->fetch('2026-11-06', '2026-11-06');
+            $this->fail('Expected typed failure.');
+        } catch (EracuniCompanySalesException $exception) {
+            $this->assertSame([
+                'method' => 'SalesInvoiceList', 'pass' => 'document',
+                'from' => '2026-11-06', 'to' => '2026-11-06', 'document_id' => 'INV-1',
+                'line_position' => 77, 'request_count' => 1,
+            ], $exception->context);
+            $this->assertNull($exception->getPrevious());
+            $this->assertStringNotContainsString('private-', json_encode($exception->context).$exception->getMessage());
+        }
+
+        $this->feed(fn (Request $request) => str_ends_with($request->url(), '/DeliveryNoteList')
+            ? throw new RuntimeException('private-token https://private.invalid')
+            : Http::response(['response' => ['result' => [$this->row()]]]));
+        try {
+            $this->client()->fetch('2026-11-06', '2026-11-06');
+            $this->fail('Expected typed transport failure.');
+        } catch (EracuniCompanySalesException $exception) {
+            $this->assertSame([
+                'method' => 'DeliveryNoteList', 'pass' => 'document',
+                'from' => '2026-11-06', 'to' => '2026-11-06', 'request_count' => 7,
+            ], $exception->context);
+            $this->assertNull($exception->getPrevious());
+            $this->assertStringNotContainsString('private-', json_encode($exception->context).$exception->getMessage());
+        }
+    }
+
+    public function test_exception_context_is_a_readonly_allowlist_that_rejects_urls_and_private_fields(): void
+    {
+        $exception = new EracuniCompanySalesException('Known local reason', [
+            'method' => 'SalesInvoiceList', 'pass' => 'document',
+            'from' => '2026-11-06', 'to' => '2026-11-06', 'document_id' => 'https://private.invalid/id',
+            'line_position' => 1, 'request_count' => 2, 'username' => 'private-user',
+            'token' => 'private-token', 'amount' => 99, 'buyerName' => 'private-buyer',
+        ]);
+
+        $this->assertSame([
+            'method' => 'SalesInvoiceList', 'pass' => 'document',
+            'from' => '2026-11-06', 'to' => '2026-11-06', 'line_position' => 1, 'request_count' => 2,
+        ], $exception->context);
+        $this->assertTrue((new \ReflectionProperty($exception, 'context'))->isReadOnly());
+        $this->assertNull($exception->getPrevious());
     }
 
     private function feed(callable $callback): void

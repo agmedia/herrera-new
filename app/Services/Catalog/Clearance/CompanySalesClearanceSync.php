@@ -5,6 +5,7 @@ namespace App\Services\Catalog\Clearance;
 use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Product\ProductClearance;
 use App\Services\Integrations\Eracuni\EracuniCompanySalesClient;
+use App\Services\Integrations\Eracuni\EracuniCompanySalesException;
 use App\Services\Integrations\Stock\StockFeedClient;
 use App\Services\Settings\SystemSettingsService;
 use Illuminate\Support\Facades\Cache;
@@ -34,7 +35,7 @@ class CompanySalesClearanceSync
             $asOf = today()->toDateString();
             $from = today()->subDays(ClearanceService::INACTIVITY_DAYS)->toDateString();
             $settings = app(SystemSettingsService::class);
-            $stage = 'fetch';
+            $stage = 'sales';
             if ($apply) {
                 $settings->put(self::STATE_KEY, ['status' => 'running', 'started_at' => now()->toIso8601String()]);
             }
@@ -45,6 +46,7 @@ class CompanySalesClearanceSync
                     || ! preg_match('/^[a-f0-9]{64}$/D', (string) ($sales['fingerprint'] ?? ''))) {
                     throw new RuntimeException('API pregled prodaje nije potpun. Rasprodaja nije pokrenuta.');
                 }
+                $stage = 'stock';
                 $stock = app(StockFeedClient::class)->fetch('eracuni');
                 $warehouse = $this->warehouse($stock);
                 $recent = [];
@@ -58,6 +60,7 @@ class CompanySalesClearanceSync
                     throw new RuntimeException('Tijekom dohvata promijenio se datum. Ponovite dnevnu provjeru.');
                 }
                 $fingerprint = hash('sha256', json_encode([$sales['fingerprint'], $warehouse], JSON_THROW_ON_ERROR));
+                $stage = 'snapshot';
                 $result = Cache::lock('catalog:automatic-clearance', 600)->block(1, function () use ($warehouse, $recent, $fingerprint, $from, $asOf, $apply, $actorId): array {
                     return DB::transaction(function () use ($warehouse, $recent, $fingerprint, $from, $asOf, $apply, $actorId): array {
                         $products = Product::query()->select(['id', 'code', 'payload', 'stock_qty', 'updated_at'])->orderBy('id')->get();
@@ -131,17 +134,20 @@ class CompanySalesClearanceSync
                 }
 
                 return $result;
-            } catch (Throwable) {
+            } catch (Throwable $exception) {
+                $reason = $exception instanceof EracuniCompanySalesException ? $exception->getMessage() : null;
+                $message = $stage === 'clearance' ? 'Primjena rasprodaje nije dovršena. Provjerite stanje pojedinih artikala.' : 'Potpuna provjera prodaje i vlastite zalihe nije uspjela. Nove rasprodaje nisu pokrenute.';
                 if ($apply) {
                     Cache::lock('catalog:automatic-clearance', 600)->block(1, function (): void {
                         ProductClearance::query()->where('source', self::SOURCE)->where('status', 'observed')
                             ->update(['confirmed_company_scope' => false]);
                     });
                     $settings->put(self::STATE_KEY, ['status' => 'failed', 'stage' => $stage, 'completed_at' => now()->toIso8601String(),
-                        'message' => $stage === 'clearance' ? 'Primjena rasprodaje nije dovršena. Provjerite stanje pojedinih artikala.' : 'Potpuna provjera prodaje i vlastite zalihe nije uspjela. Nove rasprodaje nisu pokrenute.']);
+                        'message' => $message, 'reason' => $reason,
+                        'context' => $exception instanceof EracuniCompanySalesException ? $exception->context : []]);
                 }
 
-                throw new RuntimeException($stage === 'clearance' ? 'Primjena rasprodaje nije dovršena. Provjerite stanje pojedinih artikala.' : 'Potpuna provjera prodaje i vlastite zalihe nije uspjela. Nove rasprodaje nisu pokrenute.');
+                throw new RuntimeException($message.($reason !== null ? ' '.$reason : ''));
             }
         });
     }

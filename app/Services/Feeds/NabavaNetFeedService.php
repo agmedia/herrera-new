@@ -30,7 +30,7 @@ class NabavaNetFeedService
         $fallbackLocale = trim((string) config('app.fallback_locale', config('app.locale', 'hr'))) ?: 'hr';
         $categoryPaths = $this->categoryPaths($locale, $fallbackLocale);
         $publicActions = $this->publicActions();
-        $defaultTaxRate = $this->taxPricing->resolveRateForProduct();
+        $defaultTaxRate = $this->taxPricing->catalogRateForProduct();
         $pricesIncludeTax = $this->taxPricing->pricesIncludeTax();
 
         $writer = new XMLWriter;

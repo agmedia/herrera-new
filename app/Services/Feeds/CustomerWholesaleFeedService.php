@@ -46,7 +46,7 @@ class CustomerWholesaleFeedService
         $locale = 'hr';
         $fallback = (string) config('app.fallback_locale', 'hr');
         $tax = app(TaxPricingService::class);
-        $defaultTax = $tax->resolveRateForProduct();
+        $defaultTax = $tax->catalogRateForProduct();
         $includesTax = $tax->pricesIncludeTax();
         $products = $this->products($feed)->select('products.*');
         if ($catalog) {

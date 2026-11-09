@@ -6,6 +6,7 @@ use App\Models\Catalog\Product\Product;
 use App\Models\Settings\Local\TaxRate;
 use App\Models\User;
 use App\Services\Settings\SystemSettingsService;
+use App\Support\CountryCatalog;
 
 class TaxPricingService
 {
@@ -15,6 +16,10 @@ class TaxPricingService
 
     public function resolveRateForProduct(?Product $product = null, ?User $user = null): ?TaxRate
     {
+        if ($this->isForeignBusinessExempt($user ?? auth()->user())) {
+            return new TaxRate(['code' => 'foreign-b2b-zero', 'rate' => 0, 'rate_type' => 'percent', 'is_active' => true]);
+        }
+
         if (app(B2BAccessService::class)->requiresApprovedAccount()) {
             $group = app(B2BAccessService::class)->approvedAccount($user ?? auth()->user())?->customerGroup;
             if (data_get($group?->payload, 'opencart.tax_scope_defined', false)) {
@@ -26,6 +31,32 @@ class TaxPricingService
             }
         }
 
+        return $this->catalogRateForProduct($product);
+    }
+
+    /** Only the approved business identity can grant the exemption, never a checkout address. */
+    public function isForeignBusinessExempt(?User $user): bool
+    {
+        if (! $user || $user->account_type !== 'customer') {
+            return false;
+        }
+        $account = app(B2BAccessService::class)->approvedAccount($user);
+        $country = strtoupper(trim((string) $account?->country_code));
+
+        return $account && trim((string) $account->company_name) !== ''
+            && $country !== 'HR' && in_array($country, CountryCatalog::codes(), true);
+    }
+
+    /** Stored gross prices retain their catalogue VAT basis even for an exempt buyer. */
+    public function storedPriceTaxRate(?Product $product = null, ?User $user = null): ?TaxRate
+    {
+        return $this->isForeignBusinessExempt($user ?? auth()->user())
+            ? $this->catalogRateForProduct($product)
+            : $this->resolveRateForProduct($product, $user);
+    }
+
+    public function catalogRateForProduct(?Product $product = null): ?TaxRate
+    {
         if ($product && $product->relationLoaded('taxRate')) {
             $taxRate = $product->taxRate;
             if ($taxRate && (bool) $taxRate->is_active) {
@@ -71,6 +102,10 @@ class TaxPricingService
     public function grossFromStored(float $storedAmount, ?Product $product = null, ?TaxRate $taxRate = null, ?User $user = null): float
     {
         if ($this->pricesIncludeTax()) {
+            if ($taxRate === null && $this->isForeignBusinessExempt($user ?? auth()->user())) {
+                return $this->normalizeNetPrice($storedAmount, $product, user: $user);
+            }
+
             return round(max(0.0, $storedAmount), 2);
         }
 
@@ -107,12 +142,16 @@ class TaxPricingService
     public function normalizeNetPrice(float $storedAmount, ?Product $product = null, ?TaxRate $taxRate = null, ?User $user = null): float
     {
         return $this->pricesIncludeTax()
-            ? $this->netFromGross($storedAmount, $product, $taxRate, $user)
+            ? $this->netFromGross($storedAmount, $product, $taxRate ?? $this->storedPriceTaxRate($product, $user), $user)
             : round(max(0.0, $storedAmount), 2);
     }
 
     public function taxFromStored(float $storedAmount, ?Product $product = null, ?TaxRate $taxRate = null, ?User $user = null): float
     {
+        if ($taxRate === null && $this->isForeignBusinessExempt($user ?? auth()->user())) {
+            return 0.0;
+        }
+
         if ($this->pricesIncludeTax()) {
             $net = $this->netFromGross($storedAmount, $product, $taxRate, $user);
 

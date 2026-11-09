@@ -102,12 +102,19 @@ class PriceCatalogQuery
     /** @return array{sql:string,bindings:array}|null */
     public function displayedPrice(Builder|QueryBuilder $query, ?User $user, bool $excludeSpecial = false): ?array
     {
+        $taxPricing = app(TaxPricingService::class);
+        $foreignBusinessExempt = $taxPricing->isForeignBusinessExempt($user);
         $stored = $this->storedPrice($user, $excludeSpecial);
+        if (! $stored && $foreignBusinessExempt) {
+            // Tax-aware base prices also cover mixed retail mode and a shop
+            // without a published wholesale catalogue.
+            $stored = ['sql' => 'products.base_price', 'bindings' => []];
+        }
         if (! $stored) {
             return null;
         }
-        $displayNet = (bool) config('commerce.b2b_display_net', true);
-        $storedGross = app(TaxPricingService::class)->pricesIncludeTax();
+        $displayNet = $foreignBusinessExempt || (bool) config('commerce.b2b_display_net', true);
+        $storedGross = $taxPricing->pricesIncludeTax();
         if ($displayNet !== $storedGross) {
             return ['sql' => 'ROUND('.$stored['sql'].', 2)', 'bindings' => $stored['bindings']];
         }
@@ -121,7 +128,7 @@ class PriceCatalogQuery
         $rate = ['sql' => 'COALESCE('.$taxAlias.'.rate, ?)', 'bindings' => [(float) ($default?->rate ?? 0)]];
         $type = ['sql' => 'COALESCE('.$taxAlias.'.rate_type, ?)', 'bindings' => [$default?->rate_type ?? 'percent']];
         $group = app(B2BAccessService::class)->approvedAccount($user)?->customerGroup;
-        if (data_get($group?->payload, 'opencart.tax_scope_defined', false)) {
+        if (! $foreignBusinessExempt && data_get($group?->payload, 'opencart.tax_scope_defined', false)) {
             $classes = array_values(array_unique(array_map('intval', (array) data_get($group->payload, 'opencart.taxable_class_ids', []))));
             if ($classes === []) {
                 $rate = ['sql' => '0', 'bindings' => []];

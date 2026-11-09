@@ -85,8 +85,10 @@ class CustomerOfferService
             $storedUnits = (int) round($storedPrice * 10000);
             $taxUnits = (int) round($taxValue * 10000);
             if ($this->tax->pricesIncludeTax()) {
-                $unitGross = $storedUnits / 10000;
-                $unitNet = ($rate?->rate_type === 'fixed' ? max(0, $storedUnits - $taxUnits) : round($storedUnits * 1000000 / (1000000 + $taxUnits))) / 10000;
+                $storedRate = $this->tax->storedPriceTaxRate($product, $customer);
+                $storedTaxUnits = (int) round(max(0.0, (float) ($storedRate?->rate ?? 0)) * 10000);
+                $unitNet = ($storedRate?->rate_type === 'fixed' ? max(0, $storedUnits - $storedTaxUnits) : round($storedUnits * 1000000 / (1000000 + $storedTaxUnits))) / 10000;
+                $unitGross = $this->tax->isForeignBusinessExempt($customer) ? $unitNet : $storedUnits / 10000;
             } else {
                 $unitNet = $storedUnits / 10000;
                 $unitGross = ($rate?->rate_type === 'fixed' ? $storedUnits + $taxUnits : round($storedUnits * (1000000 + $taxUnits) / 1000000)) / 10000;

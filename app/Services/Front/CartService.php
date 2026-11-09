@@ -229,9 +229,10 @@ class CartService
                 $resolvedAction = null;
             }
             $resolvedTaxRate = $this->taxPricing->resolveRateForProduct($product, $user);
-            $catalogUnitPrice = $preciseSnapshot ? $this->preciseNetPrice($storedBaseUnitPrice, $resolvedTaxRate) : $this->taxPricing->normalizeNetPrice($storedBaseUnitPrice, $product);
-            $baseUnitPrice = $preciseSnapshot ? $this->preciseNetPrice($storedAudienceUnitPrice, $resolvedTaxRate) : $this->taxPricing->normalizeNetPrice($storedAudienceUnitPrice, $product);
-            $unitPrice = $preciseSnapshot ? $this->preciseNetPrice($storedDiscountedUnitPrice, $resolvedTaxRate) : $this->taxPricing->normalizeNetPrice($storedDiscountedUnitPrice, $product);
+            $storedTaxRate = $this->taxPricing->pricesIncludeTax() ? $this->taxPricing->storedPriceTaxRate($product, $user) : $resolvedTaxRate;
+            $catalogUnitPrice = $preciseSnapshot ? $this->preciseNetPrice($storedBaseUnitPrice, $storedTaxRate) : $this->taxPricing->normalizeNetPrice($storedBaseUnitPrice, $product, user: $user);
+            $baseUnitPrice = $preciseSnapshot ? $this->preciseNetPrice($storedAudienceUnitPrice, $storedTaxRate) : $this->taxPricing->normalizeNetPrice($storedAudienceUnitPrice, $product, user: $user);
+            $unitPrice = $preciseSnapshot ? $this->preciseNetPrice($storedDiscountedUnitPrice, $storedTaxRate) : $this->taxPricing->normalizeNetPrice($storedDiscountedUnitPrice, $product, user: $user);
             $precision = $preciseSnapshot ? 4 : 2;
             $unitDiscount = round(max(0, $baseUnitPrice - $unitPrice), $precision);
             $lineDiscountTotal = round($unitDiscount * $qty, $precision);

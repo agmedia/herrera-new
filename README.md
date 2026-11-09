@@ -148,10 +148,19 @@ through the registered staging deployment; no direct cPanel file edits or upload
 Translations into additional languages are excluded from this release.
 
 - **Retail pricing:** Catalog / Actions supports the B2C-only audience, brand
-  discounts and fixed net selling prices for selected products. Negotiated B2B
+  discounts and fixed selling prices for selected products. Price inputs follow
+  the store's prices-include-tax setting. Negotiated B2B
   pricing remains separate. Orders retain their original B2B/B2C classification;
   retail orders have the internal cost centre `Web prodaja`. Statistics default
   to B2B, with B2C/all filters. No external ERP cost-centre ID is invented.
+- **Foreign business VAT:** the agreed zero-VAT rule applies only to customer
+  users with an approved, active B2B contract/group, a company name and a valid
+  non-HR country in that approved account. Checkout or address-book country
+  changes cannot grant this treatment. It also applies in mixed retail mode;
+  private customers and unapproved businesses retain the normal tax rules.
+  Stored gross prices first yield their catalogue net base, then the buyer's
+  effective tax is applied consistently in display, cart, offers and shipping.
+  Source imports and wholesale XML exports retain their catalogue tax basis.
 - **Ordering quantities:** the old OpenCart minimum remains the source for the
   safe pack-step repair. `herrera:backfill-order-quantities` previews the repair;
   `--apply` changes only still-unmodified imports. Unit prices remain per piece.

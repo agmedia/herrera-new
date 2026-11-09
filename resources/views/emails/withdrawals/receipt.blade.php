@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ __('return_request.mail.customer_heading') }}</title>
+    <title>{{ __($withdrawal->request_type === 'claim' ? 'return_request.claim.customer_heading' : 'return_request.mail.customer_heading') }}</title>
     <style>
         body { margin:0; padding:0; background:#f1f5f9; color:#0f172a; font-family:Arial,Helvetica,sans-serif; }
         .wrap { width:100%; padding:24px 10px; box-sizing:border-box; }
@@ -29,10 +29,10 @@
         <div class="card">
             <div class="head">
                 <p class="brand">{{ $storeName }}</p>
-                <h1>{{ __('return_request.mail.customer_heading') }}</h1>
+                <h1>{{ __($withdrawal->request_type === 'claim' ? 'return_request.claim.customer_heading' : 'return_request.mail.customer_heading') }}</h1>
             </div>
             <div class="content">
-                <p class="intro">{{ __('return_request.mail.customer_intro') }}</p>
+                <p class="intro">{{ __($withdrawal->request_type === 'claim' ? 'return_request.claim.customer_intro' : 'return_request.mail.customer_intro') }}</p>
                 <p class="reference">
                     <strong>{{ __('return_request.mail.reference') }}:</strong> {{ $withdrawal->reference }}<br>
                     <strong>{{ __('return_request.mail.submitted_at') }}:</strong> {{ $withdrawal->submitted_at?->format('d.m.Y. H:i:s T') }}<br>

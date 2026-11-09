@@ -153,6 +153,10 @@ class User extends Authenticatable implements HasMedia
 
     public function customerDisplayName(): string
     {
+        if ($this->account_type !== 'customer') {
+            return (string) $this->name;
+        }
+
         return $this->companyName() ?? ($this->commerceCustomerType() === 'B2B'
             ? __('Tvrtka bez naziva')
             : (string) $this->name);

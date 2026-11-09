@@ -1,6 +1,6 @@
 @extends('front.desktop.layouts.store')
 
-@section('title', __('return_request.review.heading'))
+@section('title', __($withdrawal['request_type'] === 'claim' ? 'return_request.claim.review_heading' : 'return_request.review.heading'))
 @section('body_class', 'commerce-body returns-commerce-body')
 @section('main_class', 'commerce-main')
 
@@ -11,13 +11,19 @@
 @section('content')
     <section class="commerce-hero">
         <p class="text-xs font-bold uppercase tracking-[0.16em] text-cyan-700">{{ __('return_request.review.eyebrow') }}</p>
-        <h1 class="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">{{ __('return_request.review.heading') }}</h1>
+        <h1 class="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">{{ __($withdrawal['request_type'] === 'claim' ? 'return_request.claim.review_heading' : 'return_request.review.heading') }}</h1>
         <p class="mt-2 text-slate-600">{{ __('return_request.review.subheading') }}</p>
     </section>
 
     <div class="mx-auto max-w-4xl">
+        @if ($errors->any())
+            <div class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-900" role="alert">
+                @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach
+            </div>
+        @endif
+        <p class="mb-4 text-sm font-semibold text-slate-700">{{ ($withdrawal['request_type'] ?? 'return') === 'claim' ? 'Reklamacija – zahtjev za odobrenje' : 'Povrat ispravne robe' }}</p>
         <div class="rounded-xl border border-cyan-200 bg-cyan-50 p-5">
-            <p class="text-xs font-bold uppercase tracking-wide text-cyan-800">{{ __('return_request.review.declaration_title') }}</p>
+            <p class="text-xs font-bold uppercase tracking-wide text-cyan-800">{{ __($withdrawal['request_type'] === 'claim' ? 'return_request.claim.declaration_title' : 'return_request.review.declaration_title') }}</p>
             <p class="mt-2 text-base font-semibold leading-7 text-slate-900">{{ $declaration }}</p>
         </div>
 
@@ -52,17 +58,32 @@
             {{ __('return_request.review.confirmation_notice') }}
         </div>
 
-        <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <form method="POST" action="{{ route('returns.store', ['returnRequestSlug' => __('return_request.slug')]) }}" class="mt-6">
+            @csrf
+            <input type="hidden" name="draft_token" value="{{ $draftToken }}">
+            @if ($orderItems->isNotEmpty())
+                <input type="hidden" name="structured_items" value="1">
+                <fieldset class="mb-5 rounded-xl border border-slate-200 bg-white p-5">
+                    <legend class="px-1 font-bold text-slate-900">Odaberite artikle i količine</legend>
+                    <p class="mb-3 text-sm text-slate-600">Unesite broj komada za ovaj zahtjev. Za ostale artikle ostavite 0. Prethodni povrati provjeravaju se pri slanju.</p>
+                    @foreach ($orderItems as $item)
+                        <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 py-3">
+                            <label for="return-line-{{ $item->id }}" class="min-w-0 text-sm"><strong>{{ $item->name }}</strong><br><span class="text-slate-500">{{ $item->sku ?: $item->code }} · kupljeno {{ $item->quantity }} kom · preostalo za zahtjev {{ $returnableQuantities[$item->id] ?? 0 }}</span></label>
+                            <input id="return-line-{{ $item->id }}" type="number" name="line_quantities[{{ $item->id }}]" value="{{ old('line_quantities.'.$item->id, 0) }}" min="0" max="{{ $returnableQuantities[$item->id] ?? 0 }}" step="1" class="w-24 rounded-lg border border-slate-300 px-3 py-2" aria-label="Količina za {{ $item->name }}">
+                        </div>
+                    @endforeach
+                </fieldset>
+            @else
+                <p class="mb-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-950">Narudžba nije automatski povezana. Zahtjev ćemo obraditi prema unesenom opisu, nakon provjere izvorne narudžbe.</p>
+            @endif
+            <div class="flex flex-wrap items-center justify-between gap-3">
             <a href="{{ route('returns.create', ['returnRequestSlug' => __('return_request.slug')]) }}" class="rounded-lg border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                 {{ __('return_request.review.edit') }}
             </a>
-            <form method="POST" action="{{ route('returns.store', ['returnRequestSlug' => __('return_request.slug')]) }}">
-                @csrf
-                <input type="hidden" name="draft_token" value="{{ $draftToken }}">
                 <button type="submit" class="commerce-primary-action px-7 py-3" onclick="this.disabled=true; this.form.submit();">
-                    {{ __('return_request.review.confirm') }}
+                    {{ __($withdrawal['request_type'] === 'claim' ? 'return_request.claim.confirm' : 'return_request.review.confirm') }}
                 </button>
-            </form>
-        </div>
+            </div>
+        </form>
     </div>
 @endsection

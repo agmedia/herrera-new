@@ -217,6 +217,15 @@ class CartService
             $storedDiscountedUnitPrice = $resolvedAction
                 ? $this->actionResolver->applyToPrice($storedAudienceUnitPrice, $resolvedAction)
                 : $storedAudienceUnitPrice;
+            $clearancePrice = app(\App\Services\Catalog\Clearance\ClearanceService::class)->price($product, $storedBaseUnitPrice);
+            if ($clearancePrice !== null) {
+                $groupPrice = null;
+                $preciseSnapshot = false;
+                $storedBaseUnitPrice = app(\App\Services\Catalog\Clearance\ClearanceService::class)->fullBase($product, $storedBaseUnitPrice);
+                $storedAudienceUnitPrice = $storedBaseUnitPrice;
+                $storedDiscountedUnitPrice = $clearancePrice;
+                $resolvedAction = null;
+            }
             $resolvedTaxRate = $this->taxPricing->resolveRateForProduct($product, $user);
             $catalogUnitPrice = $preciseSnapshot ? $this->preciseNetPrice($storedBaseUnitPrice, $resolvedTaxRate) : $this->taxPricing->normalizeNetPrice($storedBaseUnitPrice, $product);
             $baseUnitPrice = $preciseSnapshot ? $this->preciseNetPrice($storedAudienceUnitPrice, $resolvedTaxRate) : $this->taxPricing->normalizeNetPrice($storedAudienceUnitPrice, $product);
@@ -254,6 +263,7 @@ class CartService
                 'option_value_label' => $optionMeta['value'],
                 'sku' => (string) ($optionRow?->sku ?: $product->sku ?: ''),
                 'quantity' => $qty,
+                'delivery' => app(\App\Services\Shipping\SupplierDeliveryService::class)->estimate($product, $qty, $optionRow),
                 'catalog_unit_price' => $catalogUnitPrice,
                 'base_unit_price' => $baseUnitPrice,
                 'unit_price' => $unitPrice,
@@ -269,8 +279,9 @@ class CartService
                 'monetary_precision' => $precision,
                 'display_includes_tax' => ! $displayNet,
                 'tax_rate' => $taxRateValue,
-                'action_code' => $resolvedAction?->code,
+                'action_code' => $clearancePrice !== null ? 'B2B60' : $resolvedAction?->code,
                 'price_source' => match (true) {
+                    $clearancePrice !== null => 'clearance',
                     $groupPrice !== null && $resolvedAction !== null => 'b2b_action',
                     $groupPrice !== null => 'b2b',
                     $resolvedAction !== null => 'action',
@@ -278,7 +289,7 @@ class CartService
                 },
                 'is_b2b_price' => $groupPrice !== null,
                 'energy_declaration' => $this->energyLabelPresenter->primaryDeclaration($product),
-                'has_promotional_discount' => $resolvedAction !== null && $unitDiscount > 0,
+                'has_promotional_discount' => ($clearancePrice !== null || $resolvedAction !== null) && $unitDiscount > 0,
                 'group_price_id' => $groupPrice?->group_price_id,
                 'b2b_rule_id' => $groupPrice?->rule_id,
                 'b2b_source_type' => $groupPrice?->source_type,
@@ -711,6 +722,7 @@ class CartService
      */
     private function eligibleCartDiscountLines(CatalogAction $action, Collection $lines): Collection
     {
+        $lines = $lines->reject(fn (array $line): bool => ($line['price_source'] ?? null) === 'clearance')->values();
         if ($action->target_type === CatalogAction::TARGET_ALL) {
             return $lines;
         }

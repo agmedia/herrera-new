@@ -23,16 +23,33 @@ class SupplierCatalogService
     public function options(string $supplier): array
     {
         $this->assertSupplier($supplier);
+        $currency = 'EUR';
+        if ($supplier === 'esperanza') {
+            $currencies = SupplierCatalogItem::query()->where('supplier', $supplier)->where('is_current', true)->whereNotNull('currency')->distinct()->pluck('currency');
+            if ($currencies->count() === 1 && in_array($currencies->first(), ['EUR', 'PLN'], true)) {
+                $currency = $currencies->first();
+            }
+        }
 
         return array_replace([
-            'markup' => 0, 'default_category_id' => '', 'category_map' => [],
-            'source_currency' => 'EUR', 'exchange_rate' => 1, 'source_includes_tax' => false,
+            'markup' => 250, 'default_category_id' => '', 'category_map' => [],
+            'source_currency' => $currency, 'exchange_rate' => $currency === 'PLN' ? null : 1, 'source_includes_tax' => false,
+            'exchange_rate_source' => $currency === 'PLN' ? 'ecb' : 'manual',
             'tax_rate_id' => TaxRate::query()->where('is_active', true)->orderByDesc('is_default')->orderBy('sort_order')->value('id') ?? '',
         ], (array) app(SystemSettingsService::class)->get('supplier_catalog_'.$supplier, []));
     }
 
     public function validateOptions(array $options): array
     {
+        if (($options['exchange_rate_source'] ?? 'manual') === 'ecb') {
+            if (($options['source_currency'] ?? '') !== 'PLN' || $this->storeCurrency() !== 'EUR') {
+                throw new RuntimeException('Automatski ECB tečaj podržava izvor PLN i trgovinu EUR.');
+            }
+            $reference = app(EcbPlnExchangeRate::class)->latest();
+            $options['exchange_rate'] = $reference['eur_per_pln'];
+            $options['exchange_rate_date'] = $reference['date'];
+        }
+
         return Validator::make($options, [
             'markup' => 'required|numeric|min:0|max:10000',
             'default_category_id' => ['nullable', 'integer', Rule::exists('categories', 'id')->where('scope', 'catalog')],
@@ -40,6 +57,8 @@ class SupplierCatalogService
             'category_map.*' => ['nullable', 'integer', Rule::exists('categories', 'id')->where('scope', 'catalog')],
             'source_currency' => 'required|string|size:3|regex:/^[A-Z]{3}$/',
             'exchange_rate' => 'required|numeric|gt:0|max:100000',
+            'exchange_rate_source' => 'sometimes|in:manual,ecb',
+            'exchange_rate_date' => 'sometimes|date_format:Y-m-d',
             'source_includes_tax' => 'required|boolean',
             'tax_rate_id' => ['required', 'integer', Rule::exists('tax_rates', 'id')->where('is_active', true)],
         ])->validate();
@@ -59,7 +78,9 @@ class SupplierCatalogService
 
     public function price(SupplierCatalogItem $item, array $options): ?float
     {
-        if ($item->source_price === null || ($item->currency && $item->currency !== $options['source_currency'])) {
+        $sourcePrice = $item->source_price ?? $item->manual_source_price;
+        $currency = $item->source_price !== null ? $item->currency : $item->manual_currency;
+        if ($sourcePrice === null || ($currency && $currency !== $options['source_currency'])) {
             return null;
         }
         if ($options['source_currency'] === $this->storeCurrency() && (float) $options['exchange_rate'] !== 1.0) {
@@ -69,7 +90,7 @@ class SupplierCatalogService
         if (! $tax) {
             return null;
         }
-        $value = (float) $item->source_price * (float) $options['exchange_rate'] * (1 + (float) $options['markup'] / 100);
+        $value = (float) $sourcePrice * (float) $options['exchange_rate'] * (1 + (float) $options['markup'] / 100);
         $pricing = app(TaxPricingService::class);
         if ((bool) $options['source_includes_tax'] !== $pricing->pricesIncludeTax()) {
             $value = $options['source_includes_tax'] ? $pricing->netFromGross($value, taxRate: $tax) : $pricing->grossFromNet($value, taxRate: $tax);
@@ -148,8 +169,10 @@ class SupplierCatalogService
                             'minimum_order_quantity' => 1, 'order_quantity_step' => 1, 'tax_rate_id' => $options['tax_rate_id'],
                             'payload' => ['catalog_origin' => $supplier, 'supplier_catalog' => [
                                 'supplier' => $supplier, 'external_id' => $item->external_id, 'sku' => $item->sku,
-                                'source_price' => $item->source_price, 'source_currency' => $options['source_currency'],
+                                'source_price' => $item->source_price ?? $item->manual_source_price, 'source_currency' => $options['source_currency'],
+                                'price_origin' => $item->source_price !== null ? 'feed' : 'reviewed_csv',
                                 'markup' => $options['markup'], 'exchange_rate' => $options['exchange_rate'],
+                                'exchange_rate_source' => $options['exchange_rate_source'] ?? 'manual', 'exchange_rate_date' => $options['exchange_rate_date'] ?? null,
                                 'source_includes_tax' => $options['source_includes_tax'],
                             ]], 'created_by' => $actorId, 'updated_by' => $actorId,
                         ]);
@@ -168,13 +191,36 @@ class SupplierCatalogService
                         $item->update(['product_id' => $product->id, 'status' => 'imported', 'message' => $item->images ? 'Uvezen nacrt. Slike čekaju obradu.' : 'Uvezen nacrt. Dobavljač nema slike za ovaj artikl.']);
                         $this->addIdentity($identities, $product);
                         if ($item->images !== []) {
-                            ImportSupplierImages::dispatch($item->id)->onQueue('integrations')->afterCommit();
+                            ImportSupplierImages::dispatch($item->id)->onConnection('database')->onQueue('integrations')->afterCommit();
                         }
                         $created++;
                     }
 
                     return compact('created', 'skipped');
                 });
+            });
+        });
+    }
+
+    public function reviewMissing(string $supplier, int $itemId, ?int $actorId): string
+    {
+        $this->assertSupplier($supplier);
+
+        return Cache::lock('supplier-catalog:'.$supplier, 180)->block(1, function () use ($supplier, $itemId, $actorId): string {
+            return DB::transaction(function () use ($supplier, $itemId, $actorId): string {
+                $item = SupplierCatalogItem::query()->where('supplier', $supplier)->lockForUpdate()->findOrFail($itemId);
+                if ($item->is_current || ! $item->product_id) {
+                    throw new RuntimeException('Pregled je dostupan samo povezanom artiklu koji više nije u feedu.');
+                }
+                $product = Product::query()->lockForUpdate()->findOrFail($item->product_id);
+                $payload = $product->payload ?? [];
+                $payload['supplier_catalog_retirement'] = ['pending' => true, 'supplier' => $supplier, 'reviewed_at' => now()->toIso8601String(), 'reviewed_by' => $actorId];
+                $product->update(['payload' => $payload, 'updated_by' => $actorId]);
+                app(SupplierCatalogRetirementService::class)->reconcile($product);
+                $pending = (int) $product->stock_qty > 0;
+                $item->update(['reviewed_at' => now(), 'reviewed_by' => $actorId, 'review_action' => $pending ? 'after_own_stock_sold' : 'deactivated']);
+
+                return $pending ? 'Pregled je zabilježen. Artikl ostaje aktivan do prodaje vlastite zalihe.' : 'Pregled je zabilježen. Artikl je deaktiviran; povijest kupnje je sačuvana.';
             });
         });
     }

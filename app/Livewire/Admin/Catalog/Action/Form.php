@@ -363,8 +363,17 @@ class Form extends Component
         }
 
         $type = (string) ($this->form['type'] ?? CatalogAction::TYPE_PERCENTAGE);
-        if (in_array($type, [CatalogAction::TYPE_PERCENTAGE, CatalogAction::TYPE_FIXED], true)) {
+        if (in_array($type, [CatalogAction::TYPE_PERCENTAGE, CatalogAction::TYPE_FIXED, CatalogAction::TYPE_FIXED_PRICE], true)) {
             $rules['form.discount_value'] = ['required', 'numeric', 'min:0'];
+        }
+
+        if ($type === CatalogAction::TYPE_PERCENTAGE) {
+            $rules['form.discount_value'][] = 'max:100';
+        }
+
+        if ($type === CatalogAction::TYPE_FIXED_PRICE) {
+            $rules['form.scope'] = ['required', Rule::in([CatalogAction::SCOPE_PRODUCT])];
+            $rules['form.discount_value'] = ['required', 'numeric', 'min:0.01'];
         }
 
         if ($type === CatalogAction::TYPE_BUY_X_GET_Y) {
@@ -571,6 +580,7 @@ class Form extends Component
         return [
             CatalogAction::TYPE_PERCENTAGE => __('Percentage'),
             CatalogAction::TYPE_FIXED => __('Fixed Amount'),
+            CatalogAction::TYPE_FIXED_PRICE => __('Fiksna prodajna cijena'),
             CatalogAction::TYPE_BUY_X_GET_Y => __('Buy X Get Y'),
             CatalogAction::TYPE_GIFT_ON_AMOUNT => __('Gift On Amount'),
         ];
@@ -596,6 +606,7 @@ class Form extends Component
     {
         return [
             CatalogAction::AUDIENCE_ALL => __('All Users'),
+            CatalogAction::AUDIENCE_B2C => __('Samo B2C — Web prodaja'),
             CatalogAction::AUDIENCE_USER_GROUP => __('User Group'),
             CatalogAction::AUDIENCE_USER => __('Single User'),
         ];

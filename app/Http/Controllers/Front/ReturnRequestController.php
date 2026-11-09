@@ -9,12 +9,16 @@ use App\Models\Sales\Order\Order;
 use App\Models\User\UserAddress;
 use App\Services\Front\ContractWithdrawalNotificationService;
 use App\Services\Front\StoreSettingsService;
+use App\Services\Sales\ContractWithdrawalWorkflow;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\MessageBag;
 use Illuminate\Support\Str;
+use Illuminate\Support\ViewErrorBag;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
@@ -27,6 +31,7 @@ class ReturnRequestController extends Controller
     public function __construct(
         private readonly ContractWithdrawalNotificationService $notifications,
         private readonly StoreSettingsService $storeSettings,
+        private readonly ContractWithdrawalWorkflow $workflow,
     ) {}
 
     public function create(Request $request): View
@@ -43,6 +48,11 @@ class ReturnRequestController extends Controller
         $this->verifyCaptcha($request, $validated);
 
         $data = $this->normalize($validated);
+        $order = $this->resolveOrder($data['order_number'], $data['email'], $request->user()?->id);
+        if (! $order && $data['items'] === '') {
+            throw ValidationException::withMessages(['items' => 'Unesite opis artikala ili provjerite broj narudžbe i e-mail korišten pri kupnji.']);
+        }
+        $order?->load('items');
         $token = (string) Str::uuid();
 
         $request->session()->put(self::DRAFT_SESSION_PREFIX.$token, [
@@ -55,14 +65,48 @@ class ReturnRequestController extends Controller
         return view($this->frontendView($request, 'returns.review'), [
             'draftToken' => $token,
             'withdrawal' => $data,
-            'declaration' => $this->declaration($data['order_number']),
+            'declaration' => $this->declaration($data['order_number'], $data['request_type']),
+            'orderItems' => $order?->items ?? collect(),
+            'returnableQuantities' => $order ? $this->workflow->availableQuantities($order) : [],
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|Response
+    {
+        try {
+            return $this->submit($request);
+        } catch (ValidationException $exception) {
+            $token = $request->input('draft_token');
+            if (! is_string($token)) {
+                throw $exception;
+            }
+            $draft = $request->session()->get(self::DRAFT_SESSION_PREFIX.$token);
+            if (! is_array($draft) || (int) ($draft['expires_at'] ?? 0) < now()->timestamp
+                || isset($draft['user_id']) && (int) $draft['user_id'] !== (int) $request->user()?->id) {
+                throw $exception;
+            }
+            $data = $draft['data'];
+            $order = $this->resolveOrder($data['order_number'], $data['email'], $draft['user_id'] ?? null);
+            $order?->load('items');
+            $request->session()->flashInput($request->except('_token'));
+
+            return response()->view($this->frontendView($request, 'returns.review'), [
+                'draftToken' => $token, 'withdrawal' => $data,
+                'declaration' => $this->declaration($data['order_number'], $data['request_type'] ?? 'return'),
+                'orderItems' => $order?->items ?? collect(),
+                'returnableQuantities' => $order ? $this->workflow->availableQuantities($order) : [],
+                'errors' => (new ViewErrorBag)->put('default', new MessageBag($exception->errors())),
+            ], 422);
+        }
+    }
+
+    private function submit(Request $request): RedirectResponse
     {
         $validated = $request->validate([
             'draft_token' => ['required', 'uuid'],
+            'structured_items' => ['nullable', 'boolean'],
+            'line_quantities' => ['nullable', 'array', 'max:500'],
+            'line_quantities.*' => ['nullable', 'integer', 'min:0', 'max:1000000'],
         ]);
 
         $token = (string) $validated['draft_token'];
@@ -78,10 +122,35 @@ class ReturnRequestController extends Controller
         }
 
         $data = (array) ($draft['data'] ?? []);
-        $declaration = $this->declaration((string) ($data['order_number'] ?? ''));
+        if (isset($draft['user_id']) && (int) $draft['user_id'] !== (int) $request->user()?->id) {
+            throw ValidationException::withMessages(['draft' => __('return_request.draft_expired')]);
+        }
+        $order = $this->resolveOrder((string) $data['order_number'], (string) $data['email'], $draft['user_id'] ?? null);
+        $quantities = array_filter((array) ($validated['line_quantities'] ?? []), static fn ($qty): bool => (int) $qty > 0);
+        if (($validated['structured_items'] ?? false) && ($order === null || $quantities === [])) {
+            throw ValidationException::withMessages(['line_quantities' => 'Odaberite barem jednu stavku i količinu.']);
+        }
+        if ($quantities !== []) {
+            if (! $order) {
+                throw ValidationException::withMessages(['line_quantities' => 'Narudžba nije pronađena za navedene podatke kupca.']);
+            }
+            $originals = $order->items()->whereIn('id', array_keys($quantities))->get();
+            if ($originals->count() !== count($quantities)) {
+                throw ValidationException::withMessages(['line_quantities' => 'Odabrane stavke ne pripadaju narudžbi.']);
+            }
+            $data['line_items'] = $originals->map(fn ($item): array => [
+                'order_item_id' => $item->id, 'name' => $item->name, 'sku' => $item->sku,
+                'quantity' => (int) $quantities[$item->id],
+            ])->all();
+            $summary = $originals->map(fn ($item): string => $item->name.' ('.$item->sku.'): '.(int) $quantities[$item->id].' kom')->implode("\n");
+            $data['items'] = $summary.($data['items'] !== '' ? "\n\nOpis kupca: ".$data['items'] : '');
+        } elseif ($data['items'] === '') {
+            throw ValidationException::withMessages(['items' => 'Unesite artikle za povrat ili reklamaciju.']);
+        }
+        $declaration = $this->declaration((string) ($data['order_number'] ?? ''), $data['request_type'] ?? 'return');
         $submittedAt = now();
         $snapshot = [
-            'version' => '2026-06-19',
+            'version' => '2026-11-09',
             'submitted_at' => $submittedAt->toIso8601String(),
             'confirmation_channel' => 'email',
             'data' => $data,
@@ -98,7 +167,8 @@ class ReturnRequestController extends Controller
             $submittedAt,
             $snapshot,
             $snapshotJson,
-            $submissionKey
+            $submissionKey,
+            $quantities
         ): ContractWithdrawal {
             $existing = ContractWithdrawal::query()
                 ->where('submission_key', $submissionKey)
@@ -114,7 +184,7 @@ class ReturnRequestController extends Controller
                 userId: isset($draft['user_id']) ? (int) $draft['user_id'] : null,
             );
 
-            return ContractWithdrawal::query()->create([
+            $withdrawal = ContractWithdrawal::query()->create([
                 'reference' => $this->newReference(),
                 'submission_key' => $submissionKey,
                 'user_id' => $request->user()?->id,
@@ -130,6 +200,7 @@ class ReturnRequestController extends Controller
                 'contract_date' => $data['contract_date'] ?: null,
                 'received_date' => $data['received_date'] ?: null,
                 'items' => $data['items'],
+                'request_type' => $data['request_type'] ?? 'return',
                 'note' => $data['note'] ?: null,
                 'declaration' => $declaration,
                 'request_snapshot' => $snapshot,
@@ -140,6 +211,11 @@ class ReturnRequestController extends Controller
                 'ip_address' => $request->ip(),
                 'user_agent' => Str::limit((string) $request->userAgent(), 512, ''),
             ]);
+            if ($quantities !== []) {
+                $this->workflow->attachItems($withdrawal, $quantities);
+            }
+
+            return $withdrawal;
         });
 
         $request->session()->forget($draftKey);
@@ -148,7 +224,7 @@ class ReturnRequestController extends Controller
 
         $redirect = redirect()
             ->route('returns.create', ['returnRequestSlug' => __('return_request.slug')])
-            ->with('status', __('return_request.sent_status', [
+            ->with('status', __($withdrawal->request_type === 'claim' ? 'return_request.claim.sent_status' : 'return_request.sent_status', [
                 'reference' => $withdrawal->reference,
             ]))
             ->with('withdrawal_reference', $withdrawal->reference);
@@ -182,7 +258,8 @@ class ReturnRequestController extends Controller
                 'order_number' => ['required', 'string', 'max:80'],
                 'contract_date' => ['nullable', 'date', 'before_or_equal:today'],
                 'received_date' => ['nullable', 'date', 'before_or_equal:today', 'after_or_equal:contract_date'],
-                'items' => ['required', 'string', 'min:2', 'max:5000'],
+                'items' => ['nullable', 'string', 'min:2', 'max:5000'],
+                'request_type' => ['nullable', \Illuminate\Validation\Rule::in(['return', 'claim'])],
                 'note' => ['nullable', 'string', 'max:5000'],
                 'recaptcha_token' => [$captchaEnabled ? 'required' : 'nullable', 'string', 'max:4096'],
             ],
@@ -215,7 +292,7 @@ class ReturnRequestController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      * @return array<string, string>
      */
     private function normalize(array $validated): array
@@ -231,13 +308,14 @@ class ReturnRequestController extends Controller
             'order_number' => trim((string) $validated['order_number']),
             'contract_date' => trim((string) ($validated['contract_date'] ?? '')),
             'received_date' => trim((string) ($validated['received_date'] ?? '')),
-            'items' => trim((string) $validated['items']),
+            'items' => trim((string) ($validated['items'] ?? '')),
+            'request_type' => (string) ($validated['request_type'] ?? 'return'),
             'note' => trim((string) ($validated['note'] ?? '')),
         ];
     }
 
     /**
-     * @param array<string, mixed> $validated
+     * @param  array<string, mixed>  $validated
      */
     private function verifyCaptcha(Request $request, array $validated): void
     {
@@ -280,8 +358,12 @@ class ReturnRequestController extends Controller
         }
     }
 
-    private function declaration(string $orderNumber): string
+    private function declaration(string $orderNumber, string $type = 'return'): string
     {
+        if ($type === 'claim') {
+            return __('return_request.claim.declaration', ['order' => $orderNumber]);
+        }
+
         return __('return_request.declaration', ['order' => $orderNumber]);
     }
 
@@ -299,7 +381,7 @@ class ReturnRequestController extends Controller
         return Order::query()
             ->where('order_number', $orderNumber)
             ->where(function ($query) use ($email, $userId): void {
-                $query->where('customer_email', $email);
+                $query->whereRaw('LOWER(TRIM(customer_email)) = ?', [strtolower(trim($email))]);
                 if ($userId) {
                     $query->orWhere('user_id', $userId);
                 }

@@ -8,7 +8,7 @@ use Illuminate\Console\Command;
 
 class HerreraSyncStock extends Command
 {
-    protected $signature = 'herrera:sync-stock {supplier : videx, brock, enovalite, vayox, dpm, master, braytron or eracuni} {--cron : Record as scheduled execution and respect the automatic switch}';
+    protected $signature = 'herrera:sync-stock {supplier : videx, brock, enovalite, vayox, dpm, master, esperanza, braytron or eracuni} {--cron : Record as scheduled execution and respect the automatic switch}';
 
     protected $description = 'Synchronize supplier or own stock and store a report visible in the integration admin';
 

@@ -43,7 +43,7 @@ class ActionResolverService
                             });
                     })
                     ->orWhere(function (Builder $qq) use ($manufacturerId): void {
-                        if (!$manufacturerId) {
+                        if (! $manufacturerId) {
                             return;
                         }
 
@@ -88,6 +88,10 @@ class ActionResolverService
 
         if ($action->type === CatalogAction::TYPE_FIXED) {
             return max(0.0, $basePrice - $value);
+        }
+
+        if ($action->type === CatalogAction::TYPE_FIXED_PRICE) {
+            return min($basePrice, max(0.0, $value));
         }
 
         return $basePrice;

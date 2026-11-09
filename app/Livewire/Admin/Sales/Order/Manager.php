@@ -22,6 +22,8 @@ class Manager extends Component
 
     public string $status = '';
 
+    public string $customerType = 'all';
+
     public string $dateFrom = '';
 
     public string $dateTo = '';
@@ -36,6 +38,7 @@ class Manager extends Component
     {
         $this->authorizeAccess();
         $this->search = (string) request()->query('search', '');
+        $this->customerType = in_array(request()->query('customerType'), ['B2B', 'B2C'], true) ? request()->query('customerType') : 'all';
 
         $status = (string) request()->query('status', '');
         if ($status !== '' && ctype_digit($status) && (int) $status > 0) {
@@ -59,6 +62,11 @@ class Manager extends Component
     }
 
     public function updatedStatus(): void
+    {
+        $this->resetPage(pageName: self::PAGE_NAME);
+    }
+
+    public function updatedCustomerType(): void
     {
         $this->resetPage(pageName: self::PAGE_NAME);
     }
@@ -134,6 +142,7 @@ class Manager extends Component
         );
 
         $rows = app(OrderManagerAccess::class)->scopeOrders(Order::query())
+            ->forCustomerType($this->customerType)
             ->with(['status:id,code,name,color', 'user:id,name,email', 'user.b2bAccount:id,user_id'])
             ->withCount('items')
             ->when($this->status !== '', function (Builder $query): void {

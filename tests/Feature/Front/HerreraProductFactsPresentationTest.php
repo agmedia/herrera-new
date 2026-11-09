@@ -100,7 +100,7 @@ class HerreraProductFactsPresentationTest extends TestCase
         $this->actingAs($this->approvedBuyer());
         foreach ([route('shop.index'), route('products.show', ['slug' => 'facts-product'])] as $url) {
             $html = $this->get($url)->assertOk()->getContent();
-            $this->assertSame('14 dana', $this->textAt($html, 'data-product-delivery-time'));
+            $this->assertSame('Rok isporuke na upit', $this->textAt($html, 'data-product-delivery-time'));
             $this->assertStringNotContainsString('data-product-local-stock', $html);
             $this->assertStringNotContainsString('data-product-supplier-stock', $html);
             $this->assertStringContainsString(route('cart.items.store'), $html);

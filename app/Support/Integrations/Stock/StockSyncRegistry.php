@@ -14,7 +14,8 @@ class StockSyncRegistry
             'enovalite' => ['Enovalite', '27 1/8 * * *', true, 'sku', 'updateQuantityEnovalite', 9008368],
             'vayox' => ['Vayox', '0 4/8 * * *', true, 'ean', 'updateQuantityVayox', 9007531],
             'dpm' => ['DPM', '0 0/8 * * *', false, 'ean', 'updateQuantityDpm', 9003865],
-            'master' => ['Master', '23 2/8 * * *', true, 'sku', 'updateQuantityMaster', 9003841],
+            'master' => ['Vipelectro / Master / VIP', '23 2/8 * * *', true, 'sku', 'updateQuantityMaster', 9003841],
+            'esperanza' => ['Esperanza', '35 3,11,19 * * *', true, 'sku', null, null],
             'braytron' => ['Braytron', '24 5/8 * * *', true, 'sku', 'updateQuantity', 7874194],
             'eracuni' => ['e-Računi / Herrera', '11 1/2 * * *', true, 'model', 'updateQuantityEracuni', 7139596],
         ];
@@ -23,7 +24,7 @@ class StockSyncRegistry
             $result[$key] = [
                 'label' => $label, 'schedule' => $schedule, 'enabled' => $enabled,
                 'match' => $match, 'target' => $key === 'eracuni' ? 'stock_qty' : 'supplier_stock_qty',
-                'legacy_path' => $action ? '/admin/index.php?route=extension/module/agm_api/'.$action : '/updateqty_brock.php',
+                'legacy_path' => $action ? '/admin/index.php?route=extension/module/agm_api/'.$action : ($key === 'brock' ? '/updateqty_brock.php' : null),
                 'easycron_id' => $easycronId,
             ];
         }

@@ -404,8 +404,10 @@ class Product extends Model implements HasMedia
             return $rows;
         }
 
+        $minimum = max(1, (int) $this->minimum_order_quantity);
+
         return $rows
-            ->filter(static fn (ProductOptionValue $row): bool => (int) $row->stock_qty > 0)
+            ->filter(static fn (ProductOptionValue $row): bool => (int) $row->stock_qty >= $minimum)
             ->values();
     }
 
@@ -433,12 +435,16 @@ class Product extends Model implements HasMedia
             return $this->hasAvailableOptionRows();
         }
 
-        return $this->availableStockQuantity() > 0;
+        return $this->availableStockQuantity() >= max(1, (int) $this->minimum_order_quantity);
     }
 
     /** Zaliha artikla: vlastito skladište i dobavljač; zalihe varijanti ostaju zasebne. */
     public function availableStockQuantity(): int
     {
+        if (data_get($this->payload, 'clearance.status') === 'active' || data_get($this->payload, 'supplier_catalog_retirement.pending')) {
+            return max(0, (int) $this->stock_qty);
+        }
+
         return max(0, (int) $this->stock_qty) + max(0, (int) $this->supplier_stock_qty);
     }
 }

@@ -31,6 +31,9 @@
         @if ($user->account_type === 'customer' && ! $user->can('admin.access'))
             <livewire:admin.user.customer-details-editor :user-id="$user->id" />
             <livewire:admin.user.customer-crm-manager :customer-id="$user->id" />
+            @if (auth()->user()->isA('superadmin') || (auth()->user()->can('admin.access') && auth()->user()->can('catalog.b2b_prices.view')))
+                <livewire:admin.user.customer-catalog-feed-manager :user-id="$user->id" />
+            @endif
         @endif
 
         @if ($user->b2bAccount)

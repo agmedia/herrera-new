@@ -432,6 +432,7 @@
                 action="{{ route('cart.items.store') }}"
                 class="mt-6 space-y-4"
                 data-product-detail-form
+                data-product-delivery-url="{{ route('products.delivery', $product) }}"
                 data-ga4-add-to-cart-form
                 data-ga4-item-id="{{ (string) ($product->sku ?: $product->id) }}"
                 data-ga4-item-name="{{ $translation?->name ?? $product->code }}"
@@ -444,7 +445,7 @@
                 data-product-default-local-available="{{ ($product->hasVisibleOptionRows() ? $product->hasAvailableOptionRows() : $localStockQuantity > 0) ? '1' : '0' }}"
                 data-product-default-supplier-available="{{ ! $product->hasVisibleOptionRows() && $supplierStockQuantity > 0 ? '1' : '0' }}"
                 data-product-delivery-local="{{ __('stock.local_delivery') }}"
-                data-product-delivery-supplier="{{ __('stock.supplier_delivery') }}"
+                data-product-delivery-supplier="{{ app(\App\Services\Shipping\SupplierDeliveryService::class)->estimate($product, max(1, (int) $product->minimum_order_quantity))['label'] }}"
                 data-product-delivery-unavailable="{{ __('ui.product.unavailable') }}"
                 @if ($canViewStock)
                 data-product-default-local-stock="{{ $localStockQuantity }}"
@@ -524,7 +525,7 @@
                                                 value="{{ $row->id }}"
                                                 data-parent-id="{{ (int) ($row->parent_option_value_id ?? 0) }}"
                                                 data-option-sku="{{ (string) ($row->sku ?: '') }}"
-                                                data-option-available="{{ (int) $row->stock_qty > 0 ? '1' : '0' }}"
+                                                data-option-available="{{ (int) $row->stock_qty >= max(1, (int) $product->minimum_order_quantity) ? '1' : '0' }}"
                                                 @if ($canViewStock) data-option-stock="{{ max(0, (int) $row->stock_qty) }}" @endif
                                                 data-option-price-current="{{ $rowPriceData['current'] }}"
                                                 data-option-price-current-value="{{ $rowPriceData['current_value'] }}"
@@ -558,7 +559,7 @@
                                             class="sr-only product-size-radio"
                                             data-size-label="{{ $label }}"
                                             data-option-sku="{{ (string) ($row->sku ?: '') }}"
-                                            data-option-available="{{ (int) $row->stock_qty > 0 ? '1' : '0' }}"
+                                            data-option-available="{{ (int) $row->stock_qty >= max(1, (int) $product->minimum_order_quantity) ? '1' : '0' }}"
                                             @if ($canViewStock) data-option-stock="{{ max(0, (int) $row->stock_qty) }}" @endif
                                             data-option-price-current="{{ $rowPriceData['current'] }}"
                                             data-option-price-current-value="{{ $rowPriceData['current_value'] }}"
@@ -581,11 +582,12 @@
                     </div>
                 @endif
 
+                @include('front.partials.product-quantity-rules', ['quantityProduct' => $product])
                 <div class="product-detail-purchase-controls">
                     @if ($isPurchasable)
                         <div class="product-detail-quantity-control" data-qty-control>
                             <button type="button" data-qty-dec aria-label="Decrease quantity">-</button>
-                            <input type="text" name="quantity" value="1" inputmode="numeric" readonly aria-label="{{ __('ui.cart.modal.quantity') }}" data-qty-input>
+                            <input type="text" name="quantity" value="{{ max(1, (int) $product->minimum_order_quantity) }}" min="{{ max(1, (int) $product->minimum_order_quantity) }}" step="{{ max(1, (int) $product->order_quantity_step) }}" max="999" inputmode="numeric" readonly aria-label="{{ __('ui.cart.modal.quantity') }}" data-qty-input>
                             <button type="button" data-qty-inc aria-label="Increase quantity">+</button>
                         </div>
 

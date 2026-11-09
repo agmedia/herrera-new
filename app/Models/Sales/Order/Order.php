@@ -24,6 +24,8 @@ class Order extends Model
         'status_id',
         'user_id',
         'source',
+        'customer_type',
+        'cost_centre',
         'locale',
         'currency_code',
         'currency_rate',
@@ -93,14 +95,33 @@ class Order extends Model
         return $query->whereDoesntHave('status', fn (Builder $status) => OrderStatusClassification::applyCancelledQuery($status));
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $order): void {
+            $type = $order->commerceCustomerType();
+            $order->customer_type = $type;
+            $order->cost_centre = $type === 'B2C' ? 'Web prodaja' : $order->cost_centre;
+        });
+    }
+
+    public function scopeForCustomerType(Builder $query, ?string $type): Builder
+    {
+        return $query->when(in_array($type, ['B2B', 'B2C'], true), fn (Builder $query) => $query->where('orders.customer_type', $type));
+    }
+
     public function commerceCustomerType(): string
     {
-        $type = data_get($this->payload, 'customer_type');
+        $type = $this->customer_type ?: data_get($this->payload, 'customer_type');
         if (in_array($type, ['B2B', 'B2C'], true)) {
             return $type;
         }
 
-        return trim((string) $this->billing_company) !== '' || $this->user?->b2bAccount !== null ? 'B2B' : 'B2C';
+        return trim((string) $this->billing_company) !== '' || $this->user?->commerceCustomerType() === 'B2B' ? 'B2B' : 'B2C';
+    }
+
+    public function commerceCostCentre(): ?string
+    {
+        return $this->cost_centre ?: ($this->commerceCustomerType() === 'B2C' ? 'Web prodaja' : null);
     }
 
     public function customerDisplayName(): string

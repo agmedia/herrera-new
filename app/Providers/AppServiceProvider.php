@@ -72,6 +72,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->scoped(AssetVersion::class, fn () => new AssetVersion);
         $this->app->scoped(GuestStorefrontCache::class);
         $this->app->scoped(\App\Services\Pricing\PriceCatalogResolver::class);
+        $this->app->scoped(\App\Services\Pricing\FullWholesalePriceResolver::class);
+        $this->app->scoped(\App\Services\Shipping\SupplierDeliveryService::class);
     }
 
     /**
@@ -79,6 +81,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Product::observe(\App\Observers\SupplierAvailabilityObserver::class);
+        Product::observe(\App\Observers\ProductClearanceObserver::class);
+        Order::observe(\App\Observers\Sales\OrderReturnCancellationObserver::class);
         // One listener per application; always clear the current request, including
         // writes made while placing an order or changing stock/pricing directly.
         DB::listen(static function (QueryExecuted $query): void {

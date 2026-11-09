@@ -6,12 +6,20 @@ use App\Models\Sales\Order\Order;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ContractWithdrawal extends Model
 {
     public const STATUS_RECEIVED = 'received';
+
     public const STATUS_PROCESSING = 'processing';
+
+    public const STATUS_APPROVED = 'approved';
+
+    public const STATUS_PARTIALLY_RECEIVED = 'partially_received';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_DECLINED = 'declined';
 
     protected $fillable = [
@@ -46,6 +54,10 @@ class ContractWithdrawal extends Model
         'completed_at',
         'ip_address',
         'user_agent',
+        'request_type',
+        'approved_by',
+        'approved_at',
+        'goods_received_at',
     ];
 
     protected $hidden = [
@@ -66,6 +78,9 @@ class ContractWithdrawal extends Model
         'handled_by' => 'int',
         'handled_at' => 'datetime',
         'completed_at' => 'datetime',
+        'approved_by' => 'int',
+        'approved_at' => 'datetime',
+        'goods_received_at' => 'datetime',
     ];
 
     /**
@@ -74,8 +89,10 @@ class ContractWithdrawal extends Model
     public static function statuses(): array
     {
         return [
-            self::STATUS_RECEIVED => 'Zaprimljeno',
+            self::STATUS_RECEIVED => 'Zahtjev zaprimljen',
             self::STATUS_PROCESSING => 'U obradi',
+            self::STATUS_APPROVED => 'Odobreno – čeka se roba',
+            self::STATUS_PARTIALLY_RECEIVED => 'Roba djelomično zaprimljena',
             self::STATUS_COMPLETED => 'Dovršeno',
             self::STATUS_DECLINED => 'Odbijeno',
         ];
@@ -94,5 +111,20 @@ class ContractWithdrawal extends Model
     public function handler(): BelongsTo
     {
         return $this->belongsTo(User::class, 'handled_by');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function lineItems(): HasMany
+    {
+        return $this->hasMany(ContractWithdrawalItem::class, 'withdrawal_id');
+    }
+
+    public function typeLabel(): string
+    {
+        return $this->request_type === 'claim' ? 'Reklamacija (odobrenje)' : 'Povrat ispravne robe';
     }
 }

@@ -30,9 +30,12 @@ class CustomerIdentityPresentationFeatureTest extends TestCase
         $buyer->profile()->update(['company' => ' ']);
         $this->assertSame('Billing Company', $buyer->fresh()->customerDisplayName());
         $buyer->addresses()->where('type', 'billing')->update(['company' => ' ']);
+        $this->assertSame('Tvrtka bez naziva', $buyer->fresh()->customerDisplayName());
+        $buyer->b2bAccount()->delete();
         $this->assertSame('Contact Person', $buyer->fresh()->customerDisplayName());
         $this->assertSame('Contact Person', $buyer->fresh()->name);
         $buyer->forceFill(['account_type' => 'staff'])->save();
+        $buyer->b2bAccount()->create(['company_name' => 'Staff Employer', 'oib' => '11000000002']);
         $buyer->profile()->update(['company' => 'Employer Company']);
         $this->assertSame('Contact Person', $buyer->fresh()->customerDisplayName());
     }
@@ -78,6 +81,7 @@ class CustomerIdentityPresentationFeatureTest extends TestCase
     {
         $admin = $this->admin();
         $buyer = User::factory()->create(['name' => 'Missing Company Contact']);
+        $buyer->b2bAccount()->create(['company_name' => ' ', 'oib' => '11000000003']);
         $order = $this->order($buyer, 'MISSING-COMPANY', ' ', 25);
         config(['commerce.b2b_only' => true]);
         $this->assertSame('Tvrtka bez naziva', $buyer->fresh()->customerDisplayName());
@@ -87,8 +91,16 @@ class CustomerIdentityPresentationFeatureTest extends TestCase
         $this->assertSame('Missing Company Contact', $buyer->fresh()->name);
         $this->assertSame('Missing Company Contact', $order->fresh()->customer_name);
         config(['commerce.b2b_only' => false]);
-        $this->assertSame('Missing Company Contact', $buyer->fresh()->customerDisplayName());
-        $this->assertSame('Missing Company Contact', $order->customerDisplayName());
+        $this->assertSame('Tvrtka bez naziva', $buyer->fresh()->customerDisplayName());
+        $this->assertSame('Tvrtka bez naziva', $order->customerDisplayName());
+        $private = User::factory()->create(['name' => 'Private Person']);
+        $privateOrder = $this->order($private, 'PRIVATE-PERSON', '', 25);
+        foreach ([true, false] as $b2bOnly) {
+            config(['commerce.b2b_only' => $b2bOnly]);
+            $this->assertSame('Private Person', $private->fresh()->customerDisplayName());
+            $this->assertSame('Private Person', $privateOrder->fresh()->customerDisplayName());
+            $this->assertSame('B2C', $privateOrder->fresh()->commerceCustomerType());
+        }
     }
 
     public function test_order_list_search_and_sort_use_historical_company_and_keep_contact_visible(): void

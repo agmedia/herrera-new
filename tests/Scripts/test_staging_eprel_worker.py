@@ -11,6 +11,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 DEPLOY = ROOT / "scripts/deploy-staging.sh"
 WORKER = ROOT / "scripts/run-staging-eprel-worker.sh"
+INTEGRATIONS_WORKER = ROOT / "scripts/run-staging-integrations-worker.sh"
 MARKER = b" # HERRERA-STAGING-EPREL-WORKER\n"
 
 
@@ -34,6 +35,8 @@ class StagingEprelWorkerTest(unittest.TestCase):
         after = self.render_cron(before)
         self.assertTrue(after.startswith(before))
         self.assertEqual(1, after.count(MARKER))
+        self.assertEqual(1, after.count(b" # HERRERA-STAGING-INTEGRATIONS-WORKER\n"))
+        self.assertEqual(1, after.count(b" # HERRERA-STAGING-INTEGRATIONS-SCHEDULER\n"))
         self.assertEqual(after, self.render_cron(after))
 
     def test_cron_replaces_only_owned_line_and_handles_empty_table(self):
@@ -47,7 +50,7 @@ class StagingEprelWorkerTest(unittest.TestCase):
         self.assertTrue(self.render_cron(b"").endswith(MARKER))
 
     def test_real_scripts_parse_and_local_worker_refuses_hosting_access(self):
-        for script in [DEPLOY, WORKER]:
+        for script in [DEPLOY, WORKER, INTEGRATIONS_WORKER]:
             subprocess.run(["bash", "-n", str(script)], check=True)
         result = subprocess.run(["bash", str(WORKER), "--check"], capture_output=True, text=True)
         self.assertEqual(1, result.returncode)
@@ -136,6 +139,74 @@ class StagingEprelWorkerTest(unittest.TestCase):
             self.assertIn("artisan queue:work eprel --queue=eprel --stop-when-empty --max-time=50 --timeout=600 --sleep=3 --tries=3 --no-interaction", calls)
 
             result, calls = run("--check", TEST_LOCK_BUSY="1")
+            self.assertEqual(0, result.returncode)
+            self.assertEqual("", calls)
+
+            marker.write_text("not-deployed\n")
+            result, calls = run("--check")
+            self.assertEqual(0, result.returncode)
+            self.assertEqual("", calls)
+            marker.write_text("test-revision\n")
+            (target / "storage/framework/down").touch()
+            result, calls = run("--check")
+            self.assertEqual(0, result.returncode)
+            self.assertEqual("", calls)
+
+    def test_integrations_worker_serializes_jobs_and_checks_deployed_revision(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder).resolve()
+            checkout, target, private, tools = [base / name for name in ["checkout", "target", "private", "bin"]]
+            for directory in [checkout / "scripts", target / "vendor", target / "storage/framework", private, tools]:
+                directory.mkdir(parents=True, exist_ok=True)
+            (target / ".env").touch()
+            (target / "vendor/autoload.php").touch()
+            marker = target / ".herrera-deploy-revision"
+            marker.write_text("test-revision\n")
+            log = base / "calls"
+            for name, content in {
+                "id": '#!/bin/bash\nprintf "%s\\n" herrera\n',
+                "git": '#!/bin/bash\nif [[ "$*" == *"rev-parse"* ]]; then printf "%s\\n" test-revision; fi\n',
+                "flock": '#!/bin/bash\n[[ "${TEST_LOCK_BUSY:-0}" != 1 ]]\n',
+                "php": '#!/bin/bash\nprintf "%s\\n" "$*" >> "$TEST_CALL_LOG"\nif [[ "$1" == -r ]]; then exit "${TEST_CONFIG_STATUS:-0}"; fi\n',
+            }.items():
+                path = tools / name
+                path.write_text(content)
+                path.chmod(0o755)
+            source = INTEGRATIONS_WORKER.read_text()
+            for old, new in [
+                ("/home/herrera/repositories/herrera-new", str(checkout)),
+                ("/home/herrera/herrera.herrera.hr", str(target)),
+                ("/home/herrera/.herrera-staging-backups", str(private)),
+                ("/opt/cpanel/ea-php84/root/usr/bin/php", str(tools / "php")),
+            ]:
+                source = source.replace(old, new)
+            fixture = checkout / "scripts/run-staging-integrations-worker.sh"
+            fixture.write_text(source)
+            env = dict(os.environ, PATH=str(tools) + ":/usr/bin:/bin", TEST_CALL_LOG=str(log))
+
+            def run(*args, **overrides):
+                log.unlink(missing_ok=True)
+                result = subprocess.run(["bash", str(fixture), *args], env=dict(env, **overrides), capture_output=True, text=True)
+                return result, log.read_text() if log.exists() else ""
+
+            result, calls = run("--check")
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertNotIn("artisan queue:work", calls)
+            result, calls = run()
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertIn("artisan queue:work database --queue=integrations --stop-when-empty --max-time=50 --timeout=600", calls)
+            result, calls = run("--schedule")
+            self.assertEqual(0, result.returncode, result.stderr)
+            self.assertIn("artisan schedule:run --no-interaction", calls)
+            self.assertNotIn("artisan queue:work", calls)
+            result, calls = run(TEST_CONFIG_STATUS="1")
+            self.assertEqual(1, result.returncode)
+            self.assertNotIn("artisan queue:work", calls)
+            result, calls = run(TEST_LOCK_BUSY="1")
+            self.assertEqual(0, result.returncode)
+            self.assertEqual("", calls)
+            marker.write_text("not-deployed\n")
+            result, calls = run("--schedule")
             self.assertEqual(0, result.returncode)
             self.assertEqual("", calls)
             marker.write_text("not-deployed\n")

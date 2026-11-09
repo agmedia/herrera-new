@@ -84,9 +84,11 @@ snapshot_crontab "$backup_root/crontab.before" || fail 'The hosting crontab coul
 "$php_bin" -r '
 $before=file_get_contents($argv[1]); $after="";
 foreach(preg_split("/(?<=\\n)/",$before) as $line){
-    if(!str_ends_with(rtrim($line,"\r\n")," # HERRERA-STAGING-EPREL-WORKER")){$after.=$line;}
+    if(!preg_match("/ # HERRERA-STAGING-(?:EPREL-WORKER|INTEGRATIONS-WORKER|INTEGRATIONS-SCHEDULER)$/",rtrim($line,"\r\n"))){$after.=$line;}
 }
 if($after!=="" && !str_ends_with($after,"\n")){$after.="\n";}
+$after.="* * * * * /bin/bash /home/herrera/repositories/herrera-new/scripts/run-staging-integrations-worker.sh >> /home/herrera/.herrera-staging-backups/integrations-worker.log 2>&1 # HERRERA-STAGING-INTEGRATIONS-WORKER\n";
+$after.="* * * * * /bin/bash /home/herrera/repositories/herrera-new/scripts/run-staging-integrations-worker.sh --schedule >> /home/herrera/.herrera-staging-backups/integrations-scheduler.log 2>&1 # HERRERA-STAGING-INTEGRATIONS-SCHEDULER\n";
 $after.="* * * * * /bin/bash /home/herrera/repositories/herrera-new/scripts/run-staging-eprel-worker.sh >> /home/herrera/.herrera-staging-backups/eprel-worker.log 2>&1 # HERRERA-STAGING-EPREL-WORKER\n";
 if(file_put_contents($argv[2],$after)===false){exit(1);}
 ' "$backup_root/crontab.before" "$backup_root/crontab.after"
@@ -198,7 +200,15 @@ fi
     --path=database/migrations/2026_10_20_130000_add_customer_discount_provenance.php \
     --path=database/migrations/2026_10_20_140000_restore_customer_category_discounts.php \
     --path=database/migrations/2026_10_20_150000_add_primary_group_default_discount.php \
-    --path=database/migrations/2026_10_20_160000_create_supplier_catalog_items.php
+    --path=database/migrations/2026_10_20_160000_create_supplier_catalog_items.php \
+    --path=database/migrations/2026_11_09_100000_add_review_tracking_to_supplier_catalog_items.php \
+    --path=database/migrations/2026_11_09_110000_add_commerce_classification_to_orders.php \
+    --path=database/migrations/2026_11_09_120000_create_supplier_delivery_schedules.php \
+    --path=database/migrations/2026_11_09_121000_configure_herrera_pickup.php \
+    --path=database/migrations/2026_11_09_122000_apply_herrera_client_defaults.php \
+    --path=database/migrations/2026_11_09_130000_create_customer_catalog_feeds.php \
+    --path=database/migrations/2026_11_09_140000_create_product_clearances.php \
+    --path=database/migrations/2026_11_09_150000_add_structured_return_receipts.php
 "$php_bin" artisan supplier-catalogs:seed --publish
 "$php_bin" artisan supplier-catalogs:covers --apply
 "$php_bin" artisan config:cache

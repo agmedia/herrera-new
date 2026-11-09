@@ -5,6 +5,7 @@ namespace App\Services\Front;
 use App\Mail\ContractWithdrawalAdminMail;
 use App\Mail\ContractWithdrawalReceiptMail;
 use App\Models\Sales\ContractWithdrawal;
+use App\Services\Sales\ReturnWorkflowSettings;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
@@ -12,6 +13,7 @@ class ContractWithdrawalNotificationService
 {
     public function __construct(
         private readonly StoreSettingsService $storeSettings,
+        private readonly ReturnWorkflowSettings $workflowSettings,
     ) {}
 
     /**
@@ -68,17 +70,29 @@ class ContractWithdrawalNotificationService
 
     public function sendAdminNotification(ContractWithdrawal $withdrawal): void
     {
-        $to = $this->adminEmail();
-        if ($to === '') {
+        $recipients = array_values(array_unique(array_filter(array_merge(
+            [$this->adminEmail()], $this->workflowSettings->notificationEmails(),
+        ))));
+        if ($recipients === []) {
             throw new \RuntimeException('Nije postavljena administratorska e-mail adresa za raskide ugovora.');
         }
 
-        Mail::to($to)
-            ->locale((string) config('app.locale', 'hr'))
-            ->send(new ContractWithdrawalAdminMail(
-                withdrawal: $withdrawal,
-                adminUrl: route('admin.withdrawals.show', $withdrawal),
-            ));
+        $failures = [];
+        foreach ($recipients as $to) {
+            try {
+                Mail::to($to)
+                    ->locale((string) config('app.locale', 'hr'))
+                    ->send(new ContractWithdrawalAdminMail(
+                        withdrawal: $withdrawal,
+                        adminUrl: route('admin.withdrawals.show', $withdrawal),
+                    ));
+            } catch (\Throwable $exception) {
+                $failures[] = $to.': '.$exception->getMessage();
+            }
+        }
+        if ($failures !== []) {
+            throw new \RuntimeException(implode("\n", $failures));
+        }
 
         $withdrawal->forceFill([
             'admin_notified_at' => now(),

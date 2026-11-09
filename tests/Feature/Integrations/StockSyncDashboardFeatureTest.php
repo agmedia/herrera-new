@@ -28,7 +28,7 @@ class StockSyncDashboardFeatureTest extends TestCase
         $this->settings();
     }
 
-    public function test_authorized_admin_sees_all_eight_sources_and_navigation(): void
+    public function test_authorized_admin_sees_all_nine_sources_and_navigation(): void
     {
         $this->actingAs($this->admin())->get(route('admin.integrations.stock.index'))
             ->assertOk()->assertSee('Zalihe i cronovi')
@@ -38,7 +38,7 @@ class StockSyncDashboardFeatureTest extends TestCase
 
         Livewire::test(Dashboard::class)->assertViewHas('sources', static function (array $sources): bool {
             return array_keys($sources) === array_keys(StockSyncRegistry::all())
-                && count($sources) === 8
+                && count($sources) === 9
                 && $sources['brock']['cron_enabled'] === false
                 && $sources['dpm']['cron_enabled'] === false;
         });

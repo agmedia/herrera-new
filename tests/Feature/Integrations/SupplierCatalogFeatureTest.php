@@ -136,7 +136,7 @@ class SupplierCatalogFeatureTest extends TestCase
         $options['markup'] = 35;
         $service->saveOptions('videx', $options);
         $this->assertEquals(35, $service->options('videx')['markup']);
-        $this->assertEquals(0, $service->options('dpm')['markup']);
+        $this->assertEquals(250, $service->options('dpm')['markup']);
         $this->assertNull($service->price(new SupplierCatalogItem(['source_price' => 10, 'currency' => 'USD']), $options));
     }
 

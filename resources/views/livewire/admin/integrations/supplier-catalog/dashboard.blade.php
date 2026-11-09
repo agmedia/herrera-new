@@ -17,6 +17,10 @@
             <p class="mt-3 text-xs text-amber-800">Braytron dopušta jedan dohvat u tri sata. Katalog dijeli spremljeni dohvat sa zalihama i slikama. Izvorna cijena je NetPrice.</p>
         @elseif ($supplier === 'dpm')
             <p class="mt-3 text-xs text-slate-600">DPM nema kategorije u feedu. Koristite zadanu kategoriju ili mapiranje „Bez kategorije”. Zaliha prati postojeću integraciju (BOX_QTY).</p>
+        @elseif (in_array($supplier, ['master', 'vayox']))
+            <p class="mt-3 text-xs text-amber-800">Dostavljeni XML nema nabavne cijene ni kategorije. Katalog možete pregledati, ali uvoz čeka dopunu stvarnih nabavnih cijena i odabir kategorije. Vipelectro koristi postojeću integraciju Master/VIP.</p>
+        @elseif ($supplier === 'esperanza')
+            <p class="mt-3 text-xs text-amber-800">Esperanza cijene prate valutu navedenu u XML-u. Aktualni izvor navodi EUR, pa nema konverzije. Za izvor PLN dostupan je dnevni ECB tečaj (1 PLN = 1 / tečaj PLN za 1 EUR). Različita valuta od prikazanih postavki blokira uvoz. Feed nema slike ni kategorije; nazivi ostaju u izvornom jeziku za pregled nacrta.</p>
         @endif
     </section>
 
@@ -34,7 +38,7 @@
             <label class="text-xs font-semibold text-slate-600">Zadana kategorija
                 <select wire:model.live="options.default_category_id" class="mt-1 block w-full rounded-lg border-slate-300 text-sm"><option value="">Odaberite kategoriju</option>@foreach ($categoryLabels as $id => $label)<option value="{{ $id }}">{{ $label }}</option>@endforeach</select>
             </label>
-            <label class="text-xs font-semibold text-slate-600">Uvećanje cijene (%) — 0 bez uvećanja
+            <label class="text-xs font-semibold text-slate-600">Uvećanje cijene (%) — 250 = nabavna × 3,5
                 <input type="number" min="0" max="10000" step="0.01" wire:model.live.debounce.500ms="options.markup" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
             </label>
             <label class="text-xs font-semibold text-slate-600">Porezna stopa artikla
@@ -46,12 +50,17 @@
             <label class="text-xs font-semibold text-slate-600">Tečaj: 1 jedinica izvora = toliko {{ $storeCurrency }}
                 <input type="number" min="0.000001" step="0.000001" wire:model.live.debounce.500ms="options.exchange_rate" class="mt-1 block w-full rounded-lg border-slate-300 text-sm">
             </label>
+            <label class="text-xs font-semibold text-slate-600">Izvor tečaja
+                <select wire:model.live="options.exchange_rate_source" class="mt-1 block w-full rounded-lg border-slate-300 text-sm"><option value="manual">Ručni unos</option><option value="ecb">ECB dnevni PLN → EUR (automatski)</option></select>
+            </label>
             <label class="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" wire:model.live="options.source_includes_tax" class="rounded border-slate-300">Izvorna cijena uključuje PDV</label>
         </div>
         <p class="mt-3 text-xs text-slate-500">Cijena = izvorna cijena × tečaj × (1 + uvećanje / 100), uz pretvorbu PDV-a prema postavkama trgovine. Prikazana cijena za pohranu {{ $storedIncludesTax ? 'uključuje' : 'ne uključuje' }} PDV. Provjerite valutu i porezni tretman dobavljača prije uvoza.</p>
+        @if (($options['exchange_rate_source'] ?? '') === 'ecb')<p class="mt-2 text-xs text-slate-500">ECB objavljuje referentni tečaj radnim danom. Uvoz ponovno dohvaća posljednji raspoloživ tečaj i čuva datum korišten za svaki nacrt. Ako nema važećeg tečaja, uvoz se zaustavlja.</p>@endif
+        @if ($exchangeReference)<p class="mt-2 text-sm font-semibold text-cyan-800">ECB {{ $exchangeReference['date'] }}: 1 PLN = {{ number_format($exchangeReference['rate'], 8, ',', '.') }} EUR.</p>@elseif (($options['exchange_rate_source'] ?? '') === 'ecb')<p role="status" class="mt-2 text-sm text-amber-800">Važeći ECB tečaj trenutačno nije dostupan; uvoz čeka službeni tečaj.</p>@endif
         <details class="mt-5 rounded-xl border border-slate-200 p-4">
             <summary class="cursor-pointer text-sm font-semibold text-slate-800">Mapiranje kategorija dobavljača ({{ $sourceCategories->count() }})</summary>
-            <p class="mt-2 text-xs text-slate-500">Prazno mapiranje koristi zadanu kategoriju. Mapiranje se sprema zasebno za svakog dobavljača.</p>
+            <p class="mt-2 text-xs text-slate-500">Odaberite postojeću kategoriju trgovine uz svaku izvornu kategoriju pa spremite. Prazno mapiranje koristi zadanu kategoriju. Kada dobavljač nema kategorije, odaberite privremenu kategoriju za pregled i razvrstajte nacrte prije objave. Promjena mapiranja ne premješta postojeće artikle.</p>
             <div class="mt-3 max-h-96 space-y-3 overflow-y-auto">
                 @forelse ($sourceCategories as $sourceCategory)
                     <label class="grid items-center gap-2 text-sm sm:grid-cols-2" wire:key="map-{{ $supplier }}-{{ hash('sha256', $sourceCategory->category_key) }}"><span>{{ $sourceCategory->category_name }}</span>
@@ -77,6 +86,7 @@
             <button type="button" wire:click="clearSelection" class="text-xs font-semibold text-slate-600">Poništi odabir</button>
             <span class="text-xs text-slate-500">Odabrano: {{ count($selected) }} · Pronađeno: {{ $items->total() }}</span>
             <button type="button" wire:click="importSelected" wire:loading.attr="disabled" @disabled(count($selected) === 0) class="ml-auto rounded-xl bg-cyan-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Uvezi odabrane kao nacrte</button>
+            <button type="button" wire:click="importAllDrafts" wire:confirm="Uvesti sve nove artikle aktualnog kataloga kao neaktivne nacrte prema prikazanim postavkama?" wire:loading.attr="disabled" class="rounded-xl border border-cyan-700 px-4 py-2 text-sm font-semibold text-cyan-800">Cijeli asortiman u nacrte</button>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-left text-sm">
@@ -87,10 +97,10 @@
                         <td class="p-3"><input type="checkbox" wire:model.live="selected" value="{{ $item->id }}" aria-label="Odaberi {{ $item->name }}" @disabled($item->status !== 'new' || !$item->is_current) class="rounded border-slate-300"></td>
                         <td class="min-w-64 p-3"><div class="flex gap-3">@if ($item->images[0] ?? null)<img src="{{ $item->images[0] }}" alt="" loading="lazy" referrerpolicy="no-referrer" class="h-14 w-14 rounded-lg border border-slate-100 object-contain">@endif<div><p class="font-semibold text-slate-800">{{ $item->name }}</p><p class="mt-1 text-xs text-slate-500">{{ $item->sku }} @if ($item->barcode) · {{ $item->barcode }} @endif</p>@if ($item->description)<details class="mt-1 text-xs text-slate-500"><summary class="cursor-pointer">Opis</summary><p class="mt-1 max-w-lg">{{ strip_tags($item->description) }}</p></details>@endif</div></div></td>
                         <td class="p-3 text-xs text-slate-600">{{ $item->category_name }}<span class="mt-1 block font-semibold">→ {{ $categoryLabels[app(\App\Services\Integrations\SupplierCatalog\SupplierCatalogService::class)->categoryId($item, $options)] ?? 'Odaberite kategoriju' }}</span></td>
-                        <td class="whitespace-nowrap p-3">{{ $item->source_price !== null ? number_format((float) $item->source_price, 4, ',', '.') : 'Nema cijene' }} {{ $item->currency ?: ($options['source_currency'] ?? '') }}</td>
+                        <td class="whitespace-nowrap p-3">{{ ($item->source_price ?? $item->manual_source_price) !== null ? number_format((float) ($item->source_price ?? $item->manual_source_price), 4, ',', '.') : 'Nema cijene' }} {{ $item->currency ?: $item->manual_currency ?: ($options['source_currency'] ?? '') }}@if ($item->source_price === null && $item->manual_source_price !== null)<span class="block text-xs text-slate-500">Dopunjeno pregledanim cjenikom</span>@endif</td>
                         <td class="whitespace-nowrap p-3 font-semibold">{{ isset($prices[$item->id]) ? number_format($prices[$item->id], 2, ',', '.').' '.$storeCurrency : 'Provjerite cijenu / valutu' }}</td>
                         <td class="p-3">{{ $item->quantity }}</td>
-                        <td class="min-w-40 p-3 text-xs"><span class="rounded-full bg-slate-100 px-2 py-1 font-semibold">{{ ['new' => 'Novi', 'existing' => 'Već postoji', 'imported' => 'Uvezen nacrt', 'conflict' => 'Sukob'][$item->status] ?? $item->status }}</span>@if ($item->message)<p class="mt-2 text-slate-500">{{ $item->message }}</p>@endif @if ($item->product_id && $item->status === 'imported')<button type="button" wire:click="retryImages({{ $item->id }})" wire:loading.attr="disabled" class="mt-2 block font-semibold text-cyan-700">Ponovi dohvat slika</button>@endif</td>
+                        <td class="min-w-40 p-3 text-xs"><span class="rounded-full bg-slate-100 px-2 py-1 font-semibold">{{ ['new' => 'Novi', 'existing' => 'Već postoji', 'imported' => 'Uvezen nacrt', 'conflict' => 'Sukob'][$item->status] ?? $item->status }}</span>@if ($item->message)<p class="mt-2 text-slate-500">{{ $item->message }}</p>@endif @if ($item->product_id && $item->status === 'imported')<button type="button" wire:click="retryImages({{ $item->id }})" wire:loading.attr="disabled" class="mt-2 block font-semibold text-cyan-700">Ponovi dohvat slika</button>@endif @if (!$item->is_current && $item->product_id && !$item->reviewed_at)<button type="button" wire:click="reviewMissing({{ $item->id }})" wire:confirm="Potvrđujete li nakon provjere povlačenje artikla? Vlastita zaliha ostaje dostupna do prodaje; bez vlastite zalihe artikl se deaktivira." class="mt-2 block font-semibold text-rose-700">Provjereno — povuci nakon prodaje vlastite zalihe</button>@elseif ($item->reviewed_at)<p class="mt-2 text-slate-500">Pregledano {{ $item->reviewed_at->format('d.m.Y.') }}</p>@endif</td>
                     </tr>
                 @empty
                     <tr><td colspan="7" class="p-10 text-center text-slate-500">Nema artikala za ove filtre. Osvježite katalog ili promijenite filtre.</td></tr>
@@ -99,6 +109,6 @@
             </table>
         </div>
         <div class="mt-4">{{ $items->links() }}</div>
-        <p class="mt-3 text-xs text-slate-500">Uvoz koristi trenutačno prikazane postavke cijena i mapiranja. Najviše 100 artikala po uvozu. Postojeći artikli se preskaču. Slike se preuzimaju u pozadini.</p>
+        <p class="mt-3 text-xs text-slate-500">Uvoz koristi trenutačno prikazane postavke. Odabir je ograničen na 100 artikala; cijeli asortiman obrađuje se u pozadini. Postojeći artikli, ručni nazivi, opisi, cijene, kategorije i slike ostaju sačuvani. Nestanak iz XML-a otvara pregled i sam po sebi ne deaktivira artikl. Dopunu nabavnih cijena administrator može pripremiti CSV cjenikom (sku, source_price, currency) uz prethodni pregled.</p>
     </section>
 </div>

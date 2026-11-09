@@ -31,6 +31,7 @@ class CustomerStatisticsController extends Controller
             'search' => ['nullable', 'string', 'max:191'],
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
             'guest_email' => ['nullable', 'string', 'max:191'],
+            'customer_type' => ['nullable', Rule::in(['B2B', 'B2C', 'all'])],
             'tab' => ['nullable', Rule::in(['shop', 'invoices'])],
         ]);
         if (! empty($validated['user_id'])) {
@@ -52,6 +53,7 @@ class CustomerStatisticsController extends Controller
             'search' => trim($validated['search'] ?? ''),
             'user_id' => isset($validated['user_id']) ? (int) $validated['user_id'] : null,
             'guest_email' => trim($validated['guest_email'] ?? ''),
+            'customer_type' => $validated['customer_type'] ?? (! empty($validated['user_id']) || ! empty($validated['guest_email']) ? 'all' : 'B2B'),
         ];
         $selectedCustomer = $filters['user_id'] ? User::query()->findOrFail($filters['user_id']) : null;
 

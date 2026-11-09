@@ -444,6 +444,7 @@
                             @if (!empty($line['option_label']))
                                 <div class="mt-0.5 text-xs text-slate-500">{{ $line['option_label'] }}</div>
                             @endif
+                                    @include('front.partials.cart-line-delivery', ['line' => $line])
                             @if (!empty($line['is_b2b_price']))
                                 <div class="mt-0.5 text-[11px] font-semibold text-cyan-800">{{ __('ui.product.b2b_contract_price') }}</div>
                             @endif

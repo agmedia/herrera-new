@@ -1,10 +1,11 @@
-<x-admin-layout :title="'Raskid '.$withdrawal->reference">
+<x-admin-layout :title="'Povrat / reklamacija '.$withdrawal->reference">
     <div class="admin-stack">
         <div class="admin-panel admin-search-panel p-6">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <a href="{{ route('admin.withdrawals.index') }}" class="text-xs font-semibold text-cyan-700 hover:underline">← Svi raskidi ugovora</a>
+                    <a href="{{ route('admin.withdrawals.index') }}" class="text-xs font-semibold text-cyan-700 hover:underline">← Svi povrati i reklamacije</a>
                     <h1 class="mt-2 text-xl font-semibold tracking-tight text-slate-900">{{ $withdrawal->reference }}</h1>
+                    <p class="mt-1 text-sm font-semibold text-slate-700">{{ $withdrawal->typeLabel() }}</p>
                     <p class="mt-1 text-sm text-slate-600">Podneseno {{ $withdrawal->submitted_at?->format('d.m.Y. \u H:i:s') }}</p>
                 </div>
                 <div class="text-right text-xs text-slate-500">
@@ -18,6 +19,11 @@
             <div class="rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-900">
                 <p class="font-semibold">Pogreška pri slanju obavijesti</p>
                 <p class="mt-1 whitespace-pre-line">{{ $withdrawal->notification_error }}</p>
+            </div>
+        @endif
+        @if ($errors->any())
+            <div class="rounded-xl border border-rose-200 bg-rose-50 px-5 py-4 text-sm text-rose-900" role="alert">
+                @foreach ($errors->all() as $error)<p>{{ $error }}</p>@endforeach
             </div>
         @endif
 
@@ -43,9 +49,11 @@
                             @endif
                         </dd></div>
                         <div><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Datum ugovora/narudžbe</dt><dd class="mt-1 text-slate-900">{{ $withdrawal->contract_date?->format('d.m.Y.') ?: 'Nije naveden' }}</dd></div>
-                        <div><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Datum primitka robe</dt><dd class="mt-1 text-slate-900">{{ $withdrawal->received_date?->format('d.m.Y.') ?: 'Nije naveden' }}</dd></div>
+                        <div><dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Kupac primio robu</dt><dd class="mt-1 text-slate-900">{{ $withdrawal->received_date?->format('d.m.Y.') ?: 'Nije naveden' }}</dd></div>
                     </dl>
                 </section>
+
+                @include('admin.withdrawals._items')
 
                 <section class="admin-panel p-6">
                     <h2 class="text-base font-semibold text-slate-900">Proizvodi / dio ugovora koji se raskida</h2>
@@ -64,6 +72,8 @@
                         <label for="withdrawal-status" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Status</label>
                         <select id="withdrawal-status" name="status" class="admin-search-input w-full rounded-xl border px-3 py-2 text-sm">
                             @foreach ($statuses as $value => $label)
+                                @continue($withdrawal->lineItems->isNotEmpty() && ($withdrawal->approved_at ? $value !== $withdrawal->status : ! in_array($value, ['received', 'processing', 'declined'], true)))
+                                @continue($withdrawal->lineItems->isEmpty() && in_array($value, ['approved', 'partially_received'], true))
                                 <option value="{{ $value }}" @selected(old('status', $withdrawal->status) === $value)>{{ $label }}</option>
                             @endforeach
                         </select>

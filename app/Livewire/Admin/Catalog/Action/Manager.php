@@ -13,9 +13,13 @@ class Manager extends Component
     use WithPagination;
 
     public string $search = '';
+
     public string $locale = 'en';
+
     public string $scopeFilter = 'all';
+
     public string $typeFilter = 'all';
+
     public string $stateFilter = 'active';
 
     public function mount(): void
@@ -154,6 +158,7 @@ class Manager extends Component
         return [
             CatalogAction::TYPE_PERCENTAGE => __('Percentage'),
             CatalogAction::TYPE_FIXED => __('Fixed Amount'),
+            CatalogAction::TYPE_FIXED_PRICE => __('Fiksna prodajna cijena'),
             CatalogAction::TYPE_BUY_X_GET_Y => __('Buy X Get Y'),
             CatalogAction::TYPE_GIFT_ON_AMOUNT => __('Gift On Amount'),
         ];
@@ -179,6 +184,7 @@ class Manager extends Component
     {
         return [
             CatalogAction::AUDIENCE_ALL => __('All users'),
+            CatalogAction::AUDIENCE_B2C => __('Samo B2C — Web prodaja'),
             CatalogAction::AUDIENCE_USER_GROUP => __('User group'),
             CatalogAction::AUDIENCE_USER => __('Single user'),
             CatalogAction::AUDIENCE_ROLE => __('Legacy role'),

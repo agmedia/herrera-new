@@ -11,7 +11,7 @@ use Throwable;
 
 class SupplierCatalogFeedClient
 {
-    public const SUPPLIERS = ['videx' => 'Videx', 'dpm' => 'DPM', 'braytron' => 'Braytron'];
+    public const SUPPLIERS = ['videx' => 'Videx', 'dpm' => 'DPM', 'braytron' => 'Braytron', 'master' => 'Vipelectro / Master / VIP', 'esperanza' => 'Esperanza', 'vayox' => 'Vayox'];
 
     public function fetch(string $supplier): array
     {
@@ -62,6 +62,8 @@ class SupplierCatalogFeedClient
                 'videx' => ['yml_catalog', './shop/offers/offer'],
                 'dpm' => ['offers', './PRODUCT'],
                 'braytron' => ['Stoklar', './Stok'],
+                'master', 'vayox' => ['products', './product'],
+                'esperanza' => ['ListaStanCena', './Produkty/Produkt'],
             };
             $rows = $xml->xpath($path) ?: [];
             if ($xml->getName() !== $root || $rows === []) {
@@ -132,7 +134,7 @@ class SupplierCatalogFeedClient
             foreach ($row->xpath('./photo/main|./photo/i') ?: [] as $photo) {
                 $images[] = (string) $photo['url'];
             }
-        } else {
+        } elseif ($supplier === 'braytron') {
             $id = $sku = (string) $row->ProductCode;
             $name = (string) $row->ProductName;
             $description = (string) $row->Description;
@@ -142,10 +144,41 @@ class SupplierCatalogFeedClient
             for ($i = 1; $i <= 10; $i++) {
                 $images[] = (string) $row->{'Image'.$i};
             }
+        } elseif ($supplier === 'esperanza') {
+            $id = $sku = (string) $row->Symbol;
+            $name = trim((string) $row->NazwaEN) ?: (string) $row->Nazwa;
+            $description = '';
+            $price = (string) $row->CenaNettoJM;
+            $currency = strtoupper(trim((string) $row->Waluta)) ?: null;
+            $barcode = trim((string) $row->EAN) ?: null;
+            $quantity = (string) $row->StanJM;
+        } else {
+            $id = $sku = (string) ($supplier === 'master' ? $row->code : $row->sku);
+            $name = (string) $row->name;
+            $description = (string) $row->description;
+            // These supplier snapshots do not supply procurement prices. Never
+            // invent one: enrichment is required before an import can proceed.
+            $price = null;
+            $quantity = (string) ($supplier === 'master' ? $row->stock : $row->quantity);
+            if ($supplier === 'vayox' && is_numeric($quantity) && (float) $quantity < 0) {
+                $quantity = '0';
+            }
+            $barcode = trim((string) $row->ean) ?: null;
+            $images[] = (string) $row->image;
+            for ($i = 1; $i <= 15; $i++) {
+                $images[] = (string) $row->{'image_extra_'.$i};
+            }
         }
         $rawPrice = str_replace(',', '.', trim((string) $price));
+        if ($supplier === 'esperanza' && preg_match('/^\.\d{1,4}$/D', $rawPrice)) {
+            $rawPrice = '0'.$rawPrice;
+        }
         $price = preg_match('/^\d+(?:\.\d{1,4})?$/D', $rawPrice) && (float) $rawPrice <= 99999999 ? $rawPrice : null;
         $rawQuantity = str_replace(',', '.', trim($quantity));
+        // Esperanza writes a zero balance as ".00" in the current export.
+        if ($supplier === 'esperanza' && preg_match('/^\.\d+$/D', $rawQuantity)) {
+            $rawQuantity = '0'.$rawQuantity;
+        }
         if (! preg_match('/^\d+(?:\.\d+)?$/D', $rawQuantity) || (float) $rawQuantity > 2147483647) {
             throw new RuntimeException('Nevaljana zaliha.');
         }

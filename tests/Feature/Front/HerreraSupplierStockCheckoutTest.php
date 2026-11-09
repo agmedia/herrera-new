@@ -68,6 +68,78 @@ class HerreraSupplierStockCheckoutTest extends TestCase
         return ['local only' => [7, 12, 4, 4, 0], 'mixed' => [2, 8, 5, 2, 3], 'supplier only' => [0, 7, 4, 0, 4], 'negative local unchanged' => [-2, 7, 4, 0, 4], 'negative supplier unchanged' => [7, -2, 4, 4, 0]];
     }
 
+    public function test_fixed_supplier_availability_is_not_consumed_or_increased_by_cancellation(): void
+    {
+        $product = $this->product('FIXED', 2, 100000);
+        $product->update(['payload' => ['supplier_availability' => ['mode' => 'fixed', 'quantity' => 100000, 'supplier' => 'nopallux']]]);
+        app(CartService::class)->add($product, 5);
+        $order = app(CheckoutService::class)->placeOrder($this->checkoutPayload());
+        $item = $order->items()->sole();
+        $this->assertSame(0, $product->fresh()->stock_qty);
+        $this->assertSame(100000, $product->fresh()->supplier_stock_qty);
+        $this->assertTrue(data_get($item->payload, 'inventory.supplier_untracked'));
+        $product->update(['supplier_stock_qty' => 77]);
+        $this->assertTrue(app(OrderStockAllocationService::class)->restore($item));
+        $this->assertFalse(app(OrderStockAllocationService::class)->restore($item));
+        $this->assertSame(2, $product->fresh()->stock_qty);
+        $this->assertSame(77, $product->fresh()->supplier_stock_qty);
+    }
+
+    public function test_reviewed_missing_supplier_product_sells_only_remaining_own_stock_then_retires(): void
+    {
+        $product = $this->product('RETIRING', 2, 50);
+        $product->update(['payload' => ['supplier_catalog_retirement' => ['pending' => true]]]);
+        $this->assertSame(2, $product->availableStockQuantity());
+        $estimate = app(\App\Services\Shipping\SupplierDeliveryService::class)->estimate($product, 3);
+        $this->assertSame('unavailable', $estimate['status']);
+        app(CartService::class)->add($product, 2);
+        $order = app(CheckoutService::class)->placeOrder($this->checkoutPayload());
+        $this->assertFalse($product->fresh()->is_active);
+        $this->assertSame(0, $product->fresh()->stock_qty);
+        $this->assertSame(50, $product->fresh()->supplier_stock_qty);
+        $this->assertSame(2, $order->items()->sole()->quantity);
+        $this->assertNotEmpty(data_get($product->fresh()->payload, 'supplier_catalog_retirement.deactivated_at'));
+    }
+
+    public function test_pickup_is_free_and_keeps_address_and_delivery_snapshot_on_order(): void
+    {
+        $pickup = app(\App\Services\Shipping\HerreraPickupConfiguration::class)->configure();
+        $this->assertSame($pickup->id, app(\App\Services\Shipping\HerreraPickupConfiguration::class)->configure()->id);
+        $product = $this->product('PICKUP', 4, 0);
+        app(CartService::class)->add($product, 2);
+        $order = app(CheckoutService::class)->placeOrder(array_replace($this->checkoutPayload(), ['shipping_method_code' => 'herrera_pickup']));
+        $this->assertSame(0.0, (float) $order->shipping_total);
+        $this->assertSame('Gospodarska ulica 10', data_get($order->payload, 'shipping.pickup_address.address_line_1'));
+        $this->assertSame(0, data_get($order->items()->sole()->payload, 'delivery.days'));
+        $this->assertTrue(data_get($order->payload, 'shipping.partial_shipments_allowed'));
+        $pickup->update(['description' => 'Promijenjen opis']);
+        $this->assertStringContainsString('48260 Križevci', data_get($order->fresh()->payload, 'shipping.pickup_instructions'));
+    }
+
+    public function test_delivery_snapshot_uses_locked_current_stock_instead_of_an_earlier_cart_snapshot(): void
+    {
+        $product = $this->product('ETA-RACE', 2, 10);
+        $product->update(['payload' => ['supplier_catalog' => ['supplier' => 'master']]]);
+        $cart = app(CartService::class);
+        $cart->add($product, 2);
+        $raw = $cart->raw();
+        $lines = $cart->lines();
+        $summary = $cart->summary();
+        $this->assertSame(2, $lines->sole()['product']->stock_qty);
+        $product->update(['stock_qty' => 0]);
+        $staleCart = \Mockery::mock(CartService::class);
+        $staleCart->shouldReceive('raw')->andReturn($raw);
+        $staleCart->shouldReceive('lines')->andReturn($lines);
+        $staleCart->shouldReceive('summary')->andReturn($summary);
+        $checkout = new CheckoutService($staleCart, app(\App\Services\Shipping\ShippingCalculator::class));
+        $order = $checkout->placeOrder($this->checkoutPayload());
+        $item = $order->items()->sole();
+        $this->assertSame('supplier', data_get($item->payload, 'delivery.status'));
+        $this->assertNotEmpty(data_get($item->payload, 'delivery.supplier_order_date'));
+        $this->assertSame(0, data_get($item->payload, 'inventory.local_quantity'));
+        $this->assertSame(2, data_get($item->payload, 'inventory.supplier_quantity'));
+    }
+
     #[DataProvider('cancellationProviders')]
     public function test_cancellation_restores_original_pools_once_after_other_inventory_updates(string $provider): void
     {

@@ -37,6 +37,10 @@ class Manager extends Component
 
     public string $customerType = '';
 
+    public string $commerceType = 'all';
+
+    public string $turnoverCustomerType = 'B2B';
+
     public string $visit = '';
 
     public string $visitSince = '';
@@ -63,6 +67,7 @@ class Manager extends Component
         $this->visit = in_array(request()->query('visit'), ['visited', 'unvisited'], true) ? request()->query('visit') : '';
         $this->visitSince = request()->query('visitSince', now()->subDays(60)->format('Y-m-d'));
         $this->representative = ctype_digit((string) request()->query('representative', '')) ? (string) request()->query('representative') : '';
+        $this->commerceType = in_array(request()->query('commerceType'), ['B2B', 'B2C'], true) ? request()->query('commerceType') : 'all';
     }
 
     public function updatedSearch(): void
@@ -99,7 +104,7 @@ class Manager extends Component
 
     public function updated($property): void
     {
-        if (in_array($property, ['representative', 'city', 'postalCode', 'county', 'customerType', 'visit', 'visitSince', 'turnoverCurrency', 'turnoverYear'], true)) {
+        if (in_array($property, ['representative', 'city', 'postalCode', 'county', 'customerType', 'commerceType', 'turnoverCustomerType', 'visit', 'visitSince', 'turnoverCurrency', 'turnoverYear'], true)) {
             $this->resetPage(pageName: self::PAGE_NAME);
         }
     }
@@ -129,8 +134,10 @@ class Manager extends Component
             'visitSince' => ['nullable', 'date'], 'visit' => ['nullable', 'in:visited,unvisited'],
             'turnoverCurrency' => ['required', 'string', 'size:3'], 'turnoverYear' => ['nullable', 'digits:4', 'integer', 'min:1900', 'max:2200'],
             'sortBy' => ['required', 'in:id,name,email,email_verified_at,created_at,webshop_turnover'], 'sortDir' => ['required', 'in:asc,desc'],
+            'commerceType' => ['required', 'in:all,B2B,B2C'], 'turnoverCustomerType' => ['required', 'in:all,B2B,B2C'],
         ]);
         $turnover = Order::query()->withoutCancelled()->selectRaw('COALESCE(SUM(grand_total - tax_total), 0)')
+            ->forCustomerType($this->turnoverCustomerType)
             ->whereColumn('orders.user_id', 'users.id')->whereRaw('UPPER(currency_code) = ?', [strtoupper($this->turnoverCurrency)])
             ->when($this->turnoverYear !== '', fn ($query) => $query->whereRaw('COALESCE(placed_at, created_at) >= ?', [$this->turnoverYear.'-01-01 00:00:00'])->whereRaw('COALESCE(placed_at, created_at) <= ?', [$this->turnoverYear.'-12-31 23:59:59']));
         $settings = app(SystemSettingsService::class);
@@ -153,6 +160,17 @@ class Manager extends Component
                 'profile:id,user_id,company,oib,county,customer_type',
                 'addresses' => fn ($query) => $query->where('type', 'billing'),
             ])
+            ->when($this->commerceType !== 'all', function (Builder $query): void {
+                $business = fn (Builder $identity) => $identity->whereHas('b2bAccount')
+                    ->orWhereHas('profile', fn (Builder $profile) => $profile->whereNotNull('company')->whereRaw("TRIM(company) <> ''"))
+                    ->orWhereHas('addresses', fn (Builder $address) => $address->where('type', 'billing')->whereNotNull('company')->whereRaw("TRIM(company) <> ''"));
+                $query->where('account_type', 'customer');
+                if ($this->commerceType === 'B2B') {
+                    $query->where($business);
+                } else {
+                    $query->whereNot($business);
+                }
+            })
             ->when($this->search !== '', function (Builder $query): void {
                 $term = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], trim($this->search)).'%';
                 $query->where(function (Builder $q) use ($term): void {

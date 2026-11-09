@@ -65,6 +65,8 @@ Route::get('integrations/eracuni/attributes', \App\Http\Controllers\Integrations
     ->middleware('throttle:30,1')->name('integrations.eracuni.attributes');
 
 Route::get('robots.txt', [\App\Http\Controllers\Front\SitemapController::class, 'robots'])->name('seo.robots');
+Route::get('feeds/customers/{token}.xml', \App\Http\Controllers\Feed\CustomerWholesaleFeedController::class)
+    ->where('token', '[A-Za-z0-9]{64}')->middleware('throttle:10,1')->name('feed.customer-wholesale');
 Route::get('sitemap.xml', [\App\Http\Controllers\Front\SitemapController::class, 'index'])->name('seo.sitemap');
 Route::get('sitemap-{kind}-{page}.xml', [\App\Http\Controllers\Front\SitemapController::class, 'part'])
     ->where('kind', 'products|categories|manufacturers|pages|blog')->whereNumber('page')->name('seo.sitemap.part');
@@ -118,6 +120,8 @@ Route::middleware(['front.customer-impersonation', 'front.locale', 'front.device
         Route::get('categories', [CatalogController::class, 'categories'])->name('categories.index');
         Route::get('category/{slug}', [CatalogController::class, 'showCategory'])->name('categories.show');
         Route::get('product/{slug}', [ProductController::class, 'show'])->name('products.show');
+        Route::get('product/{product}/delivery', \App\Http\Controllers\Front\ProductDeliveryController::class)
+            ->whereNumber('product')->middleware('throttle:120,1')->name('products.delivery');
         Route::get('product/{product}/energy/{declaration}/{document}', EprelDocumentController::class)
             ->whereNumber('product')->whereNumber('declaration')->where('document', 'label|sheet')
             ->middleware('throttle:60,1')->name('products.energy.document');
@@ -558,6 +562,7 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
                 Route::view('eprel/catalog', 'admin.integrations.eprel.catalog')->name('eprel.catalog');
                 Route::view('stock', 'admin.integrations.stock.index')->name('stock.index');
                 Route::view('supplier-catalog', 'admin.integrations.supplier-catalog.index')->name('supplier-catalog.index');
+                Route::view('delivery', 'admin.integrations.delivery.index')->name('delivery.index');
                 Route::view('eracuni', 'admin.integrations.eracuni.index')->name('eracuni.index');
                 Route::view('spreadsheet', 'admin.integrations.spreadsheet.index')->name('spreadsheet.index');
                 Route::view('media', 'admin.integrations.media.index')->name('media.index');

@@ -23,6 +23,8 @@ class CatalogAction extends Model
 
     public const TYPE_FIXED = 'fixed_amount';
 
+    public const TYPE_FIXED_PRICE = 'fixed_price';
+
     public const TYPE_BUY_X_GET_Y = 'buy_x_get_y';
 
     public const TYPE_GIFT_ON_AMOUNT = 'gift_on_amount';
@@ -36,6 +38,8 @@ class CatalogAction extends Model
     public const TARGET_MANUFACTURER = 'manufacturer';
 
     public const AUDIENCE_ALL = 'all';
+
+    public const AUDIENCE_B2C = 'b2c';
 
     public const AUDIENCE_USER_GROUP = 'user_group';
 
@@ -106,6 +110,7 @@ class CatalogAction extends Model
         return [
             self::TYPE_PERCENTAGE,
             self::TYPE_FIXED,
+            self::TYPE_FIXED_PRICE,
             self::TYPE_BUY_X_GET_Y,
             self::TYPE_GIFT_ON_AMOUNT,
         ];
@@ -131,6 +136,7 @@ class CatalogAction extends Model
     {
         return [
             self::AUDIENCE_ALL,
+            self::AUDIENCE_B2C,
             self::AUDIENCE_USER_GROUP,
             self::AUDIENCE_USER,
         ];
@@ -201,6 +207,10 @@ class CatalogAction extends Model
     {
         return $query->where(function (Builder $audienceQuery) use ($user): void {
             $audienceQuery->where('audience_type', self::AUDIENCE_ALL);
+
+            if (! $user || ($user->account_type === 'customer' && $user->commerceCustomerType() === 'B2C')) {
+                $audienceQuery->orWhere('audience_type', self::AUDIENCE_B2C);
+            }
 
             if ($user) {
                 $audienceQuery->orWhere(function (Builder $q) use ($user): void {

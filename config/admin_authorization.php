@@ -213,6 +213,10 @@ return [
             'view' => ['integrations.stock.manage'],
             'mutate' => ['integrations.stock.manage'],
         ],
+        'admin.integrations.delivery.index' => [
+            'view' => ['integrations.stock.manage'],
+            'mutate' => ['integrations.stock.manage'],
+        ],
         'admin.integrations.eracuni.index' => [
             'view' => ['integrations.eracuni.manage'],
             'mutate' => ['integrations.eracuni.manage'],

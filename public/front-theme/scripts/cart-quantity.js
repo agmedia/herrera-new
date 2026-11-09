@@ -15,17 +15,16 @@
             control.dataset.cartQtyInit = '1';
 
             const setValue = (value) => {
-                const parsed = Number.parseInt(String(value), 10);
-                input.value = String(Number.isNaN(parsed) ? 1 : Math.min(999, Math.max(1, parsed)));
+                input.value = String(window.ShopOrderQuantity.normalize(input, value));
                 input.dispatchEvent(new Event('change', { bubbles: true }));
             };
 
             decrease.addEventListener('click', () => {
-                setValue((Number.parseInt(input.value, 10) || 1) - 1);
+                setValue(window.ShopOrderQuantity.move(input, -1));
             });
 
             increase.addEventListener('click', () => {
-                setValue((Number.parseInt(input.value, 10) || 1) + 1);
+                setValue(window.ShopOrderQuantity.move(input, 1));
             });
         });
     };

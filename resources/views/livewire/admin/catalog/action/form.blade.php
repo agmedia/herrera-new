@@ -98,9 +98,12 @@
             <div class="admin-panel admin-form-panel p-6">
                 <p class="admin-section-title">{{ __('Logic') }}</p>
 
+                <p class="mt-3 text-sm text-slate-600">{{ __('Za B2C cijene odaberite publiku „Samo B2C — Web prodaja”, zatim pojedine proizvode ili proizvođača. Postotak snižava redovnu cijenu; fiksna prodajna cijena postavlja željenu nižu cijenu po komadu. Pojedinačna akcija koja daje najnižu cijenu ima prednost; popusti se ne zbrajaju.') }}</p>
+                <p class="mt-2 text-xs text-slate-500">{{ app(\App\Services\Pricing\TaxPricingService::class)->pricesIncludeTax() ? __('Iznose cijena unosite s PDV-om, prema postavci kataloga.') : __('Iznose cijena unosite bez PDV-a, prema postavci kataloga. B2C kupcu prikazat će se cijena s PDV-om.') }}</p>
+
                 <div class="mt-4 grid gap-3" style="grid-template-columns: repeat(12, minmax(0, 1fr));">
                     <div style="grid-column: span 4;">
-                        <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Discount Value') }}</label>
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ $form['type'] === \App\Models\Catalog\Action\CatalogAction::TYPE_FIXED_PRICE ? __('Prodajna cijena') : __('Discount Value') }}</label>
                         <input type="number" min="0" step="0.01" wire:model="form.discount_value" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
                         @error('form.discount_value') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                     </div>

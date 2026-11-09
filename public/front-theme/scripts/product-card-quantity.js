@@ -20,9 +20,8 @@
                 return;
             }
 
-            const current = Number.parseInt(input.value, 10) || 1;
             const direction = button.matches('[data-qty-inc]') ? 1 : -1;
-            const value = Math.min(9999, Math.max(1, current + direction));
+            const value = window.ShopOrderQuantity.move(input, direction);
 
             input.value = String(value);
             if ('value' in valueElement) {

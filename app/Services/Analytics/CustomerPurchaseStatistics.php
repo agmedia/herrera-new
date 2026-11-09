@@ -4,6 +4,7 @@ namespace App\Services\Analytics;
 
 use App\Models\User;
 use App\Services\Admin\OrderManagerAccess;
+use App\Services\Sales\ReceivedReturnQuantities;
 use App\Support\OrderStatusClassification;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
@@ -31,7 +32,7 @@ class CustomerPurchaseStatistics
             COUNT(*) AS orders,
             COALESCE(SUM(orders.grand_total), 0) AS order_value,
             COALESCE(SUM(orders.grand_total - orders.tax_total), 0) AS net_value,
-            COALESCE(SUM(orders.item_qty), 0) AS items_sold,
+            COALESCE(SUM(CASE WHEN orders.item_qty > COALESCE(received_order_returns.returned_quantity, 0) THEN orders.item_qty - COALESCE(received_order_returns.returned_quantity, 0) ELSE 0 END), 0) AS items_sold,
             COALESCE(SUM(CASE WHEN orders.paid_at IS NOT NULL OR order_statuses.is_paid = 1 THEN orders.grand_total ELSE 0 END), 0) AS paid_value,
             MIN(COALESCE(orders.placed_at, orders.created_at)) AS first_order_at,
             MAX(COALESCE(orders.placed_at, orders.created_at)) AS last_order_at
@@ -72,6 +73,7 @@ class CustomerPurchaseStatistics
 
         return $this->eligibleOrders($filters)
             ->join('order_items', 'order_items.order_id', '=', 'orders.id')
+            ->leftJoinSub(app(ReceivedReturnQuantities::class)->query(), 'received_item_returns', 'received_item_returns.order_item_id', '=', 'order_items.id')
             ->when(! empty($filters['product_search']), function (Builder $query) use ($filters) {
                 $term = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $filters['product_search']).'%';
                 $query->where(fn (Builder $items) => $items->whereRaw("order_items.name LIKE ? ESCAPE '!'", [$term])
@@ -81,7 +83,7 @@ class CustomerPurchaseStatistics
             ->select('order_items.product_id', 'order_items.product_option_value_id')
             ->selectRaw($identity.' AS historical_identity')
             ->selectRaw('MAX(order_items.name) AS name, MAX(order_items.sku) AS sku, MAX(order_items.code) AS code')
-            ->selectRaw('SUM(order_items.quantity) AS quantity, COUNT(DISTINCT orders.id) AS order_count')
+            ->selectRaw('SUM(CASE WHEN order_items.quantity > COALESCE(received_item_returns.returned_quantity, 0) THEN order_items.quantity - COALESCE(received_item_returns.returned_quantity, 0) ELSE 0 END) AS quantity, COUNT(DISTINCT orders.id) AS order_count')
             // Both checkout and the legacy importer store line totals before tax.
             ->selectRaw('SUM(order_items.line_total) AS net_value')
             ->groupBy('order_items.product_id', 'order_items.product_option_value_id')
@@ -145,9 +147,11 @@ class CustomerPurchaseStatistics
             ->leftJoin('user_profiles as purchase_profiles', 'purchase_profiles.user_id', '=', 'orders.user_id')
             ->leftJoinSub($billingCompanies, 'purchase_billing', 'purchase_billing.user_id', '=', 'orders.user_id')
             ->select('orders.user_id')
+            ->selectRaw("CASE WHEN MIN(orders.customer_type) = MAX(orders.customer_type) THEN MAX(orders.customer_type) ELSE 'all' END AS customer_type")
+            ->selectRaw('CASE WHEN MIN(orders.customer_type) = MAX(orders.customer_type) THEN MAX(orders.cost_centre) ELSE NULL END AS cost_centre')
             ->selectRaw($email.' AS guest_email, '.$anonymous.' AS anonymous_order_id')
             ->selectRaw("MAX(COALESCE(NULLIF(users.name, ''), orders.customer_name)) AS name, MAX(COALESCE(NULLIF(users.email, ''), orders.customer_email)) AS email, MAX(COALESCE(NULLIF(TRIM(purchase_accounts.company_name), ''), NULLIF(TRIM(purchase_profiles.company), ''), NULLIF(TRIM(purchase_billing.company), ''), NULLIF(TRIM(orders.billing_company), ''))) AS company")
-            ->selectRaw('COUNT(*) AS order_count, SUM(orders.grand_total) AS order_value, AVG(orders.grand_total) AS average_order, SUM(orders.item_qty) AS items_sold')
+            ->selectRaw('COUNT(*) AS order_count, SUM(orders.grand_total) AS order_value, AVG(orders.grand_total) AS average_order, SUM(CASE WHEN orders.item_qty > COALESCE(received_order_returns.returned_quantity, 0) THEN orders.item_qty - COALESCE(received_order_returns.returned_quantity, 0) ELSE 0 END) AS items_sold')
             ->selectRaw('MIN(COALESCE(orders.placed_at, orders.created_at)) AS first_order_at, MAX(COALESCE(orders.placed_at, orders.created_at)) AS last_order_at')
             ->groupBy('orders.user_id')
             ->groupByRaw($email)
@@ -157,7 +161,15 @@ class CustomerPurchaseStatistics
     /** @param array<string, mixed> $filters */
     private function eligibleOrders(array $filters): Builder
     {
-        return $this->orders($filters)->whereNot(fn (Builder $query) => $this->whereCancelled($query));
+        $returns = DB::table('order_items as returned_order_items')
+            ->joinSub(app(ReceivedReturnQuantities::class)->query(), 'received_returns', 'received_returns.order_item_id', '=', 'returned_order_items.id')
+            ->select('returned_order_items.order_id')
+            ->selectRaw('SUM(CASE WHEN received_returns.returned_quantity > returned_order_items.quantity THEN returned_order_items.quantity ELSE received_returns.returned_quantity END) AS returned_quantity')
+            ->groupBy('returned_order_items.order_id');
+
+        return $this->orders($filters)
+            ->leftJoinSub($returns, 'received_order_returns', 'received_order_returns.order_id', '=', 'orders.id')
+            ->whereNot(fn (Builder $query) => $this->whereCancelled($query));
     }
 
     private function whereCancelled(Builder $query): void
@@ -170,6 +182,10 @@ class CustomerPurchaseStatistics
     {
         $query = app(OrderManagerAccess::class)->scopeOrders(DB::table('orders'))
             ->leftJoin('order_statuses', 'order_statuses.id', '=', 'orders.status_id');
+
+        if (in_array($filters['customer_type'] ?? null, ['B2B', 'B2C'], true)) {
+            $query->where('orders.customer_type', $filters['customer_type']);
+        }
 
         if (! empty($filters['currency'])) {
             $query->whereRaw('UPPER(orders.currency_code) = ?', [strtoupper($filters['currency'])]);

@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ __('return_request.mail.admin_heading') }}</title>
+    <title>{{ __($withdrawal->request_type === 'claim' ? 'return_request.claim.admin_heading' : 'return_request.mail.admin_heading') }}</title>
     <style>
         body { margin:0; padding:0; background:#f1f5f9; color:#0f172a; font-family:Arial,Helvetica,sans-serif; }
         .wrap { width:100%; padding:24px 10px; box-sizing:border-box; }
@@ -25,9 +25,9 @@
 <body>
     <div class="wrap">
         <div class="card">
-            <div class="head"><h1>{{ __('return_request.mail.admin_heading') }}</h1></div>
+            <div class="head"><h1>{{ __($withdrawal->request_type === 'claim' ? 'return_request.claim.admin_heading' : 'return_request.mail.admin_heading') }}</h1></div>
             <div class="content">
-                <p class="intro">{{ __('return_request.mail.admin_intro') }}</p>
+                <p class="intro">{{ __($withdrawal->request_type === 'claim' ? 'return_request.claim.admin_intro' : 'return_request.mail.admin_intro') }}</p>
                 <div class="statement">{{ $withdrawal->declaration }}</div>
                 <table role="presentation">
                     <tr><th>{{ __('return_request.mail.reference') }}</th><td>{{ $withdrawal->reference }}</td></tr>

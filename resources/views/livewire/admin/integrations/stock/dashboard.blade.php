@@ -23,6 +23,9 @@
         <p role="status" wire:loading wire:target="runSupplier" class="mt-4 rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-800">{{ __('Dohvaćam zalihe i obrađujem artikle. Izvještaj će se prikazati nakon završetka.') }}</p>
     </section>
 
+    <livewire:admin.integrations.stock.fixed-availability />
+    <livewire:admin.integrations.stock.clearance />
+
     <section class="grid gap-4 lg:grid-cols-2" aria-label="{{ __('Izvori zaliha') }}">
         @foreach ($sources as $supplier => $source)
             @php

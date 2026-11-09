@@ -1,11 +1,11 @@
-<x-admin-layout title="Jednostrani raskidi ugovora">
+<x-admin-layout title="Povrati i reklamacije">
     <div class="admin-stack">
         <div class="admin-panel admin-search-panel p-6">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <p class="admin-section-title">Prodaja</p>
-                    <h1 class="mt-2 text-xl font-semibold tracking-tight text-slate-900">Jednostrani raskidi ugovora</h1>
-                    <p class="mt-2 text-sm text-slate-600">Centralna evidencija digitalno podnesenih izjava potrošača.</p>
+                    <h1 class="mt-2 text-xl font-semibold tracking-tight text-slate-900">Povrati i reklamacije</h1>
+                    <p class="mt-2 text-sm text-slate-600">Zahtjevi kupaca, odobrenja i fizički primitak vraćene robe.</p>
                 </div>
                 <a href="{{ route('admin.settings.system.withdrawal-settings') }}" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
                     Postavke
@@ -56,7 +56,7 @@
                                 };
                             @endphp
                             <tr class="hover:bg-slate-50/70">
-                                <td class="whitespace-nowrap px-5 py-4 font-semibold text-slate-900">{{ $withdrawal->reference }}</td>
+                                <td class="whitespace-nowrap px-5 py-4 text-slate-900"><strong>{{ $withdrawal->reference }}</strong><div class="mt-1 text-xs text-slate-500">{{ $withdrawal->typeLabel() }}</div></td>
                                 <td class="px-5 py-4">
                                     <div class="font-medium text-slate-900">{{ $withdrawal->full_name }}</div>
                                     <div class="text-xs text-slate-500">{{ $withdrawal->email }}</div>
@@ -81,7 +81,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="px-5 py-12 text-center text-slate-500">Nema evidentiranih raskida ugovora za odabrane filtre.</td>
+                                <td colspan="7" class="px-5 py-12 text-center text-slate-500">Nema evidentiranih povrata i reklamacija za odabrane filtre.</td>
                             </tr>
                         @endforelse
                     </tbody>

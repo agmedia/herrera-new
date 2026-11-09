@@ -34,6 +34,9 @@
         @include('front.desktop.account.partials.nav', ['current' => 'order_show'])
 
         <div class="min-w-0 space-y-6">
+            @if (data_get($order->payload, 'shipping.pickup_instructions'))
+                <section class="border border-slate-200 bg-white p-6"><h2 class="font-semibold">{{ __('Osobno preuzimanje') }}</h2><p class="mt-2 text-sm">{{ data_get($order->payload, 'shipping.pickup_instructions') }}</p></section>
+            @endif
             <section class="border border-slate-200 bg-white p-6" data-order-billing-address>
                 <h2 class="text-lg font-semibold text-slate-900">{{ __('ui.checkout.sections.billing') }}</h2>
                 <div class="mt-3 space-y-1 text-sm text-slate-700">
@@ -252,6 +255,7 @@
                                             @if ($item->sku)
                                                 <p class="mt-1 text-xs text-slate-500">SKU: {{ $item->sku }}</p>
                                             @endif
+                                            @if (data_get($item->payload, 'delivery.label'))<p class="mt-1 text-xs text-emerald-800">{{ __('Procjena isporuke pri naručivanju') }}: {{ data_get($item->payload, 'delivery.label') }}</p>@endif
                                         </div>
                                     </div>
                                 </td>

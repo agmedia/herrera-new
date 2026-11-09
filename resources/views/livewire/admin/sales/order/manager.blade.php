@@ -25,7 +25,7 @@
             </div>
 
             <div class="w-full xl:max-w-[72rem]">
-                <div class="grid w-full items-end gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(24rem,1fr)_13rem_10rem_10rem]">
+                <div class="grid w-full items-end gap-3 sm:grid-cols-2 xl:grid-cols-5">
                     <div>
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('admin.common.search') }}</label>
                         <input
@@ -34,6 +34,14 @@
                             placeholder="{{ __('Order #, customer, email, phone...') }}"
                             class="admin-search-input w-full rounded-xl border px-3 py-2 text-sm"
                         />
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Prodajni kanal') }}</label>
+                        <select wire:model.live="customerType" class="admin-select w-full rounded-xl border px-3 py-2 text-sm">
+                            <option value="all">{{ __('Sve narudžbe') }}</option>
+                            <option value="B2B">{{ __('B2B') }}</option>
+                            <option value="B2C">{{ __('B2C — Web prodaja') }}</option>
+                        </select>
                     </div>
                     <div>
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Status') }}</label>
@@ -85,7 +93,7 @@
                             <p class="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{{ __('Customer') }}</p>
                             <p class="mt-1 font-medium text-slate-800">{{ $row->customerDisplayName() }} <span class="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{{ $row->commerceCustomerType() }}</span></p>
                             @if ($row->customerDisplayName() !== $row->customer_name)<p class="text-xs text-slate-500">{{ __('Kontakt') }}: {{ $row->customer_name }}</p>@endif
-                            <p class="truncate text-xs text-slate-500">{{ $row->customer_email }}</p>
+                            <p class="truncate text-xs text-slate-500">{{ $row->customer_email }}</p>@if ($row->commerceCostCentre())<p class="text-xs font-semibold text-slate-500">{{ __('Mjesto troška') }}: {{ $row->commerceCostCentre() }}</p>@endif
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <div>
@@ -167,7 +175,7 @@
                             <td class="px-3 py-2 text-slate-700">
                                 <div class="font-medium">{{ $row->customerDisplayName() }} <span class="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{{ $row->commerceCustomerType() }}</span></div>
                             @if ($row->customerDisplayName() !== $row->customer_name)<p class="text-xs text-slate-500">{{ __('Kontakt') }}: {{ $row->customer_name }}</p>@endif
-                                <div class="text-xs text-slate-500">{{ $row->customer_email }}</div>
+                                <div class="text-xs text-slate-500">{{ $row->customer_email }}</div>@if ($row->commerceCostCentre())<div class="text-xs font-semibold text-slate-500">{{ __('Mjesto troška') }}: {{ $row->commerceCostCentre() }}</div>@endif
                             </td>
                             <td class="px-3 py-2 text-center text-slate-700">
                                 <div class="font-semibold">{{ \App\Support\Currency::format((float) $row->grand_total, $row->currency_code) }}</div>

@@ -511,6 +511,9 @@ class CatalogController extends Controller
                 'products.code',
                 'products.sku',
                 'products.barcode',
+                'products.unit_of_measure',
+                'products.minimum_order_quantity',
+                'products.order_quantity_step',
                 'products.base_price',
                 'products.stock_qty',
                 'products.supplier_stock_qty',
@@ -903,6 +906,9 @@ class CatalogController extends Controller
                     'products.code',
                     'products.sku',
                     'products.barcode',
+                    'products.unit_of_measure',
+                    'products.minimum_order_quantity',
+                    'products.order_quantity_step',
                     'products.base_price',
                     'products.stock_qty',
                     'products.supplier_stock_qty',
@@ -2584,8 +2590,9 @@ class CatalogController extends Controller
             ->selectRaw('1')
             ->active()
             ->where('scope', CatalogAction::SCOPE_PRODUCT)
-            ->whereIn('type', [CatalogAction::TYPE_PERCENTAGE, CatalogAction::TYPE_FIXED])
+            ->whereIn('type', [CatalogAction::TYPE_PERCENTAGE, CatalogAction::TYPE_FIXED, CatalogAction::TYPE_FIXED_PRICE])
             ->where('discount_value', '>', 0)
+            ->where(fn (Builder $action) => $action->where('type', '!=', CatalogAction::TYPE_FIXED_PRICE)->orWhereColumn('discount_value', '<', 'products.base_price'))
             ->availableForAudience($user)
             ->where(function (Builder $couponQuery): void {
                 $couponQuery

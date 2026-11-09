@@ -27,7 +27,7 @@ class StockFeedClient
         $format = match ($supplier) {
             'braytron', 'brytron' => 'braytron',
             'videx', 'allegro' => 'videx',
-            'master', 'dpm', 'vayox', 'enovalite', 'eracuni', 'brock' => $supplier,
+            'master', 'dpm', 'vayox', 'esperanza', 'enovalite', 'eracuni', 'brock' => $supplier,
             default => throw new RuntimeException('Nepoznat izvor zalihe.'),
         };
         $connection = $this->settings->connection($supplier);
@@ -188,6 +188,7 @@ class StockFeedClient
             'videx' => ['yml_catalog', './shop/offers/offer', 'vendorCode', 'stock_quantity'],
             'dpm' => ['offers', './PRODUCT', 'ean', 'BOX_QTY'],
             'vayox' => ['products', './product', 'ean', 'quantity'],
+            'esperanza' => ['ListaStanCena', './Produkty/Produkt', 'Symbol', 'StanJM'],
             'brock' => [null, './products_inner/product_inner', 'ean_code', 'stock'],
         };
         $items = $xml->xpath($path);
@@ -203,6 +204,9 @@ class StockFeedClient
             // DPM historically treats an empty BOX_QTY as zero.
             if ($format === 'dpm' && $quantity !== null && trim($quantity) === '') {
                 $quantity = '0';
+            }
+            if ($format === 'esperanza' && $quantity !== null && preg_match('/^\.\d+$/D', trim($quantity))) {
+                $quantity = '0'.trim($quantity);
             }
             $rows[] = ['identifier' => (string) $item->{$identifierKey}, 'quantity' => $quantity];
         }

@@ -73,8 +73,9 @@
 
         const currentQty = function (form) {
             const input = form.querySelector('input[name="quantity"]');
-            const value = Number.parseInt(String(input ? input.value : '1'), 10);
-            return Number.isNaN(value) ? 1 : Math.min(99, Math.max(1, value));
+            const quantity = window.ShopOrderQuantity.normalize(input, input?.value);
+            if (input) input.value = String(quantity);
+            return quantity;
         };
 
         const submit = async function (form) {
@@ -85,6 +86,7 @@
             const optionError = form.querySelector('[data-option-error]');
 
             form.dataset.cartSubmitting = '1';
+            currentQty(form);
 
             try {
                 const response = await fetch(form.action, {
@@ -178,9 +180,8 @@
                     return;
                 }
 
-                const current = Number.parseInt(input.value, 10) || 1;
                 const direction = quantityButton.matches('[data-qty-inc]') ? 1 : -1;
-                const value = Math.min(9999, Math.max(1, current + direction));
+                const value = window.ShopOrderQuantity.move(input, direction);
 
                 input.value = String(value);
                 if ('value' in valueElement) {

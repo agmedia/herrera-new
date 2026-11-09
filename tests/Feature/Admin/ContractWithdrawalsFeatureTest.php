@@ -18,9 +18,10 @@ class ContractWithdrawalsFeatureTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_can_view_and_process_contract_withdrawals(): void
+    public function test_assigned_admin_can_view_and_process_contract_withdrawals(): void
     {
         $admin = $this->makeUserWithRole('admin');
+        app(SystemSettingsService::class)->put('store_withdrawal_approver_email', $admin->email);
         $withdrawal = $this->makeWithdrawal();
 
         $this->actingAs($admin)
@@ -94,11 +95,9 @@ class ContractWithdrawalsFeatureTest extends TestCase
             ->post('/admin/withdrawals/'.$withdrawal->id.'/resend')
             ->assertRedirect('/admin/withdrawals/'.$withdrawal->id);
 
-        Mail::assertSent(ContractWithdrawalReceiptMail::class, static fn ($mail): bool =>
-            $mail->hasTo('buyer@example.test')
+        Mail::assertSent(ContractWithdrawalReceiptMail::class, static fn ($mail): bool => $mail->hasTo('buyer@example.test')
         );
-        Mail::assertSent(ContractWithdrawalAdminMail::class, static fn ($mail): bool =>
-            $mail->hasTo('returns@example.test')
+        Mail::assertSent(ContractWithdrawalAdminMail::class, static fn ($mail): bool => $mail->hasTo('returns@example.test')
         );
 
         $withdrawal->refresh();

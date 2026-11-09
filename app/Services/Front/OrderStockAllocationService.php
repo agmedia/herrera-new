@@ -45,12 +45,16 @@ class OrderStockAllocationService
         }
         $localQuantity = min($quantity, max(0, (int) $product->stock_qty));
         $supplierQuantity = $quantity - $localQuantity;
+        $supplierUntracked = data_get($product->payload, 'supplier_availability.mode') === 'fixed';
         $product->forceFill([
             'stock_qty' => (int) $product->stock_qty - $localQuantity,
-            'supplier_stock_qty' => (int) $product->supplier_stock_qty - $supplierQuantity,
+            'supplier_stock_qty' => (int) $product->supplier_stock_qty - ($supplierUntracked ? 0 : $supplierQuantity),
         ])->save();
+        app(\App\Services\Integrations\SupplierCatalog\SupplierCatalogRetirementService::class)->reconcile($product);
+        app(\App\Services\Catalog\Clearance\ClearanceService::class)->reconcile($product);
         $allocation['local_quantity'] = $localQuantity;
         $allocation['supplier_quantity'] = $supplierQuantity;
+        $allocation['supplier_untracked'] = $supplierUntracked;
 
         return $allocation;
     }
@@ -59,7 +63,12 @@ class OrderStockAllocationService
     public function restore(OrderItem $item): bool
     {
         return DB::transaction(function () use ($item): bool {
+            // Receipt processing locks the order before its lines too.
+            \App\Models\Sales\Order\Order::query()->whereKey($item->order_id)->lockForUpdate()->firstOrFail();
             $item = OrderItem::query()->lockForUpdate()->findOrFail($item->id);
+            if (\App\Models\Sales\ContractWithdrawalItem::query()->where('order_item_id', $item->id)->where('received_quantity', '>', 0)->exists()) {
+                throw ValidationException::withMessages(['order' => 'Narudžba ima fizički zaprimljen povrat. Zalihe uredite kroz evidenciju povrata.']);
+            }
             $payload = is_array($item->payload) ? $item->payload : [];
             $allocation = is_array($payload['inventory'] ?? null) ? $payload['inventory'] : null;
             if (! empty($allocation['restored_at'])) {
@@ -90,9 +99,11 @@ class OrderStockAllocationService
                 $product = Product::query()->lockForUpdate()->find($item->product_id);
                 if ($product) {
                     $stock = ! empty($allocation['legacy_local_fallback']) ? max(0, (int) $product->stock_qty) : (int) $product->stock_qty;
+                    $restoreSupplier = empty($allocation['supplier_untracked'])
+                        && data_get($product->payload, 'supplier_availability.mode') !== 'fixed';
                     $product->forceFill([
                         'stock_qty' => $stock + max(0, (int) ($allocation['local_quantity'] ?? 0)),
-                        'supplier_stock_qty' => (int) $product->supplier_stock_qty + max(0, (int) ($allocation['supplier_quantity'] ?? 0)),
+                        'supplier_stock_qty' => (int) $product->supplier_stock_qty + ($restoreSupplier ? max(0, (int) ($allocation['supplier_quantity'] ?? 0)) : 0),
                     ])->save();
                 }
             }

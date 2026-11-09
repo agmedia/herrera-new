@@ -115,6 +115,9 @@ class StockSyncService
             Product::query()->select(['id', 'code', 'sku', 'barcode', 'payload', 'stock_qty', 'supplier_stock_qty'])
                 ->lockForUpdate()->chunkById(500, function ($products) use ($definition, $target, $quantities, &$matched, &$counts, &$resetCount, $addItem): void {
                     foreach ($products as $product) {
+                        if ($target === 'supplier_stock_qty' && data_get($product->payload, 'supplier_availability.mode') === 'fixed') {
+                            continue;
+                        }
                         $legacy = $product->payload['opencart'] ?? [];
                         $identifier = $this->identifier($product, $definition['match'], $legacy);
                         $key = 'id:'.$identifier;
@@ -139,6 +142,11 @@ class StockSyncService
                         $counts[$status === 'updated' ? 'updated_count' : 'unchanged_count']++;
                         if ($old !== $quantity) {
                             DB::table('products')->where('id', $product->id)->update([$target => $quantity, 'updated_at' => now()]);
+                        }
+                        if ($target === 'stock_qty') {
+                            $product->stock_qty = $quantity;
+                            app(\App\Services\Integrations\SupplierCatalog\SupplierCatalogRetirementService::class)->reconcile($product);
+                            app(\App\Services\Catalog\Clearance\ClearanceService::class)->reconcile($product);
                         }
                         $addItem([
                             'product_id' => $product->id, 'identifier' => $identifier, 'status' => $status,

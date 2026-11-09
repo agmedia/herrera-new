@@ -24,7 +24,7 @@ class ContractWithdrawalReceiptMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: __('return_request.mail.customer_subject', [
+            subject: __($this->withdrawal->request_type === 'claim' ? 'return_request.claim.customer_subject' : 'return_request.mail.customer_subject', [
                 'reference' => $this->withdrawal->reference,
             ]),
         );

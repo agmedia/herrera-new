@@ -37,6 +37,8 @@ class StockFeedClientTest extends TestCase
         return [
             'Braytron ProductCode' => ['braytron', '<Stoklar><Stok><ProductCode>001234</ProductCode><Quantity>7</Quantity></Stok></Stoklar>', 7],
             'Master code' => ['master', '<products><product><code>001234</code><stock>8</stock></product></products>', 8],
+            'Esperanza symbol' => ['esperanza', '<ListaStanCena><Produkty><Produkt><Symbol>001234</Symbol><StanJM>6</StanJM></Produkt></Produkty></ListaStanCena>', 6],
+            'Esperanza decimal zero' => ['esperanza', '<ListaStanCena><Produkty><Produkt><Symbol>001234</Symbol><StanJM>.00</StanJM></Produkt></Produkty></ListaStanCena>', 0],
             'Videx vendorCode' => ['videx', '<yml_catalog><shop><offers><offer><vendorCode>001234</vendorCode><stock_quantity>9</stock_quantity></offer></offers></shop></yml_catalog>', 9],
             'Videx normal external DOCTYPE' => ['videx', '<!DOCTYPE yml_catalog SYSTEM "shops.dtd"><yml_catalog><shop><offers><offer><vendorCode>001234</vendorCode><stock_quantity>9</stock_quantity></offer></offers></shop></yml_catalog>', 9],
             'DPM legacy BOX_QTY' => ['dpm', '<offers><PRODUCT><ean>001234</ean><stock>99</stock><BOX_QTY>10</BOX_QTY></PRODUCT></offers>', 10],

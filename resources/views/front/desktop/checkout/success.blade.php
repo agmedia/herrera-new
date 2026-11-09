@@ -79,6 +79,9 @@
             </section>
         @endif
 
+        @if (data_get($order->payload, 'shipping.pickup_instructions'))
+            <section class="mt-6 border border-slate-200 p-4"><h2 class="font-semibold">{{ __('Osobno preuzimanje') }}</h2><p class="mt-2 text-sm">{{ data_get($order->payload, 'shipping.pickup_instructions') }}</p></section>
+        @endif
         <div class="mt-8 flex flex-wrap gap-2">
             @auth
                 <a href="{{ route('account.orders.show', ['orderNumber' => $order->order_number]) }}" class="checkout-primary-button px-5 py-2.5">{{ __('ui.checkout.success.view_in_account') }}</a>

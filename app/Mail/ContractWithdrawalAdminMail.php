@@ -22,7 +22,7 @@ class ContractWithdrawalAdminMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: __('return_request.mail.admin_subject', [
+            subject: __($this->withdrawal->request_type === 'claim' ? 'return_request.claim.admin_subject' : 'return_request.mail.admin_subject', [
                 'order' => $this->withdrawal->order_number,
                 'reference' => $this->withdrawal->reference,
             ]),

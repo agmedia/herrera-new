@@ -334,6 +334,9 @@ class CheckoutService
                     'coupon_code' => (string) ($summary['coupon_code'] ?? ''),
                     'monetary_precision' => $precision,
                     'shipping' => [
+                        'partial_shipments_allowed' => true,
+                        'pickup_address' => data_get($shippingMethod->settings, 'pickup_address'),
+                        'pickup_instructions' => $shippingMethod->service_type === 'pickup' ? $shippingMethod->description : null,
                         'tax_total' => $shippingTaxTotal,
                         'tax_rate_percent' => (float) data_get($shippingMethod->settings, 'tax_rate_percent', 0),
                         'destination' => $shippingDestination->toArray(),
@@ -374,7 +377,7 @@ class CheckoutService
             $index = 0;
             foreach ($lines as $line) {
                 /** @var Product $product */
-                $product = $line['product'];
+                $product = Product::query()->lockForUpdate()->findOrFail($line['product']->id);
                 $translation = $line['translation'];
 
                 $quantity = (int) $line['quantity'];
@@ -387,11 +390,12 @@ class CheckoutService
                 $lineTaxRate = round((float) ($line['tax_rate'] ?? $defaultTaxRate), 4);
                 $productOptionValueId = isset($line['product_option_value_id']) ? (int) $line['product_option_value_id'] : null;
                 $optionRow = $productOptionValueId
-                    ? ProductOptionValue::query()->find($productOptionValueId)
+                    ? ProductOptionValue::query()->where('product_id', $product->id)->lockForUpdate()->find($productOptionValueId)
                     : null;
                 if ($productOptionValueId && ! $optionRow) {
                     throw ValidationException::withMessages(['cart' => 'Odabrana varijanta više nije dostupna.']);
                 }
+                $deliveryEstimate = app(\App\Services\Shipping\SupplierDeliveryService::class)->estimate($product, $quantity, $optionRow, pickup: $shippingMethod->service_type === 'pickup');
                 $stockAllocation = app(OrderStockAllocationService::class)->reserve($product, $quantity, $optionRow);
 
                 OrderItem::query()->create([
@@ -411,6 +415,7 @@ class CheckoutService
                     'payload' => [
                         'product_slug' => (string) ($translation?->slug ?? ''),
                         'inventory' => $stockAllocation,
+                        'delivery' => $deliveryEstimate,
                         'pricing' => [
                             'source' => $line['b2b_source_type'] ?? $line['price_source'] ?? 'base',
                             'catalog_id' => $line['price_catalog_id'] ?? null,

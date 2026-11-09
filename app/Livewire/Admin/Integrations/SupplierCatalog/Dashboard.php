@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Integrations\SupplierCatalog;
 
+use App\Jobs\Integrations\SupplierCatalog\ImportSupplierCatalogueDrafts;
 use App\Jobs\Integrations\SupplierCatalog\ImportSupplierImages;
 use App\Models\Catalog\Category\Category;
 use App\Models\Integrations\SupplierCatalog\SupplierCatalogItem;
@@ -116,10 +117,28 @@ class Dashboard extends Component
         $item = SupplierCatalogItem::query()->where('supplier', $this->supplier)->whereNotNull('product_id')->findOrFail($id);
         abort_unless(\App\Models\Catalog\Product\Product::query()->whereKey($item->product_id)->where('payload->supplier_catalog->supplier', $this->supplier)->exists(), 403);
         $this->runAction(function () use ($item): string {
-            ImportSupplierImages::dispatch($item->id)->onQueue('integrations');
+            ImportSupplierImages::dispatch($item->id)->onConnection('database')->onQueue('integrations');
 
             return 'Dohvat slika je stavljen u red.';
         });
+    }
+
+    public function importAllDrafts(): void
+    {
+        $this->authorizeManage();
+        $this->runAction(function (): string {
+            $options = app(SupplierCatalogService::class)->validateOptions($this->options);
+            $lastId = (int) SupplierCatalogItem::query()->where('supplier', $this->supplier)->where('is_current', true)->max('id');
+            ImportSupplierCatalogueDrafts::dispatch($this->supplier, $options, auth()->id(), $lastId)->onConnection('database')->onQueue('integrations');
+
+            return 'Uvoz cijelog aktualnog asortimana stavljen je u red. Novi artikli s kategorijom i valjanom cijenom postaju neaktivni nacrti. Stavke bez cijene, valute ili kategorije ostaju na pregledu.';
+        });
+    }
+
+    public function reviewMissing(int $id): void
+    {
+        $this->authorizeManage();
+        $this->runAction(fn (): string => app(SupplierCatalogService::class)->reviewMissing($this->supplier, $id, auth()->id()));
     }
 
     public function render()
@@ -142,18 +161,23 @@ class Dashboard extends Component
             ->select('category_key', 'category_name')->distinct()->orderBy('category_name')->get();
         $items = $this->query()->orderBy('name')->paginate(25);
         $prices = [];
+        $exchangeReference = null;
         // Options may be incomplete while the user edits a field.
         try {
             $validOptions = $service->validateOptions($this->options);
+            if (($validOptions['exchange_rate_source'] ?? '') === 'ecb') {
+                $exchangeReference = ['date' => $validOptions['exchange_rate_date'], 'rate' => $validOptions['exchange_rate']];
+            }
             foreach ($items as $item) {
                 $prices[$item->id] = $service->price($item, $validOptions);
             }
-        } catch (ValidationException) {
+        } catch (\RuntimeException|ValidationException) {
         }
 
         return view('livewire.admin.integrations.supplier-catalog.dashboard', [
             'suppliers' => SupplierCatalogFeedClient::SUPPLIERS, 'items' => $items, 'categoryLabels' => $categoryLabels,
             'sourceCategories' => $sourceCategories, 'prices' => $prices, 'storeCurrency' => $service->storeCurrency(),
+            'exchangeReference' => $exchangeReference,
             'storedIncludesTax' => app(\App\Services\Pricing\TaxPricingService::class)->pricesIncludeTax(),
             'taxRates' => TaxRate::query()->where('is_active', true)->orderBy('sort_order')->get(),
             'counts' => SupplierCatalogItem::query()->where('supplier', $this->supplier)->where('is_current', true)->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status'),

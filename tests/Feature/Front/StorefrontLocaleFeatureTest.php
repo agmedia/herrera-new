@@ -41,7 +41,7 @@ class StorefrontLocaleFeatureTest extends TestCase
 
         $this->get('/returns-and-claims')
             ->assertOk()
-            ->assertSee('Withdraw from contract')
+            ->assertSee('Returns and claims')
             ->assertSee('/returns-and-claims', false);
 
         $this->from('/returns-and-claims')->get('/locale/de');

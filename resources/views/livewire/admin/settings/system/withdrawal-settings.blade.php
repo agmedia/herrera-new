@@ -18,6 +18,19 @@
         </div>
 
         <div>
+            <label for="withdrawal-notification-emails" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Odgovorne osobe i skladište</label>
+            <textarea id="withdrawal-notification-emails" wire:model="notificationEmails" rows="4" class="admin-search-input w-full rounded-xl border px-3 py-2 text-sm"></textarea>
+            <p class="mt-1 text-xs text-slate-500">Dodatni primatelji svakog zahtjeva, svaki e-mail u novi red. Administrator iznad također prima obavijest.</p>
+            @error('notificationEmails') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
+        </div>
+        <div>
+            <label for="withdrawal-approver-email" class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Osoba koja odobrava povrate i reklamacije</label>
+            <input id="withdrawal-approver-email" type="email" wire:model="approverEmail" class="admin-search-input w-full rounded-xl border px-3 py-2 text-sm">
+            <p class="mt-1 text-xs text-slate-500">Mora imati korisnički račun i ovlast za obradu povrata. Superadministrator može pomoći pri obradi.</p>
+            @error('approverEmail') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
+        </div>
+
+        <div>
             <label for="withdrawal-return-address" class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Adresa za povrat robe
             </label>

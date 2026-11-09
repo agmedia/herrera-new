@@ -175,8 +175,8 @@ class NabavaNetFeedService
         return CatalogAction::query()
             ->active()
             ->where('scope', CatalogAction::SCOPE_PRODUCT)
-            ->where('audience_type', CatalogAction::AUDIENCE_ALL)
-            ->whereIn('type', [CatalogAction::TYPE_PERCENTAGE, CatalogAction::TYPE_FIXED])
+            ->availableForAudience(null)
+            ->whereIn('type', [CatalogAction::TYPE_PERCENTAGE, CatalogAction::TYPE_FIXED, CatalogAction::TYPE_FIXED_PRICE])
             ->where(function ($query): void {
                 $query->whereNull('coupon_code')->orWhere('coupon_code', '');
             })

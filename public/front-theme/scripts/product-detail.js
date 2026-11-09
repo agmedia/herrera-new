@@ -466,20 +466,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const setValue = function (value) {
-            const numeric = Number.parseInt(String(value), 10);
-            const maximum = Number.parseInt(String(input.max || '99'), 10) || 99;
-            const clamped = Number.isNaN(numeric) ? 1 : Math.min(maximum, Math.max(1, numeric));
-            input.value = String(clamped);
+            input.value = String(window.ShopOrderQuantity.normalize(input, value));
             input.dispatchEvent(new Event('input', { bubbles: true }));
             input.dispatchEvent(new Event('change', { bubbles: true }));
         };
 
         dec.addEventListener('click', function () {
-            setValue((Number.parseInt(String(input.value), 10) || 1) - 1);
+            setValue(window.ShopOrderQuantity.move(input, -1));
         });
 
         inc.addEventListener('click', function () {
-            setValue((Number.parseInt(String(input.value), 10) || 1) + 1);
+            setValue(window.ShopOrderQuantity.move(input, 1));
         });
     });
 
@@ -500,9 +497,7 @@ document.addEventListener('DOMContentLoaded', function () {
             || document.querySelector('[data-product-detail-lower]');
 
         const normalizedQuantity = function (value) {
-            const numeric = Number.parseInt(String(value), 10);
-            const maximum = Number.parseInt(String(sourceQtyInput ? sourceQtyInput.max : '99'), 10) || 99;
-            return Number.isNaN(numeric) ? 1 : Math.min(maximum, Math.max(1, numeric));
+            return window.ShopOrderQuantity.normalize(sourceQtyInput, value);
         };
 
         const syncFloatingQuantity = function () {
@@ -531,13 +526,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (floatingQtyDec) {
             floatingQtyDec.addEventListener('click', function () {
-                setSourceQuantity((Number.parseInt(String(sourceQtyInput ? sourceQtyInput.value : '1'), 10) || 1) - 1);
+                setSourceQuantity(window.ShopOrderQuantity.move(sourceQtyInput, -1));
             });
         }
 
         if (floatingQtyInc) {
             floatingQtyInc.addEventListener('click', function () {
-                setSourceQuantity((Number.parseInt(String(sourceQtyInput ? sourceQtyInput.value : '1'), 10) || 1) + 1);
+                setSourceQuantity(window.ShopOrderQuantity.move(sourceQtyInput, 1));
             });
         }
 
@@ -638,7 +633,31 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     };
 
+    const deliveryRequests = new WeakMap();
+    const syncDeliveryEstimate = function (form) {
+        if (!form.dataset.productDeliveryUrl || form.dataset.productStockVisible === '1') return;
+        const displayRoot = form.closest('[data-product-detail]') || form;
+        const previous = deliveryRequests.get(form);
+        if (previous) { clearTimeout(previous.timer); previous.controller.abort(); }
+        const controller = new AbortController();
+        const timer = setTimeout(async function () {
+            const params = new URLSearchParams();
+            params.set('quantity', String(currentQty(form)));
+            const selected = new FormData(form).get('product_option_value_id');
+            if (selected) params.set('product_option_value_id', String(selected));
+            try {
+                const response = await fetch(form.dataset.productDeliveryUrl + '?' + params.toString(), { headers: { Accept: 'application/json' }, signal: controller.signal });
+                if (!response.ok) return;
+                const estimate = await response.json();
+                if (controller.signal.aborted || !estimate.label) return;
+                displayRoot.querySelectorAll('[data-product-delivery-time]').forEach(function (node) { node.textContent = estimate.label; });
+            } catch (error) { /* Keep the server-rendered estimate if the connection is interrupted. */ }
+        }, 180);
+        deliveryRequests.set(form, { controller: controller, timer: timer });
+    };
+
     const syncStockDisplay = function (form) {
+        const displayRoot = form.closest('[data-product-detail]') || form;
         const radio = form.querySelector('input[name="product_option_value_id"]:checked');
         const select = form.querySelector('select[name="product_option_value_id"]');
         const selected = radio || (select && !select.disabled && select.value ? select.options[select.selectedIndex] : null);
@@ -649,14 +668,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const supplierStock = Math.max(0, Number.parseInt(String(selected ? '0' : form.dataset.productDefaultSupplierStock), 10) || 0);
 
         (stockVisible ? [['[data-product-local-stock]', localStock], ['[data-product-supplier-stock]', supplierStock]] : []).forEach(function ([selector, quantity]) {
-            document.querySelectorAll(selector).forEach(function (node) {
+            displayRoot.querySelectorAll(selector).forEach(function (node) {
                 node.textContent = quantity.toLocaleString(document.documentElement.lang || 'hr');
                 node.classList.toggle('text-emerald-700', quantity > 0);
                 node.classList.toggle('text-slate-500', quantity <= 0);
             });
         });
 
-        document.querySelectorAll('[data-product-delivery-time]').forEach(function (node) {
+        displayRoot.querySelectorAll('[data-product-delivery-time]').forEach(function (node) {
             node.textContent = localAvailable
                 ? form.dataset.productDeliveryLocal
                 : (supplierAvailable ? form.dataset.productDeliverySupplier : form.dataset.productDeliveryUnavailable);
@@ -668,9 +687,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (input) {
             // Customers receive a fixed input limit; actual availability is validated on the server.
             input.max = stockVisible
-                ? String(Math.max(1, Math.min(99, localStock + supplierStock)))
-                : (localAvailable || supplierAvailable ? '99' : '1');
-            input.value = String(Math.min(Number.parseInt(input.max, 10), Math.max(1, Number.parseInt(input.value, 10) || 1)));
+                ? String(Math.max(1, Math.min(999, localStock + supplierStock)))
+                : (localAvailable || supplierAvailable ? '999' : String(window.ShopOrderQuantity.limits(input).minimum));
+            input.value = String(window.ShopOrderQuantity.normalize(input, input.value));
             input.dispatchEvent(new Event('input', { bubbles: true }));
         }
     };
@@ -857,12 +876,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const currentQty = function (form) {
         const input = form.querySelector('input[name="quantity"]');
-        const value = Number.parseInt(String(input ? input.value : '1'), 10);
-        if (Number.isNaN(value)) {
-            return 1;
-        }
-
-        return Math.min(99, Math.max(1, value));
+        return window.ShopOrderQuantity.normalize(input, input?.value);
     };
 
     const confirmAdded = function (form, payload) {
@@ -876,12 +890,20 @@ document.addEventListener('DOMContentLoaded', function () {
         syncSkuDisplay(form);
         syncPriceDisplay(form);
         syncStockDisplay(form);
+        syncDeliveryEstimate(form);
+        form.addEventListener('input', function (event) {
+            if (event.target.matches('input[name="quantity"]')) syncDeliveryEstimate(form);
+        });
+        form.addEventListener('change', function (event) {
+            if (event.target.matches('input[name="quantity"]')) syncDeliveryEstimate(form);
+        });
 
         form.querySelectorAll('input[name="product_option_value_id"], select[name="product_option_value_id"], [data-linked-option-primary]').forEach(function (field) {
             field.addEventListener('change', function () {
                 syncSkuDisplay(form);
                 syncPriceDisplay(form);
                 syncStockDisplay(form);
+                syncDeliveryEstimate(form);
             });
         });
 

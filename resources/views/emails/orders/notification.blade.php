@@ -78,6 +78,7 @@
                     <tr><td class="label">{{ __('mail.orders.placed_at') }}</td><td>{{ $placed_at }}</td></tr>
                     <tr><td class="label">{{ __('mail.orders.payment') }}</td><td>{{ $payment_method }}</td></tr>
                     <tr><td class="label">{{ __('mail.orders.shipping') }}</td><td>{{ $shipping_method }}</td></tr>
+                    @if (!empty($pickup_instructions))<tr><td class="label">{{ __('Preuzimanje') }}</td><td>{{ $pickup_instructions }}</td></tr>@endif
                     <tr><td class="label">{{ __('mail.orders.billing_address') }}</td><td>{{ $billing_address }}</td></tr>
                     <tr><td class="label">{{ __('mail.orders.shipping_address') }}</td><td>{{ $shipping_address }}</td></tr>
                 </table>
@@ -127,6 +128,7 @@
                                     @if (!empty($item['option_label']))
                                         <div class="sku">{{ __('mail.orders.option') }}: {{ $item['option_label'] }}</div>
                                     @endif
+                                    @if (!empty($item['delivery_label']))<div class="sku">{{ __('Procjena isporuke') }}: {{ $item['delivery_label'] }}</div>@endif
                                 </td>
                                 <td class="num">{{ $item['quantity'] }}</td>
                                 <td class="num">{{ $item['unit_price'] }}</td>

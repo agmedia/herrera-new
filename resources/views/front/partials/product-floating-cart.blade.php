@@ -39,7 +39,10 @@
                 <button type="button" data-product-floating-qty-dec aria-label="{{ __('ui.cart.modal.quantity') }} -">-</button>
                 <input
                     type="text"
-                    value="1"
+                    value="{{ max(1, (int) $product->minimum_order_quantity) }}"
+                    min="{{ max(1, (int) $product->minimum_order_quantity) }}"
+                    step="{{ max(1, (int) $product->order_quantity_step) }}"
+                    max="999"
                     inputmode="numeric"
                     readonly
                     tabindex="-1"

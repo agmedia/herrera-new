@@ -1165,6 +1165,7 @@
 @if (empty($isMobileDevice))
     <script defer src="{{ asset('front-theme/scripts/scroll-to-top.js') }}?v={{ filemtime(public_path('front-theme/scripts/scroll-to-top.js')) }}"></script>
 @endif
+<script defer src="{{ asset('front-theme/scripts/order-quantity.js') }}?v={{ filemtime(public_path('front-theme/scripts/order-quantity.js')) }}"></script>
 @stack('scripts')
 </body>
 </html>

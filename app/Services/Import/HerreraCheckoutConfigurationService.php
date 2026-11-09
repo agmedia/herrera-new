@@ -69,7 +69,7 @@ class HerreraCheckoutConfigurationService
     {
         return DB::transaction(function () use ($methods, $legacySettings, $languageId) {
             // Retain seeded records for historical orders, replacing their checkout activation.
-            ShippingMethod::query()->update(['is_active' => false]);
+            ShippingMethod::query()->where('code', '!=', 'herrera_pickup')->update(['is_active' => false]);
             PaymentMethod::query()->update(['is_active' => false]);
             $shippingCount = 0;
             foreach ($methods as $method) {

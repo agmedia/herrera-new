@@ -105,6 +105,15 @@
 
             <fieldset class="mt-8 border-t border-slate-200 pt-6">
                 <legend class="mb-4 text-base font-bold text-slate-900">{{ __('return_request.form.contract_section') }}</legend>
+                <div class="mb-4">
+                    <label for="withdrawal-type" class="{{ $labelClass }}">Vrsta zahtjeva</label>
+                    <select id="withdrawal-type" name="request_type" class="{{ $fieldClass }}">
+                        <option value="return" @selected(old('request_type', 'return') === 'return')>Povrat ispravne robe</option>
+                        <option value="claim" @selected(old('request_type') === 'claim')>Reklamacija – zahtjev za odobrenje</option>
+                    </select>
+                    <p class="mt-1 text-xs text-slate-500">Popravke ne obavljamo. Stavke i količine iz pronađene narudžbe odabirete u sljedećem koraku.</p>
+                    @error('request_type') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
+                </div>
                 <div class="grid gap-4 md:grid-cols-2">
                     <div>
                         <label for="withdrawal-order-number" class="{{ $labelClass }}">{{ __('return_request.form.order_number') }} <x-front.required-mark /></label>
@@ -124,8 +133,9 @@
                     </div>
                 </div>
                 <div class="mt-4">
-                    <label for="withdrawal-items" class="{{ $labelClass }}">{{ __('return_request.form.items') }} <x-front.required-mark /></label>
-                    <textarea id="withdrawal-items" name="items" rows="6" class="{{ $fieldClass }}" placeholder="{{ __('return_request.form.items_placeholder') }}" required maxlength="5000" @error('items') aria-invalid="true" @enderror>{{ old('items') }}</textarea>
+                    <label for="withdrawal-items" class="{{ $labelClass }}">{{ __('return_request.form.items') }}</label>
+                    <textarea id="withdrawal-items" name="items" rows="6" class="{{ $fieldClass }}" placeholder="{{ __('return_request.form.items_placeholder') }}" maxlength="5000" @error('items') aria-invalid="true" @enderror>{{ old('items') }}</textarea>
+                    <p class="mt-1 text-xs text-slate-500">Ako narudžbu nije moguće pronaći, navedite proizvode i količine u ovom polju. Za reklamaciju opišite nedostatak.</p>
                     @error('items') <p class="mt-1 text-xs font-semibold text-rose-600">{{ $message }}</p> @enderror
                 </div>
                 <div class="mt-4">

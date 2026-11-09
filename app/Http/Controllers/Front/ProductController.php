@@ -109,7 +109,7 @@ class ProductController extends Controller
 
         $product = Product::query()
             ->withStorefrontEnergyData()
-            ->select(['id', 'code', 'sku', 'barcode', 'base_price', 'stock_qty', 'supplier_stock_qty', 'tax_rate_id', 'manufacturer_id', 'is_active', 'payload'])
+            ->select(['id', 'code', 'sku', 'barcode', 'unit_of_measure', 'minimum_order_quantity', 'order_quantity_step', 'base_price', 'stock_qty', 'supplier_stock_qty', 'tax_rate_id', 'manufacturer_id', 'is_active', 'payload'])
             ->withApprovedCommentSummary([$locale, $fallbackLocale])
             ->where('is_active', true)
             ->whereHas('translations', function ($q) use ($locale, $fallbackLocale, $slug): void {
@@ -202,7 +202,7 @@ class ProductController extends Controller
 
         $relatedBaseQuery = Product::query()
             ->withStorefrontEnergyData()
-            ->select(['id', 'code', 'sku', 'barcode', 'base_price', 'stock_qty', 'supplier_stock_qty', 'tax_rate_id', 'manufacturer_id', 'is_active', 'payload'])
+            ->select(['id', 'code', 'sku', 'barcode', 'unit_of_measure', 'minimum_order_quantity', 'order_quantity_step', 'base_price', 'stock_qty', 'supplier_stock_qty', 'tax_rate_id', 'manufacturer_id', 'is_active', 'payload'])
             ->withApprovedCommentSummary([$locale, $fallbackLocale])
             ->visibleOnStorefront($this->hideOutOfStockProducts())
             ->where('id', '!=', $product->id)

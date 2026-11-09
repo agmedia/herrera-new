@@ -112,19 +112,24 @@ class ProductPricePresentationService
             $package,
             $storedBase,
         );
+        $clearancePrice = app(\App\Services\Catalog\Clearance\ClearanceService::class)->price($product, $storedBase);
+        if ($clearancePrice !== null) {
+            $groupPrice = null;
+            $storedBase = app(\App\Services\Catalog\Clearance\ClearanceService::class)->fullBase($product, $storedBase);
+        }
         $snapshotSpecial = $groupPrice?->is_final
             && in_array($groupPrice->source_type, ['price_catalog_special', 'price_catalog_legacy_category_discount'], true)
             && $groupPrice->previous_price !== null
             && $groupPrice->price < ($groupPrice->previous_price - 0.0001);
         $audienceStoredBase = (float) ($snapshotSpecial ? $groupPrice->previous_price : ($groupPrice?->price ?? $storedBase));
-        $resolvedAction = $groupPrice?->is_final ? null : $this->actionResolver->resolveProductAction($product, $user);
-        $storedCurrent = $groupPrice?->is_final
+        $resolvedAction = $clearancePrice !== null || $groupPrice?->is_final ? null : $this->actionResolver->resolveProductAction($product, $user);
+        $storedCurrent = $clearancePrice ?? ($groupPrice?->is_final
             ? $groupPrice->price
-            : ($resolvedAction ? $this->actionResolver->applyToPrice($audienceStoredBase, $resolvedAction) : $audienceStoredBase);
+            : ($resolvedAction ? $this->actionResolver->applyToPrice($audienceStoredBase, $resolvedAction) : $audienceStoredBase));
         $catalogGross = (float) $this->taxPricing->grossFromStored($storedBase, $product, user: $user);
         $audienceBaseGross = (float) $this->taxPricing->grossFromStored($audienceStoredBase, $product, user: $user);
         $currentGross = (float) $this->taxPricing->grossFromStored($storedCurrent, $product, user: $user);
-        $hasPromotionalDiscount = $snapshotSpecial || ($resolvedAction !== null
+        $hasPromotionalDiscount = $clearancePrice !== null || $snapshotSpecial || ($resolvedAction !== null
             && $currentGross < ($audienceBaseGross - 0.0001));
 
         $lowest30DaysGross = null;
@@ -164,6 +169,7 @@ class ProductPricePresentationService
                 : null,
             'lowest_30_days_gross' => $lowest30DaysGross,
             'price_source' => match (true) {
+                $clearancePrice !== null => 'clearance',
                 $groupPrice !== null && $resolvedAction !== null => 'b2b_action',
                 $groupPrice !== null => 'b2b',
                 $resolvedAction !== null => 'action',
@@ -193,7 +199,7 @@ class ProductPricePresentationService
 
         $actions = CatalogAction::query()
             ->where('scope', CatalogAction::SCOPE_PRODUCT)
-            ->whereIn('type', [CatalogAction::TYPE_PERCENTAGE, CatalogAction::TYPE_FIXED])
+            ->whereIn('type', [CatalogAction::TYPE_PERCENTAGE, CatalogAction::TYPE_FIXED, CatalogAction::TYPE_FIXED_PRICE])
             ->availableForAudience($user)
             ->where(function (Builder $q): void {
                 $q->whereNull('coupon_code')

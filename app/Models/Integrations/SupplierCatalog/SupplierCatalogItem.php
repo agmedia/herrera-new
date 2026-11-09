@@ -10,6 +10,6 @@ class SupplierCatalogItem extends Model
 
     protected function casts(): array
     {
-        return ['images' => 'array', 'specifications' => 'array', 'is_current' => 'boolean', 'synced_at' => 'datetime', 'source_price' => 'decimal:4'];
+        return ['images' => 'array', 'specifications' => 'array', 'is_current' => 'boolean', 'synced_at' => 'datetime', 'reviewed_at' => 'datetime', 'source_price' => 'decimal:4', 'manual_source_price' => 'decimal:4'];
     }
 }

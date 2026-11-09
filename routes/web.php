@@ -463,6 +463,7 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
         Route::view('users', 'admin.users.index')->name('users');
         Route::get('users/statistics', CustomerStatisticsController::class)->name('users.statistics');
         Route::get('users/opportunities', [\App\Http\Controllers\Admin\SalesOpportunityController::class, 'index'])->name('users.opportunities');
+        Route::get('users/opportunities/export', [\App\Http\Controllers\Admin\SalesOpportunityController::class, 'export'])->name('users.opportunities.export');
         Route::post('users/opportunities/refresh', [\App\Http\Controllers\Admin\SalesOpportunityController::class, 'refresh'])
             ->middleware('throttle:1,5')->name('users.opportunities.refresh');
         Route::view('users/b2b', 'admin.users.b2b')->name('users.b2b');

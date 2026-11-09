@@ -386,6 +386,11 @@ for the two-button pull workflow.
   The completed report displays a data-quality note when this occurs. The
   searchable partner picker includes all approved assigned partners and loads
   only the fields needed for selection.
+  The report supports 20/50/100/200 articles per page and product thumbnails.
+  Its Excel download exports the complete filtered ranking, rather than just
+  the visible page, using the same partner access rules. The real XLSX is
+  written in bounded batches with private temporary files; SKU/EAN/text cells
+  retain leading zeroes and cannot become spreadsheet formulas.
   `herrera:sync-sales-opportunities` performs the first
   read-only ERP refresh; daily 05:30 Europe/Zagreb refreshes start only after a
   successful snapshot. A failed scan retains the previous completed snapshot.

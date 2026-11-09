@@ -368,6 +368,9 @@ return [
         'admin.users.opportunities' => [
             'view' => ['sales.opportunities.view'],
         ],
+        'admin.users.opportunities.export' => [
+            'view' => ['sales.opportunities.view'],
+        ],
         'admin.users.edit' => [
             'view' => ['users.profile.update'],
             'mutate' => ['users.profile.update'],

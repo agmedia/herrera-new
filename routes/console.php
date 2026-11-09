@@ -20,8 +20,10 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('herrera:sync-supplier-catalog --import-drafts')
     ->dailyAt('03:45')->timezone('Europe/Zagreb')->withoutOverlapping(60);
 
-Schedule::command('herrera:clearance --apply')
-    ->dailyAt('04:30')->timezone('Europe/Zagreb')->withoutOverlapping(60);
+Schedule::command('herrera:sync-clearance-sales --apply --run-clearance')
+    ->dailyAt('04:30')->timezone('Europe/Zagreb')->withoutOverlapping(120)
+    ->when(fn () => (bool) app(\App\Services\Catalog\Clearance\ClearanceService::class)->settings()['enabled']
+        && app(\App\Services\Integrations\Stock\StockSyncSettingsService::class)->configured('eracuni'));
 
 Schedule::command('herrera:sync-stock esperanza --cron')
     ->cron(\App\Support\Integrations\Stock\StockSyncRegistry::get('esperanza')['schedule'])->timezone('Europe/Zagreb')->withoutOverlapping(60)

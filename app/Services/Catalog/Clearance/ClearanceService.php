@@ -29,7 +29,9 @@ class ClearanceService
     public function saveSettings(array $settings): void
     {
         $settings = Validator::make($settings, ['enabled' => 'required|boolean', 'category_id' => ['required', 'integer', Rule::exists('categories', 'id')->where('scope', 'catalog')]])->validate();
-        if ($settings['enabled'] && ! ProductClearance::query()->where('confirmed_company_scope', true)->whereDate('snapshot_date', today())->exists()) {
+        $salesState = app(CompanySalesClearanceSync::class)->state();
+        $freshApi = ($salesState['status'] ?? null) === 'completed' && ($salesState['as_of'] ?? null) === today()->toDateString();
+        if ($settings['enabled'] && ! $freshApi && ! ProductClearance::query()->where('confirmed_company_scope', true)->whereDate('snapshot_date', today())->exists()) {
             throw new RuntimeException('Prije uključivanja potreban je svjež potvrđen izvještaj ukupnih izlaza iz e-Računa. Prodaja samo s webshopa nije dovoljna.');
         }
         app(SystemSettingsService::class)->put('catalog_automatic_clearance', $settings);
@@ -50,7 +52,7 @@ class ClearanceService
     }
 
     /** A dry run never creates categories, groups, prices or product flags. */
-    public function run(bool $apply = false): array
+    public function run(bool $apply = false, ?string $requiredSourceFingerprint = null): array
     {
         $settings = $this->settings();
         if (! $settings['enabled']) {
@@ -61,11 +63,15 @@ class ClearanceService
             throw new RuntimeException('Odaberite postojeću kategoriju Rasprodaja prije obrade.');
         }
 
-        return Cache::lock('catalog:automatic-clearance', 600)->block(1, function () use ($apply, $category): array {
+        return Cache::lock('catalog:automatic-clearance', 600)->block(1, function () use ($apply, $category, $requiredSourceFingerprint): array {
             $counts = ['eligible' => 0, 'activated' => 0, 'retired' => 0, 'stale_or_unproven' => 0];
-            ProductClearance::query()->whereIn('status', ['observed', 'active'])->select('id')->chunkById(200, function ($rows) use ($apply, $category, &$counts): void {
+            $salesState = app(CompanySalesClearanceSync::class)->state();
+            $verifiedZero = ($salesState['status'] ?? null) === 'completed' && ($salesState['as_of'] ?? null) === today()->toDateString()
+                && ($requiredSourceFingerprint === null || ($salesState['fingerprint'] ?? null) === $requiredSourceFingerprint)
+                ? ($salesState['zero_stock_product_proofs'] ?? []) : [];
+            ProductClearance::query()->whereIn('status', ['observed', 'active'])->select('id')->chunkById(200, function ($rows) use ($apply, $category, $requiredSourceFingerprint, $verifiedZero, &$counts): void {
                 foreach ($rows as $row) {
-                    DB::transaction(function () use ($row, $apply, $category, &$counts): void {
+                    DB::transaction(function () use ($row, $apply, $category, $requiredSourceFingerprint, $verifiedZero, &$counts): void {
                         $observed = ProductClearance::query()->find($row->id);
                         $product = $observed ? Product::query()->lockForUpdate()->find($observed->product_id) : null;
                         if (! $product) {
@@ -73,7 +79,8 @@ class ClearanceService
                         }
                         $clearance = ProductClearance::query()->lockForUpdate()->findOrFail($row->id);
                         if ($clearance->status === 'active') {
-                            if ((int) $product->stock_qty <= 0) {
+                            $erpZero = isset($verifiedZero[$product->id]) && hash_equals($verifiedZero[$product->id], app(CompanySalesClearanceSync::class)->productFingerprint($product));
+                            if ((int) $product->stock_qty <= 0 || $erpZero) {
                                 $counts['retired']++;
                                 if ($apply) {
                                     $this->retire($product, $clearance);
@@ -82,7 +89,7 @@ class ClearanceService
 
                             return;
                         }
-                        if (! $this->proven($clearance)) {
+                        if (! $this->proven($clearance) || ($requiredSourceFingerprint !== null && $clearance->source_fingerprint !== $requiredSourceFingerprint)) {
                             $counts['stale_or_unproven']++;
 
                             return;
@@ -136,8 +143,15 @@ class ClearanceService
     private function proven(ProductClearance $clearance): bool
     {
         $cutoff = $clearance->snapshot_date->copy()->subDays(self::INACTIVITY_DAYS);
+        if ($clearance->source === CompanySalesClearanceSync::SOURCE) {
+            $state = app(CompanySalesClearanceSync::class)->state();
+            if (($state['status'] ?? null) !== 'completed' || ($state['fingerprint'] ?? null) !== $clearance->source_fingerprint
+                || ($state['as_of'] ?? null) !== today()->toDateString()) {
+                return false;
+            }
+        }
 
-        return $clearance->confirmed_company_scope && $clearance->source === 'eracuni_company_export'
+        return $clearance->confirmed_company_scope && in_array($clearance->source, ['eracuni_company_export', CompanySalesClearanceSync::SOURCE], true)
             && $clearance->snapshot_date->isSameDay(today()) && $clearance->snapshot_date->lte(today())
             && $clearance->coverage_from->lte($cutoff)
             && ($clearance->last_outgoing_at === null || $clearance->last_outgoing_at->lte($cutoff));

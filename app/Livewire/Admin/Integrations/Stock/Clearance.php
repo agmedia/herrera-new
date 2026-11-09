@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Admin\Integrations\Stock;
 
+use App\Jobs\Integrations\SyncCompanySalesForClearance;
 use App\Models\Catalog\Category\Category;
 use App\Models\Catalog\Product\ProductClearance;
 use App\Services\Catalog\Clearance\ClearanceService;
 use App\Services\Catalog\Clearance\CompanyOutgoingImport;
+use App\Services\Catalog\Clearance\CompanySalesClearanceSync;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -48,6 +50,20 @@ class Clearance extends Component
             app(ClearanceService::class)->saveSettings($this->settings);
 
             return 'Postavke rasprodaje su spremljene.';
+        });
+    }
+
+    public function refreshCompanySales(): void
+    {
+        $this->authorizeManage();
+        $this->action(function (): string {
+            if (! app(\App\Services\Integrations\Stock\StockSyncSettingsService::class)->configured('eracuni')) {
+                throw new \RuntimeException('Najprije provjerite postojeći e-Računi pristup u integracijama.');
+            }
+            SyncCompanySalesForClearance::dispatch(auth()->id());
+            $this->candidatePreview = null;
+
+            return 'Provjera ukupne prodaje i vlastite zalihe stavljena je u pozadinsku obradu. Osvježite stranicu nakon dovršetka; cijene se ovom provjerom ne mijenjaju.';
         });
     }
 
@@ -106,6 +122,7 @@ class Clearance extends Component
             'categories' => Category::query()->where('scope', 'catalog')->with('translations')->defaultOrder()->get(),
             'lastSnapshot' => ProductClearance::query()->where('confirmed_company_scope', true)->max('snapshot_date'),
             'counts' => ProductClearance::query()->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status'),
+            'salesSync' => app(CompanySalesClearanceSync::class)->state(),
         ]);
     }
 

@@ -46,6 +46,11 @@ class CompanyOutgoingImport
         if ($rows === []) {
             throw new RuntimeException('Izvještaj nema stavaka.');
         }
+        $snapshotDates = array_values(array_unique(array_column($rows, 'snapshot_date')));
+        if (count($snapshotDates) !== 1) {
+            throw new RuntimeException('Cijeli izvještaj mora imati isti datum presjeka as_of. Ništa nije spremljeno.');
+        }
+        $snapshotDate = $snapshotDates[0];
         $map = [];
         Product::query()->select(['id', 'code', 'payload'])->chunkById(500, function ($products) use (&$map): void {
             foreach ($products as $product) {
@@ -69,8 +74,12 @@ class CompanyOutgoingImport
         }
         $fingerprint = hash_file('sha256', $file);
 
-        return Cache::lock('catalog:automatic-clearance', 600)->block(1, function () use ($resolved, $fingerprint, $apply, $confirmedCompanyScope, $actorId): array {
-            return DB::transaction(function () use ($resolved, $fingerprint, $apply, $confirmedCompanyScope, $actorId): array {
+        return Cache::lock('catalog:automatic-clearance', 600)->block(1, function () use ($resolved, $fingerprint, $snapshotDate, $apply, $confirmedCompanyScope, $actorId): array {
+            return DB::transaction(function () use ($resolved, $fingerprint, $snapshotDate, $apply, $confirmedCompanyScope, $actorId): array {
+                $latestSnapshot = ProductClearance::query()->whereIn('source', ['eracuni_company_export', CompanySalesClearanceSync::SOURCE])->where('confirmed_company_scope', true)->max('snapshot_date');
+                if ($latestSnapshot !== null && CarbonImmutable::parse($latestSnapshot)->toDateString() > $snapshotDate) {
+                    throw new RuntimeException('Izvještaj je stariji od već spremljenog presjeka tvrtke. Ništa nije spremljeno.');
+                }
                 $fresh = 0;
                 foreach ($resolved as $id => $row) {
                     Product::query()->whereKey($id)->lockForUpdate()->firstOrFail();
@@ -85,8 +94,17 @@ class CompanyOutgoingImport
                         ProductClearance::query()->updateOrCreate(['product_id' => $id], $row + ['source' => 'eracuni_company_export', 'source_fingerprint' => $fingerprint, 'confirmed_company_scope' => $confirmedCompanyScope, 'imported_by' => $actorId]);
                     }
                 }
+                $invalidated = 0;
+                if ($apply) {
+                    // An omitted article is not proof of inactivity. A replacement
+                    // snapshot must not leave earlier same-day candidates eligible.
+                    $invalidated = ProductClearance::query()->whereIn('source', ['eracuni_company_export', CompanySalesClearanceSync::SOURCE])
+                        ->where('status', 'observed')->where('confirmed_company_scope', true)
+                        ->whereIntegerNotInRaw('product_id', array_keys($resolved))
+                        ->update(['confirmed_company_scope' => false]);
+                }
 
-                return ['products' => count($resolved), 'fresh' => $fresh, 'stale' => count($resolved) - $fresh, 'applied' => $apply, 'fingerprint' => $fingerprint];
+                return ['products' => count($resolved), 'fresh' => $fresh, 'stale' => count($resolved) - $fresh, 'invalidated' => $invalidated, 'applied' => $apply, 'fingerprint' => $fingerprint];
             });
         });
     }

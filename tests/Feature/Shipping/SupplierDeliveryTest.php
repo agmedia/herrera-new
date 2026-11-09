@@ -105,7 +105,7 @@ class SupplierDeliveryTest extends TestCase
         \Illuminate\Support\Facades\Http::preventStrayRequests();
         $this->artisan('schedule:list', ['--no-ansi' => true])
             ->expectsOutputToContain('herrera:sync-supplier-catalog --import-drafts')
-            ->expectsOutputToContain('herrera:clearance --apply')
+            ->expectsOutputToContain('herrera:sync-clearance-sales --apply --run-clearance')
             ->expectsOutputToContain('herrera:sync-stock esperanza --cron')
             ->assertExitCode(0);
         \Illuminate\Support\Facades\Http::assertNothingSent();

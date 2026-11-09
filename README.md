@@ -195,16 +195,32 @@ Translations into additional languages are excluded from this release.
 - **Pickup:** the Herrera method is free, at Gospodarska ulica 10, 48260
   Križevci, by telephone arrangement. No opening hours are invented. The order
   keeps the address/instructions and omits the two customer-transport days.
-- **Clearance:** disabled until a fresh, confirmed all-company e-Računi outgoing
-  report is provided and a clearance category is chosen. The CSV schema is
+- **Clearance:** the automatic API source reads 100 calendar days of all-company
+  sales using `SalesInvoiceList`, `POSSalesInvoiceList` and `DeliveryNoteList`,
+  without warehouse/customer/cost-centre filters. Document, supply and (where
+  supported) issuance date passes are combined conservatively. Recent unbilled
+  deliveries also block a candidate. Limited responses are split by date; a
+  daily limit, malformed linked product or failed source blocks activation.
+  Unlinked free-text lines without any product identity are counted separately
+  in the admin; stock goods must be recorded against their ERP article codes.
+  Current ERP own stock proves article identity and availability, while ambiguous
+  or unproven mappings are skipped. A successful API preview can be requested
+  under Integrations / Clearance or with `herrera:sync-clearance-sales`.
+  `--apply` stores observations; `--apply --run-clearance` activates only after
+  a successful fetch and only when the rule is enabled and its category chosen.
+  A fresh authoritative ERP zero also retires an active clearance without
+  overwriting local inventory. Failed refreshes invalidate earlier API proof.
+  The manual CSV fallback schema is
   `product_code,last_outgoing_at,coverage_from,as_of`, dates `YYYY-MM-DD`; blank
-  last-outgoing means none in the confirmed coverage. Current-day evidence and
+  last-outgoing means none in the confirmed coverage. A replacement report
+  invalidates omitted observations, including observations from the other source.
+  Current-day evidence and
   at least 100 calendar days of coverage are required. `herrera:clearance`
   previews candidates; `--apply` changes eligible products. Clearance sells only
   real own stock at 60% off the full wholesale base, without stacking coupons or
   personal discounts. At zero it stays inactive until explicit manual activation.
-  The supplied ERP APIs do not establish an authoritative all-company movement
-  endpoint; do not infer this from webshop orders or inventory balances.
+  This implements the client's confirmed definition of no company sales;
+  internal transfers and inventory adjustments are not treated as sales.
 - **Returns/claims:** select original order items and quantities; Klara approves
   (with superadmin support). Only cumulative physical receipt reduces net sold
   quantities. Inspected, sellable restocking is a separate explicit quantity;
@@ -221,14 +237,15 @@ unrelated crons. In addition to EPREL, it manages
 nonblocking locks plus the shared deployment lock, check the deployed revision,
 and skip maintenance. The database queue must have `retry_after > 9000` to cover
 existing long integration jobs. `--check` validates without running jobs;
-`--schedule` invokes Laravel's scheduler. Catalogue drafts run at 03:45, clearance
-at 04:30 Europe/Zagreb, and Esperanza stock follows its registry schedule only
+`--schedule` invokes Laravel's scheduler. Catalogue drafts run at 03:45; clearance
+refreshes API evidence before applying at 04:30 Europe/Zagreb when enabled.
+Esperanza stock follows its registry schedule only
 when configured and enabled. The worker consumes only the `integrations` queue.
 
 Private feed settings are imported with the tracked
 `herrera:configure-stock --connection-file <private.json> --replace` command.
 Never commit credentials, source XMLs or customer bearer URLs. Master/Vayox
-procurement data, authoritative ERP movements and any external ERP cost-centre
+procurement data, a chosen clearance category and any external ERP cost-centre
 mapping remain data/configuration prerequisites, not fabricated defaults.
 
 ## Storefront cache

@@ -124,6 +124,89 @@ class SalesOpportunitiesTest extends TestCase
             ->assertSee('Last attempt failed');
     }
 
+    public function test_partner_picker_includes_more_than_one_thousand_approved_partners_without_loading_private_payloads(): void
+    {
+        $admin = User::factory()->create(['account_type' => 'staff']);
+        Bouncer::assign('admin')->to($admin);
+        Bouncer::refresh();
+        $users = [];
+        for ($index = 1; $index <= 1005; $index++) {
+            $users[] = ['name' => sprintf('Partner %04d', $index), 'email' => 'picker-'.$index.'@example.test', 'password' => 'fixture-unused', 'account_type' => 'customer'];
+        }
+        foreach (array_chunk($users, 200) as $chunk) {
+            DB::table('users')->insert($chunk);
+        }
+        $accounts = [];
+        foreach (User::query()->where('email', 'like', 'picker-%@example.test')->orderBy('id')->get(['id', 'name']) as $user) {
+            $accounts[] = ['user_id' => $user->id, 'status' => B2BAccount::STATUS_APPROVED, 'company_name' => $user->name, 'oib' => str_pad((string) $user->id, 11, '0', STR_PAD_LEFT),
+                'payload' => json_encode(['private' => str_repeat('x', 4096)])];
+        }
+        foreach (array_chunk($accounts, 200) as $chunk) {
+            DB::table('b2b_accounts')->insert($chunk);
+        }
+        $lastId = $accounts[array_key_last($accounts)]['user_id'];
+        $this->actingAs($admin)->get(route('admin.users.opportunities', ['user_id' => $lastId]))->assertOk()
+            ->assertSee('Partner 1005')->assertSee('data-tom-select', false)
+            ->assertViewHas('customers', function ($customers) use ($lastId): bool {
+                $this->assertCount(1005, $customers);
+                $last = $customers->firstWhere('id', $lastId);
+                $this->assertNotNull($last);
+                $this->assertArrayNotHasKey('email', $last->getAttributes());
+                $this->assertArrayNotHasKey('password', $last->getAttributes());
+                $this->assertSame(['id', 'user_id', 'company_name'], array_keys($last->b2bAccount->getAttributes()));
+
+                return true;
+            });
+    }
+
+    public function test_completed_snapshot_displays_escaped_data_quality_notice_and_first_running_scan_has_correct_message(): void
+    {
+        $manager = $this->manager();
+        DB::table('sales_opportunity_snapshots')->insert(['status' => 'running', 'coverage_from' => today()->subDays(365), 'as_of' => today(), 'created_at' => now(), 'updated_at' => now()]);
+        $this->actingAs($manager)->get(route('admin.users.opportunities'))->assertOk()
+            ->assertSee('Prvi potpuni ERP pregled je u obradi.')
+            ->assertDontSee('Pokrenite osvježavanje prije prikaza prodajnih prilika.')
+            ->assertViewHas('products', null);
+        $snapshotId = $this->snapshot();
+        $notice = 'Dvosmislenih ERP oznaka kupca: 2. Količine su sačuvane; doseg koristi potvrđene identitete. <provjera>';
+        DB::table('sales_opportunity_snapshots')->where('id', $snapshotId)->update(['message' => $notice]);
+        $this->get(route('admin.users.opportunities'))->assertOk()->assertSee($notice)
+            ->assertDontSee('<provjera>', false)->assertDontSee('Prvi potpuni ERP pregled je u obradi.');
+    }
+
+    public function test_ambiguous_shared_erp_id_cannot_hide_another_partners_products_or_match_unknown_purchases(): void
+    {
+        $manager = $this->manager();
+        $partner = $this->customer('Selected Partner', '12345678901');
+        $partner->b2bAccount->update(['erp_customer_id' => 'shared-id']);
+        $erpOnly = $this->customer('ERP Only Partner', '');
+        $erpOnly->b2bAccount->update(['erp_customer_id' => 'shared-id']);
+        $this->assign($manager, $partner);
+        $this->assign($manager, $erpOnly);
+        $snapshotId = $this->snapshot();
+        $opportunity = $this->product('OTHER-PARTNER');
+        $ownProduct = $this->product('OWN-PURCHASE');
+        $sync = app(SalesOpportunitySync::class);
+        $other = $sync->buyerIdentity(['buyerTaxNumber' => '99999999999']);
+        $own = $sync->buyerIdentity(['buyerTaxNumber' => '12345678901']);
+        $unknown = $sync->buyerIdentity(['buyerDocumentID' => 'shared-id']);
+        $unknown['known_buyer'] = false;
+        $unknown['document_key'] = null;
+        DB::table('sales_opportunity_purchases')->insert([
+            $other + ['snapshot_id' => $snapshotId, 'product_id' => $opportunity->id, 'quantity_90' => 10, 'quantity_365' => 10],
+            $own + ['snapshot_id' => $snapshotId, 'product_id' => $ownProduct->id, 'quantity_90' => 1, 'quantity_365' => 1],
+            $unknown + ['snapshot_id' => $snapshotId, 'product_id' => $opportunity->id, 'quantity_90' => 5, 'quantity_365' => 5],
+        ]);
+        DB::table('sales_opportunity_buyer_aliases')->insert([
+            ['snapshot_id' => $snapshotId, 'alias_key' => $own['tax_key'], 'buyer_key' => $own['buyer_key']],
+            ['snapshot_id' => $snapshotId, 'alias_key' => $other['tax_key'], 'buyer_key' => $other['buyer_key']],
+        ]);
+        $this->actingAs($manager)->get(route('admin.users.opportunities', ['user_id' => $partner->id]))->assertOk()
+            ->assertViewHas('products', fn ($products) => $products->modelKeys() === [$opportunity->id]);
+        $this->get(route('admin.users.opportunities', ['user_id' => $erpOnly->id]))->assertOk()
+            ->assertViewHas('products', fn ($products) => $products->modelKeys() === [$opportunity->id, $ownProduct->id]);
+    }
+
     private function manager(): User
     {
         $user = User::factory()->create(['account_type' => 'staff']);

@@ -140,6 +140,77 @@ class SalesOpportunitySyncTest extends TestCase
         $this->assertSame(1, DB::table('sales_opportunity_buyer_aliases')->distinct()->count('buyer_key'));
     }
 
+    public function test_reused_buyer_id_discovered_on_late_credit_note_keeps_tax_buyers_separate_and_all_signed_quantities(): void
+    {
+        Product::query()->create(['code' => 'ERP-ONE', 'base_price' => 10, 'is_active' => true]);
+        Http::fake(fn (Request $request) => Http::response(['response' => ['result' => match (basename($request->url())) {
+            'SalesInvoiceList' => [
+                $this->document('tax-only', 1, ['buyerDocumentID' => '']),
+                $this->document('id-only', 2, ['buyerTaxNumber' => '', 'buyerDocumentID' => 'shared-buyer']),
+                $this->document('bridge-first-tax', 3, ['buyerDocumentID' => 'shared-buyer']),
+            ],
+            'CreditNoteList' => [$this->document('late-other-tax', 1, ['buyerTaxNumber' => 'HR99999999999', 'buyerDocumentID' => 'shared-buyer'])],
+            default => [],
+        }]]));
+        $sync = app(SalesOpportunitySync::class);
+        $result = $sync->run();
+        $this->assertSame('completed', $result['status']);
+        $this->assertSame(1, $result['ambiguous_buyer_ids']);
+        $this->assertSame(1, $result['anonymous_lines']);
+        $this->assertStringContainsString('identiteta: 1.', $result['message']);
+        $this->assertStringNotContainsString('99999999999', $result['message']);
+        $this->assertStringNotContainsString('shared-buyer', $result['message']);
+        $rows = DB::table('sales_opportunity_purchases')->get();
+        $this->assertCount(3, $rows);
+        $this->assertEquals(5, $rows->sum('quantity_90'));
+        $firstTax = $sync->buyerIdentity(['buyerTaxNumber' => 'HR12345678901'])['tax_key'];
+        $secondTax = $sync->buyerIdentity(['buyerTaxNumber' => 'HR99999999999'])['tax_key'];
+        $documentKey = $sync->buyerIdentity(['buyerDocumentID' => 'shared-buyer'])['document_key'];
+        $this->assertEquals(4, $rows->firstWhere('tax_key', $firstTax)->quantity_90);
+        $this->assertEquals(-1, $rows->firstWhere('tax_key', $secondTax)->quantity_90);
+        $unknown = $rows->firstWhere('buyer_key', $documentKey);
+        $this->assertFalse((bool) $unknown->known_buyer);
+        $this->assertNull($unknown->document_key);
+        $this->assertEquals(2, $unknown->quantity_90);
+        $this->assertSame(0, $rows->whereNotNull('document_key')->count());
+        $this->assertDatabaseCount('sales_opportunity_buyer_aliases', 2);
+        $this->assertDatabaseMissing('sales_opportunity_buyer_aliases', ['alias_key' => $documentKey]);
+        $this->assertSame($result['message'], DB::table('sales_opportunity_snapshots')->sole()->message);
+    }
+
+    public function test_late_ambiguity_after_buffer_flush_is_order_independent_and_progress_contains_no_buyer_data(): void
+    {
+        $product = Product::query()->create(['code' => 'ERP-ONE', 'base_price' => 10, 'is_active' => true]);
+        $filler = [];
+        for ($index = 0; $index < 249; $index++) {
+            $filler[] = Product::query()->create(['code' => 'FILL-'.$index, 'base_price' => 10, 'is_active' => true]);
+        }
+        $this->mock(EracuniCompanySalesClient::class)->shouldReceive('eachFinancialDocument')->once()->andReturnUsing(function ($from, $until, $consume) use ($product, $filler): array {
+            $consume($this->document('first-tax', 3, ['buyerDocumentID' => 'shared-buyer']), 'SalesInvoiceList');
+            $consume($this->document('id-only', 2, ['buyerTaxNumber' => '', 'buyerDocumentID' => 'shared-buyer']), 'SalesInvoiceList');
+            foreach ($filler as $index => $row) {
+                $consume($this->document('filler-'.$index, 1, ['buyerDocumentID' => '', 'Items' => [['productCode' => $row->code, 'quantity' => 1, 'amount' => 10]]]), 'SalesInvoiceList');
+            }
+            // The initial pairs have already been written. A later OIB must
+            // still be able to invalidate the ID without irreversibly merging.
+            $this->assertSame(2, DB::table('sales_opportunity_purchases')->where('product_id', $product->id)->count());
+            $consume($this->document('last-other-tax', 4, ['buyerTaxNumber' => 'HR99999999999', 'buyerDocumentID' => 'shared-buyer']), 'POSSalesInvoiceList');
+
+            return ['complete' => true, 'document_count' => 252, 'request_count' => 3];
+        });
+        $progress = [];
+        $result = app(SalesOpportunitySync::class)->run(function ($event) use (&$progress): void {
+            $progress[] = $event;
+        });
+        $rows = DB::table('sales_opportunity_purchases')->where('product_id', $product->id)->get();
+        $this->assertSame('completed', $result['status']);
+        $this->assertCount(3, $rows);
+        $this->assertEquals(9, $rows->sum('quantity_90'));
+        $this->assertSame(2, $rows->where('known_buyer', 1)->count());
+        $this->assertEquals(2, $rows->where('known_buyer', 0)->sole()->quantity_90);
+        $this->assertSame([['method' => 'SalesInvoiceList', 'document_count' => 250]], $progress);
+    }
+
     public function test_invoice_cancellation_with_positive_quantity_and_negative_amount_reverses_the_sale(): void
     {
         Product::query()->create(['code' => 'ERP-ONE', 'base_price' => 10, 'is_active' => true]);

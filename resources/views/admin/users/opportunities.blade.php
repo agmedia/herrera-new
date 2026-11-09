@@ -3,7 +3,7 @@
         <section class="admin-panel p-5 sm:p-6">
             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Komercijala') }}</p>
             <h1 class="mt-2 text-2xl font-semibold text-slate-900">{{ __('Prodajne prilike za partnera') }}</h1>
-            <p class="mt-2 max-w-4xl text-sm text-slate-600">{{ __('Najprodavaniji artikli cijele tvrtke u posljednjih 90 dana koje odabrani partner nije kupovao u posljednjih 365 dana. Poredak daje prednost broju poznatih kupaca, zatim neto prodanoj količini. Kategorijom možete suziti prijedloge.') }}</p>
+            <p class="mt-2 max-w-4xl text-sm text-slate-600">{{ __('Najprodavaniji artikli cijele tvrtke u posljednjih 90 dana bez povezane kupnje odabranog partnera u posljednjih 365 dana. Poredak daje prednost broju poznatih kupaca, zatim neto prodanoj količini. Kategorijom možete suziti prijedloge.') }}</p>
             <p class="mt-2 text-xs text-slate-500">{{ __('Izvor su izdani ERP računi, POS računi i odobrenja. Otpremnice se ne zbrajaju ponovno. Storna i odobrenja umanjuju neto količine. Anonimna POS prodaja ulazi u količinu, a ne u broj poznatih kupaca. Podaci drugih kupaca nisu prikazani.') }}</p>
             @if (auth()->user()->isA('superadmin') || auth()->user()->can('integrations.eracuni.manage'))
             <form method="POST" action="{{ route('admin.users.opportunities.refresh') }}" class="mt-4">
@@ -16,16 +16,19 @@
             @if ($latestAttempt?->status === 'failed')<p role="status" class="mt-3 text-sm text-amber-800">{{ $latestAttempt->message }}</p>@endif
             @if ($snapshot)
                 <p class="mt-3 text-xs text-slate-500">{{ __('Presjek') }}: {{ $snapshot->as_of }} · {{ __('Dokumenti') }}: {{ number_format($snapshot->document_count, 0, ',', '.') }} · {{ __('Stavke bez jednoznačnog artikla u katalogu') }}: {{ number_format($snapshot->unmapped_lines, 0, ',', '.') }}.</p>
+                @if ($snapshot->message)<p role="status" class="mt-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{{ $snapshot->message }}</p>@endif
                 @if ($snapshot->as_of !== today()->toDateString())<p class="mt-2 text-sm text-amber-800">{{ __('Prikazan je stariji ERP presjek. Nove potvrđene webshop narudžbe odabranog partnera izuzimaju se odmah; za ostalu prodaju osvježite ERP pregled.') }}</p>@endif
+            @elseif ($latestAttempt?->status === 'running')
+                <p role="status" class="mt-3 rounded-xl bg-cyan-50 p-3 text-sm text-cyan-900">{{ __('Prvi potpuni ERP pregled je u obradi. Prijedlozi će biti dostupni nakon dovršetka.') }}</p>
             @else
                 <p class="mt-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">{{ __('Još nema potpunog ERP pregleda. Pokrenite osvježavanje prije prikaza prodajnih prilika.') }}</p>
             @endif
         </section>
         <form method="GET" class="admin-panel flex flex-wrap items-end gap-4 p-5 sm:p-6">
             <label class="min-w-64 flex-1 text-sm font-semibold text-slate-600">{{ __('Partner') }}
-                <select name="user_id" class="mt-2 block w-full rounded-xl border-slate-300 text-sm" required>
+                <select name="user_id" data-tom-select data-tom-placeholder="{{ __('Pretražite i odaberite partnera') }}" class="mt-2 admin-select block w-full rounded-xl border-slate-300 text-sm" required>
                     <option value="">{{ __('Odaberite partnera') }}</option>
-                    @foreach ($customers as $customer)<option value="{{ $customer->id }}" @selected($selectedCustomer?->id === $customer->id)>{{ $customer->customerDisplayName() }}</option>@endforeach
+                    @foreach ($customers as $customer)<option value="{{ $customer->id }}" @selected($selectedCustomer?->id === $customer->id)>{{ trim((string) $customer->b2bAccount?->company_name) ?: $customer->name }}</option>@endforeach
                 </select>
             </label>
             <label class="min-w-56 flex-1 text-sm font-semibold text-slate-600">{{ __('Kategorija') }}

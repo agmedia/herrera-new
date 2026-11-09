@@ -33,18 +33,27 @@ class SalesOpportunities
             'buyerCode' => data_get($customer->b2bAccount->payload, 'eracuni.buyerCode'),
         ]);
         abort_unless($identity['known_buyer'], 422, 'Za ERP usporedbu potreban je OIB ili ERP ID odabranog kupca.');
-        // Generic cash-customer codes may be shared. They are only a fallback
-        // when the selected partner has no tax number or immutable ERP ID.
-        $identityFields = $identity['tax_key'] || $identity['document_key'] ? ['tax_key', 'document_key'] : ['code_key'];
-        $canonicalKeys = DB::table('sales_opportunity_buyer_aliases')->where('snapshot_id', $snapshot->id)
-            ->whereIn('alias_key', array_filter(array_intersect_key($identity, array_flip($identityFields))))->pluck('buyer_key')->all();
+        $aliases = DB::table('sales_opportunity_buyer_aliases')->where('snapshot_id', $snapshot->id)
+            ->whereIn('alias_key', array_filter([$identity['tax_key'], $identity['document_key']]))->pluck('buyer_key', 'alias_key');
+        $canonicalKeys = [];
+        if ($identity['tax_key']) {
+            $canonicalKeys = array_filter([$identity['tax_key'], $aliases[$identity['tax_key']] ?? null]);
+            $documentRoot = $identity['document_key'] ? ($aliases[$identity['document_key']] ?? null) : null;
+            if ($documentRoot && in_array($documentRoot, [...$canonicalKeys, $identity['document_key']], true)) {
+                $canonicalKeys[] = $documentRoot;
+            }
+        } elseif ($identity['document_key'] && isset($aliases[$identity['document_key']])) {
+            $canonicalKeys[] = $aliases[$identity['document_key']];
+        }
         $bought = DB::table('sales_opportunity_purchases')->where('snapshot_id', $snapshot->id)
-            ->where('quantity_365', '>', 0)->where(function ($query) use ($identity, $canonicalKeys, $identityFields): void {
+            ->where('quantity_365', '>', 0)->where('known_buyer', true)->where(function ($query) use ($identity, $canonicalKeys): void {
                 $query->whereIn('buyer_key', $canonicalKeys);
-                foreach ($identityFields as $field) {
-                    if ($identity[$field]) {
-                        $query->orWhere($field, $identity[$field]);
-                    }
+                if ($identity['tax_key']) {
+                    $query->orWhere('tax_key', $identity['tax_key']);
+                } elseif (! $identity['document_key'] && $identity['code_key']) {
+                    // Codes can be reused for cash buyers, so never join them
+                    // to another customer's stronger tax/ERP-ID identity.
+                    $query->orWhere(fn ($code) => $code->where('buyer_key', $identity['code_key'])->whereNull('tax_key')->whereNull('document_key'));
                 }
             })->select('product_id');
         $ranking = DB::table('sales_opportunity_purchases')->where('snapshot_id', $snapshot->id)

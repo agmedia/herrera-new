@@ -16,11 +16,14 @@ class HerreraSyncSalesOpportunities extends Command
     public function handle(SalesOpportunitySync $sync): int
     {
         try {
-            $result = $sync->run();
+            $result = $sync->run(function (array $progress): void {
+                $this->line($progress['method'].': provjereno '.$progress['document_count'].' dokumenata.');
+            });
             $this->info('Potpuni ERP pregled prodajnih prilika je spremljen.');
             $this->table(['Dokumenti', 'API pozivi', 'Nepovezane stavke', 'Anonimne stavke'], [[
                 $result['document_count'], $result['request_count'], $result['unmapped_lines'], $result['anonymous_lines'],
             ]]);
+            $this->line('Vrh memorije: '.round(memory_get_peak_usage(true) / 1048576).' MB.');
 
             return self::SUCCESS;
         } catch (Throwable $exception) {

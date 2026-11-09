@@ -30,9 +30,9 @@ class SalesOpportunityController extends Controller
         $latestAttempt = DB::table('sales_opportunity_snapshots')->latest('id')->first();
 
         return view('admin.users.opportunities', [
-            'customers' => app(OrderManagerAccess::class)->scopeCustomers(User::query(), $request->user())
+            'customers' => app(OrderManagerAccess::class)->scopeCustomers(User::query()->select(['users.id', 'users.name', 'users.account_type']), $request->user())
                 ->where('account_type', 'customer')->whereHas('b2bAccount', fn ($query) => $query->where('status', B2BAccount::STATUS_APPROVED))
-                ->with('b2bAccount')->orderBy('name')->limit(1000)->get(),
+                ->with('b2bAccount:id,user_id,company_name')->orderBy('name')->get(),
             'selectedCustomer' => $selectedCustomer, 'snapshot' => $snapshot, 'latestAttempt' => $latestAttempt,
             'categories' => Category::query()->where('scope', 'catalog')->with('translations')->defaultOrder()->get(),
             'categoryId' => (int) ($validated['category_id'] ?? 0),

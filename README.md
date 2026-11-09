@@ -368,10 +368,16 @@ for the two-button pull workflow.
   product still must be saved. No bulk generation or automatic publication runs.
 - **Sales opportunities:** internal customer-scoped report uses a complete ERP
   invoice/POS/credit-note snapshot, without adding delivery notes again. Default
-  ranking is the last 90 days, excluding the selected partner's net purchases in
+  ranking is the last 90 days, excluding the selected partner's linked net purchases in
   365 days and newer confirmed webshop orders. It ranks by known buyers, then net
   quantity, with a category filter. Buyer identities are HMACs, never names in
-  the analytical snapshot. `herrera:sync-sales-opportunities` performs the first
+  the analytical snapshot. Shared ERP IDs associated with several tax identities
+  never merge those buyers: identified purchases remain separate; unattributable
+  purchases retain their net quantities without increasing known-buyer reach.
+  The completed report displays a data-quality note when this occurs. The
+  searchable partner picker includes all approved assigned partners and loads
+  only the fields needed for selection.
+  `herrera:sync-sales-opportunities` performs the first
   read-only ERP refresh; daily 05:30 Europe/Zagreb refreshes start only after a
   successful snapshot. A failed scan retains the previous completed snapshot.
 

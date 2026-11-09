@@ -15,13 +15,15 @@ class SalesOpportunitySync
 {
     private array $buffer = [];
 
-    private array $buyerParents = [];
+    private array $documentTaxes = [];
 
-    private array $buyerTaxes = [];
+    private array $taxKeys = [];
 
-    public function run(): array
+    private array $documentOnlyLines = [];
+
+    public function run(?callable $progress = null): array
     {
-        return Cache::lock('sales:opportunities-sync', 7200)->block(1, function (): array {
+        return Cache::lock('sales:opportunities-sync', 7200)->block(1, function () use ($progress): array {
             $from = today()->subDays(365)->toDateString();
             $asOf = today()->toDateString();
             $rankFrom = today()->subDays(90)->toDateString();
@@ -30,11 +32,15 @@ class SalesOpportunitySync
                 'created_at' => now(), 'updated_at' => now(),
             ]);
             $this->buffer = [];
-            $this->buyerParents = $this->buyerTaxes = [];
+            $this->documentTaxes = $this->taxKeys = $this->documentOnlyLines = [];
             try {
                 $identities = $this->productIdentities();
-                $unmapped = $anonymous = 0;
-                $result = app(EracuniCompanySalesClient::class)->eachFinancialDocument($from, $asOf, function (array $document, string $method) use ($snapshotId, $identities, $rankFrom, &$unmapped, &$anonymous): void {
+                $unmapped = $anonymous = $processedDocuments = 0;
+                $result = app(EracuniCompanySalesClient::class)->eachFinancialDocument($from, $asOf, function (array $document, string $method) use ($snapshotId, $identities, $rankFrom, $progress, &$processedDocuments, &$unmapped, &$anonymous): void {
+                    $processedDocuments++;
+                    if ($progress && $processedDocuments % 250 === 0 && in_array($method, EracuniCompanySalesClient::FINANCIAL_SOURCES, true)) {
+                        $progress(['method' => $method, 'document_count' => $processedDocuments]);
+                    }
                     if (($document['status'] ?? null) === 'Draft') {
                         return;
                     }
@@ -45,7 +51,7 @@ class SalesOpportunitySync
                         throw new RuntimeException('ERP nije vratio potpune prodajne stavke za analizu.');
                     }
                     $buyer = $this->buyerIdentity($document);
-                    $buyer['buyer_key'] = $this->canonicalBuyer($buyer);
+                    $this->registerBuyerAliases($buyer);
                     foreach ($document['Items'] as $lineIndex => $line) {
                         try {
                             if (! is_array($line) || ! $this->numeric($line['quantity'] ?? null)) {
@@ -90,6 +96,9 @@ class SalesOpportunitySync
                             if (! $buyer['known_buyer']) {
                                 $anonymous++;
                             }
+                            if ($buyer['tax_key'] === null && $buyer['document_key'] !== null) {
+                                $this->documentOnlyLines[$buyer['document_key']] = ($this->documentOnlyLines[$buyer['document_key']] ?? 0) + 1;
+                            }
                             $key = $productId.':'.$buyer['buyer_key'];
                             $this->buffer[$key] ??= $buyer + ['snapshot_id' => $snapshotId, 'product_id' => $productId, 'quantity_90' => 0.0, 'quantity_365' => 0.0];
                             $this->buffer[$key]['quantity_365'] += $quantity;
@@ -106,20 +115,24 @@ class SalesOpportunitySync
                     }
                 });
                 $this->flush($snapshotId);
-                $this->mergeBuyerAliases($snapshotId);
+                $quality = $this->mergeBuyerAliases($snapshotId);
+                $anonymous += $quality['ambiguous_lines'];
                 if (today()->toDateString() !== $asOf || ($result['complete'] ?? false) !== true) {
                     throw new RuntimeException('Dnevni ERP pregled nije potpun. Ponovite provjeru.');
                 }
                 $state = ['status' => 'completed', 'document_count' => $result['document_count'], 'request_count' => $result['request_count'],
-                    'unmapped_lines' => $unmapped, 'anonymous_lines' => $anonymous, 'completed_at' => now(), 'updated_at' => now()];
+                    'unmapped_lines' => $unmapped, 'anonymous_lines' => $anonymous,
+                    'message' => $quality['ambiguous_ids'] > 0
+                        ? 'ERP ID-ova povezanih s više poreznih identiteta: '.$quality['ambiguous_ids'].'. Različiti OIB-i nisu spojeni; nepovezane stavke zadržane su u neto količinama, bez povećanja broja poznatih kupaca.' : null,
+                    'completed_at' => now(), 'updated_at' => now()];
                 DB::table('sales_opportunity_snapshots')->where('id', $snapshotId)->update($state);
                 $keep = DB::table('sales_opportunity_snapshots')->where('status', 'completed')->orderByDesc('id')->limit(2)->pluck('id');
                 DB::table('sales_opportunity_snapshots')->whereNotIn('id', $keep)->where('id', '<', $snapshotId)->delete();
 
-                return $state + ['id' => $snapshotId];
+                return $state + ['id' => $snapshotId, 'ambiguous_buyer_ids' => $quality['ambiguous_ids']];
             } catch (Throwable $exception) {
                 $this->buffer = [];
-                $this->buyerParents = $this->buyerTaxes = [];
+                $this->documentTaxes = $this->taxKeys = $this->documentOnlyLines = [];
                 DB::table('sales_opportunity_purchases')->where('snapshot_id', $snapshotId)->delete();
                 DB::table('sales_opportunity_buyer_aliases')->where('snapshot_id', $snapshotId)->delete();
                 DB::table('sales_opportunity_snapshots')->where('id', $snapshotId)->update([
@@ -175,51 +188,45 @@ class SalesOpportunitySync
         return hash_hmac('sha256', $value, (string) config('app.key'));
     }
 
-    private function canonicalBuyer(array $buyer): string
+    private function registerBuyerAliases(array $buyer): void
     {
-        // An invoice containing both immutable ERP ID and VAT ID bridges earlier
-        // documents exposing only one of them. Codes alone cannot safely bridge
-        // identities: generic cash-customer codes can be reused for many buyers.
-        $aliases = array_filter([$buyer['tax_key'], $buyer['document_key']]);
-        if ($aliases === []) {
-            return $buyer['buyer_key'];
+        // Keep tax-primary rows separate until every document has been read:
+        // an ERP ID may be reused with a different OIB on a later credit note.
+        $tax = $buyer['tax_key'];
+        $document = $buyer['document_key'];
+        if ($tax !== null) {
+            $this->taxKeys[$tax] = true;
         }
-        $roots = array_values(array_unique(array_map(fn ($alias) => $this->buyerRoot($alias), $aliases)));
-        sort($roots);
-        $root = $roots[0];
-        $taxes = array_values(array_unique(array_filter([$buyer['tax_key'], ...array_map(fn ($key) => $this->buyerTaxes[$key] ?? null, $roots)])));
-        if (count($taxes) > 1) {
-            throw new RuntimeException('Isti ERP kupac povezan je s različitim poreznim identitetima. Pregled nije objavljen.');
+        if ($document !== null) {
+            if (! array_key_exists($document, $this->documentTaxes)) {
+                $this->documentTaxes[$document] = $tax;
+            } elseif ($tax !== null && $this->documentTaxes[$document] !== false) {
+                $previous = $this->documentTaxes[$document];
+                $this->documentTaxes[$document] = $previous === null || $previous === $tax ? $tax : false;
+            }
         }
-        foreach ([...$roots, ...$aliases] as $alias) {
-            $this->buyerParents[$alias] = $root;
-        }
-        if (count($this->buyerParents) > 50000) {
+        if (count($this->taxKeys) + count($this->documentTaxes) > 50000) {
             throw new RuntimeException('ERP pregled prelazi dopušteni broj identiteta kupaca. Nije objavljen nepotpun pregled.');
         }
-        if ($taxes !== []) {
-            $this->buyerTaxes[$root] = $taxes[0];
-        }
-
-        return $root;
     }
 
-    private function buyerRoot(string $key): string
+    private function mergeBuyerAliases(int $snapshotId): array
     {
-        $parent = $this->buyerParents[$key] ?? $key;
-        if ($parent !== $key) {
-            return $this->buyerParents[$key] = $this->buyerRoot($parent);
+        $ambiguous = array_keys(array_filter($this->documentTaxes, fn ($tax) => $tax === false));
+        $anonymousLines = 0;
+        foreach ($ambiguous as $document) {
+            $anonymousLines += $this->documentOnlyLines[$document] ?? 0;
         }
-
-        return $key;
-    }
-
-    private function mergeBuyerAliases(int $snapshotId): void
-    {
+        foreach (array_chunk($ambiguous, 250) as $documents) {
+            DB::table('sales_opportunity_purchases')->where('snapshot_id', $snapshotId)->whereIn('buyer_key', $documents)
+                ->whereNull('tax_key')->update(['known_buyer' => false, 'document_key' => null]);
+            DB::table('sales_opportunity_purchases')->where('snapshot_id', $snapshotId)->whereIn('document_key', $documents)
+                ->update(['document_key' => null]);
+        }
         DB::table('sales_opportunity_purchases')->where('snapshot_id', $snapshotId)->orderBy('id')->chunkById(200, function ($rows) use ($snapshotId): void {
             foreach ($rows as $row) {
-                $root = $this->buyerRoot($row->buyer_key);
-                if ($root === $row->buyer_key) {
+                $root = $this->documentTaxes[$row->buyer_key] ?? null;
+                if ($row->tax_key !== null || ! is_string($root)) {
                     continue;
                 }
                 DB::transaction(function () use ($row, $root, $snapshotId): void {
@@ -232,28 +239,39 @@ class SalesOpportunitySync
                         DB::table('sales_opportunity_purchases')->where('id', $target->id)->update([
                             'quantity_90' => (float) $target->quantity_90 + (float) $current->quantity_90,
                             'quantity_365' => (float) $target->quantity_365 + (float) $current->quantity_365,
-                            'tax_key' => $target->tax_key ?: $current->tax_key, 'document_key' => $target->document_key ?: $current->document_key,
+                            'tax_key' => $root, 'document_key' => $target->document_key ?: $current->document_key,
                             'code_key' => $target->code_key ?: $current->code_key,
                         ]);
                         DB::table('sales_opportunity_purchases')->where('id', $current->id)->delete();
                     } else {
-                        DB::table('sales_opportunity_purchases')->where('id', $current->id)->update(['buyer_key' => $root]);
+                        DB::table('sales_opportunity_purchases')->where('id', $current->id)->update(['buyer_key' => $root, 'tax_key' => $root]);
                     }
                 });
             }
         });
         $aliases = [];
-        foreach (array_keys($this->buyerParents) as $alias) {
-            $aliases[] = ['snapshot_id' => $snapshotId, 'alias_key' => $alias, 'buyer_key' => $this->buyerRoot($alias)];
-            if (count($aliases) >= 250) {
-                DB::table('sales_opportunity_buyer_aliases')->insert($aliases);
-                $aliases = [];
+        foreach ($this->taxKeys as $tax => $present) {
+            $aliases[$tax] = $tax;
+        }
+        foreach ($this->documentTaxes as $document => $tax) {
+            if ($tax !== false) {
+                $aliases[$document] = $tax ?? $document;
             }
         }
-        if ($aliases !== []) {
-            DB::table('sales_opportunity_buyer_aliases')->insert($aliases);
+        $batch = [];
+        foreach ($aliases as $alias => $root) {
+            $batch[] = ['snapshot_id' => $snapshotId, 'alias_key' => $alias, 'buyer_key' => $root];
+            if (count($batch) >= 250) {
+                DB::table('sales_opportunity_buyer_aliases')->insert($batch);
+                $batch = [];
+            }
         }
-        $this->buyerParents = $this->buyerTaxes = [];
+        if ($batch !== []) {
+            DB::table('sales_opportunity_buyer_aliases')->insert($batch);
+        }
+        $this->documentTaxes = $this->taxKeys = $this->documentOnlyLines = [];
+
+        return ['ambiguous_ids' => count($ambiguous), 'ambiguous_lines' => $anonymousLines];
     }
 
     private function identifier(mixed $value): string

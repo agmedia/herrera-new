@@ -3,7 +3,7 @@
         <script>
             (function () {
                 const init = function () {
-                    if (typeof window.Splide !== 'function') {
+                    if (document.readyState === 'loading' || typeof window.Splide !== 'function') {
                         return false;
                     }
                     document.querySelectorAll('[data-herrera-home-carousel]').forEach(function (el) {
@@ -31,16 +31,14 @@
                     });
                     return true;
                 };
-                if (init()) {
-                    return;
+                const loader = document.querySelector('[data-storefront-splide]');
+                if (loader) {
+                    loader.addEventListener('load', init, { once: true });
                 }
-                let attempts = 0;
-                const timer = window.setInterval(function () {
-                    attempts += 1;
-                    if (init() || attempts > 40) {
-                        window.clearInterval(timer);
-                    }
-                }, 120);
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', init, { once: true });
+                }
+                init();
             })();
         </script>
     @endpush

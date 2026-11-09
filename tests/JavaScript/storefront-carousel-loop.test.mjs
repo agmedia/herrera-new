@@ -22,6 +22,106 @@ for (const initiallyLoaded of [false, true]) {
     });
 }
 
+function homeCarouselPage(readyState = 'complete') {
+    const eventTarget = () => {
+        const listeners = new Map();
+        return {
+            addEventListener(type, listener, options = {}) {
+                const entries = listeners.get(type) || [];
+                entries.push({ listener, once: options.once });
+                listeners.set(type, entries);
+            },
+            emit(type) {
+                const entries = listeners.get(type) || [];
+                listeners.set(type, entries.filter((entry) => !entry.once));
+                entries.forEach((entry) => entry.listener());
+            },
+        };
+    };
+    const loader = eventTarget();
+    const mounts = [];
+    const elements = [{ dataset: {}, querySelectorAll: () => [] }, { dataset: {}, querySelectorAll: () => [] }];
+    const document = {
+        ...eventTarget(),
+        readyState,
+        querySelector: (selector) => selector === '[data-storefront-splide]' ? loader : null,
+        querySelectorAll: (selector) => selector === '[data-herrera-home-carousel]' ? elements : [],
+    };
+    const timers = new Map();
+    let time = 0;
+    let timerId = 0;
+    const window = {
+        setInterval(callback, delay) {
+            timers.set(++timerId, { callback, delay, next: time + delay });
+            return timerId;
+        },
+        clearInterval(id) { timers.delete(id); },
+    };
+    const source = read('resources/views/front/partials/herrera-home-carousel-script.blade.php').match(/<script>([\s\S]*?)<\/script>/)[1];
+    const run = () => vm.runInNewContext(source, { document, window });
+    run();
+    return {
+        mounts, elements, run,
+        advance(milliseconds) {
+            const end = time + milliseconds;
+            while (timers.size) {
+                const [id, timer] = [...timers].sort((left, right) => left[1].next - right[1].next)[0];
+                if (timer.next > end) break;
+                time = timer.next;
+                timer.next += timer.delay;
+                timer.callback();
+                if (!timers.has(id)) continue;
+            }
+            time = end;
+        },
+        loadLibrary() {
+            window.Splide = class {
+                constructor(element) { this.element = element; }
+                mount() { mounts.push(this.element); return this; }
+            };
+            loader.emit('load');
+        },
+        ready() { document.readyState = 'complete'; document.emit('DOMContentLoaded'); },
+        repeatEvents() { loader.emit('load'); document.emit('DOMContentLoaded'); },
+    };
+}
+
+test('home carousels still initialize when Splide loads after more than five seconds', () => {
+    const page = homeCarouselPage();
+    page.advance(6000);
+    assert.equal(page.mounts.length, 0);
+
+    page.loadLibrary();
+
+    assert.deepEqual(page.mounts, page.elements);
+    assert.ok(page.elements.every((element) => element.dataset.splideReady === '1'));
+});
+
+for (const firstEvent of ['library', 'document']) {
+    test('home carousels wait for both library and DOM readiness when ' + firstEvent + ' is ready first', () => {
+        const page = homeCarouselPage('loading');
+        if (firstEvent === 'library') page.loadLibrary();
+        else page.ready();
+        assert.equal(page.mounts.length, 0);
+
+        if (firstEvent === 'library') page.ready();
+        else page.loadLibrary();
+
+        assert.deepEqual(page.mounts, page.elements);
+    });
+}
+
+test('repeated readiness events and initializer calls mount each home carousel only once', () => {
+    const page = homeCarouselPage('loading');
+    page.loadLibrary();
+    page.ready();
+    page.repeatEvents();
+    page.run();
+    page.repeatEvents();
+
+    assert.deepEqual(page.mounts, page.elements);
+});
+
 test('small related collections retain configured card columns at every viewport', () => {
     const element = {
         dataset: { desktopCols: '6', mobileCols: '2' },

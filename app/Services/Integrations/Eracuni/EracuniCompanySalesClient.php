@@ -14,6 +14,8 @@ class EracuniCompanySalesClient
 {
     public const SOURCES = ['SalesInvoiceList', 'POSSalesInvoiceList', 'DeliveryNoteList'];
 
+    public const FINANCIAL_SOURCES = ['SalesInvoiceList', 'POSSalesInvoiceList', 'CreditNoteList'];
+
     private const LIMIT = 500;
 
     private const MAX_REQUESTS = 2048;
@@ -88,6 +90,112 @@ class EracuniCompanySalesClient
     }
 
     public function __construct(private readonly StockSyncSettingsService $settings) {}
+
+    /** Read each financial sales document once; delivery notes are never revenue. */
+    public function eachFinancialDocument(string $coverageFrom, string $asOf, callable $consume): array
+    {
+        $from = $this->date($coverageFrom);
+        $until = $this->date($asOf);
+        if ($from->gt($until) || $until->gt(CarbonImmutable::today()) || $from->diffInDays($until) > 366) {
+            throw new RuntimeException('Razdoblje analize prodaje nije valjano.');
+        }
+        if (! $this->settings->configured('eracuni')) {
+            throw new RuntimeException('Pristup e-Računima nije konfiguriran.');
+        }
+        $connection = $this->settings->connection('eracuni');
+        $base = $this->baseUrl($connection);
+        $this->requestCount = 0;
+        $this->deadline = hrtime(true) + self::MAX_FETCH_SECONDS * 1_000_000_000;
+        $this->lastRequestContext = [];
+        $seen = [];
+        try {
+            foreach (self::FINANCIAL_SOURCES as $method) {
+                $this->collectFinancial($method, $from, $until, $base, $connection, $seen, $consume);
+            }
+        } catch (RuntimeException $exception) {
+            if ($exception instanceof EracuniCompanySalesException || get_class($exception) !== RuntimeException::class) {
+                throw $exception;
+            }
+            throw new EracuniCompanySalesException($exception->getMessage(), $this->lastRequestContext);
+        }
+
+        return ['complete' => true, 'document_count' => count($seen), 'request_count' => $this->requestCount,
+            'coverage_from' => $coverageFrom, 'as_of' => $asOf];
+    }
+
+    private function collectFinancial(string $method, CarbonImmutable $from, CarbonImmutable $until, string $base, array $connection, array &$seen, callable $consume): void
+    {
+        $this->lastRequestContext = ['method' => $method, 'from' => $from->toDateString(), 'to' => $until->toDateString()];
+        [$rows, $truncated] = $this->request($base.'/'.$method, ['dateFrom' => $from->toDateString(), 'dateTo' => $until->toDateString()], $connection);
+        if ($truncated || count($rows) >= self::LIMIT) {
+            unset($rows);
+            gc_collect_cycles();
+            if ($from->isSameDay($until)) {
+                throw new RuntimeException('Dnevni limit ERP dokumenata ne dopušta potpunu analizu prodaje.');
+            }
+            $middle = $from->addDays((int) floor($from->diffInDays($until) / 2));
+            $this->collectFinancial($method, $from, $middle, $base, $connection, $seen, $consume);
+            $this->collectFinancial($method, $middle->addDay(), $until, $base, $connection, $seen, $consume);
+
+            return;
+        }
+        foreach ($rows as $row) {
+            unset($this->lastRequestContext['document_id'], $this->lastRequestContext['line_position']);
+            if (is_array($row) && $this->validIdentifier($row['documentID'] ?? null, 160)) {
+                $this->lastRequestContext['document_id'] = (string) $row['documentID'];
+            }
+            if (! is_array($row) || ! $this->validIdentifier($row['documentID'] ?? null, 160)
+                || ! is_string($row['date'] ?? null)) {
+                throw new RuntimeException('ERP je vratio prodajni dokument bez identifikatora ili datuma.');
+            }
+            $this->validateFilter($row, 'document', $from, $until);
+            if (($row['status'] ?? null) === 'IssuedInvoice' && ! array_key_exists('Items', $row)) {
+                [$full, $incomplete] = $this->request($base.'/'.str_replace('List', 'Get', $method), ['documentID' => (string) $row['documentID']], $connection, true);
+                if ($incomplete || ! $this->validIdentifier($full[0]['documentID'] ?? null, 160)
+                    || (string) $full[0]['documentID'] !== (string) $row['documentID'] || ($full[0]['date'] ?? null) !== $row['date']) {
+                    throw new RuntimeException('Potpuni ERP dokument ne odgovara zatraženom identitetu.');
+                }
+                $row = $full[0];
+                if (! array_key_exists('Items', $row) && $this->confirmedEmptyFinancialDocument($row)) {
+                    $row['Items'] = [];
+                }
+            }
+            // documentID is globally unique. The same invoice may be exposed by
+            // both invoice endpoints, so a source prefix would double-count it.
+            $identity = 'document:'.(string) $row['documentID'];
+            $fingerprint = hash('sha256', json_encode(array_intersect_key($row, array_flip([
+                'date', 'status', 'buyerTaxNumber', 'buyerCountry', 'buyerDocumentID', 'buyerCode', 'documentAmount',
+                'cancelledDocumentRef', 'cancelledByDocumentsRef', 'Items',
+            ])), JSON_THROW_ON_ERROR));
+            if (isset($seen[$identity])) {
+                if (! hash_equals($seen[$identity], $fingerprint)) {
+                    throw new RuntimeException('ERP je vratio proturječne podatke istog prodajnog dokumenta.');
+                }
+
+                continue;
+            }
+            $seen[$identity] = $fingerprint;
+            if (count($seen) > 100000) {
+                throw new RuntimeException('ERP analiza prelazi dopušteni broj dokumenata. Nepotpuni pregled nije objavljen.');
+            }
+            $consume($row, $method);
+        }
+    }
+
+    private function confirmedEmptyFinancialDocument(array $document): bool
+    {
+        if (($document['status'] ?? null) !== 'IssuedInvoice' || ! $this->numericZero($document['documentAmount'] ?? null)
+            || ! $this->numericZero($document['totalNetAmount'] ?? null)) {
+            return false;
+        }
+        foreach ($document as $field => $value) {
+            if (preg_match('/^total(?:Discount|.*Amount)/D', $field) && ! $this->numericZero($value)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private function collect(string $method, string $pass, CarbonImmutable $from, CarbonImmutable $until, string $base, array $connection, array &$codes, array &$documents): void
     {

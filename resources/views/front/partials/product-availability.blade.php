@@ -20,7 +20,7 @@
         @else
             <div class="flex items-center justify-between gap-2">
                 <dt class="text-slate-500">{{ __('stock.delivery_time') }}:</dt>
-                <dd class="text-right font-semibold {{ $hasLocalAvailability || $hasSupplierAvailability ? 'text-emerald-700' : 'text-slate-500' }}" data-product-delivery-time>{{ $product->hasVisibleOptionRows() ? ($hasLocalAvailability ? __('stock.local_delivery') : __('ui.product.unavailable')) : $deliveryEstimate['label'] }}</dd>
+                <dd class="text-right font-semibold {{ $hasLocalAvailability || $hasSupplierAvailability ? 'text-emerald-700' : 'text-slate-500' }}" data-product-delivery-time>{{ $product->hasVisibleOptionRows() ? ($hasLocalAvailability ? app(\App\Services\Shipping\SupplierDeliveryService::class)->localDeliveryLabel() : __('ui.product.unavailable')) : $deliveryEstimate['label'] }}</dd>
             </div>
         @endif
     </dl>

@@ -173,8 +173,8 @@ test('main product quantity and option requests never overwrite a related card d
     const form = {
         dataset: {
             productStockVisible: '0', productDefaultLocalAvailable: '0', productDefaultSupplierAvailable: '1',
-            productDeliveryLocal: '48 sati', productDeliverySupplier: '14 dana', productDeliveryUnavailable: 'Nedostupno',
-            productDeliveryUrl: '/product/lamp/delivery',
+            productDeliveryLocal: 'Dostava do 5 dana', productDeliverySupplier: '14 dana', productDeliveryUnavailable: 'Nedostupno',
+            productDeliveryUrl: '/product/lamp/delivery', productDeliveryCountry: 'SI',
         },
         closest: (selector) => selector === '[data-product-detail]' ? displayRoot : null,
         querySelector(selector) {
@@ -217,6 +217,7 @@ test('main product quantity and option requests never overwrite a related card d
     assert.equal(relatedDelivery.textContent, '5–9 dana');
     await runLatestRequest();
     assert.equal(mainDelivery.textContent, '18–22 dana');
+    assert.match(requests.at(-1), /country_code=SI/);
     assert.equal(relatedDelivery.textContent, '5–9 dana');
 
     quantity.value = '12';
@@ -227,7 +228,7 @@ test('main product quantity and option requests never overwrite a related card d
 
     selected = true;
     optionListeners.get('change')();
-    assert.equal(mainDelivery.textContent, '48 sati');
+    assert.equal(mainDelivery.textContent, 'Dostava do 5 dana');
     assert.equal(relatedDelivery.textContent, '5–9 dana');
     await runLatestRequest();
     assert.match(requests.at(-1), /product_option_value_id=7/);

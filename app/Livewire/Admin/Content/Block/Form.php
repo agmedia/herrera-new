@@ -469,6 +469,12 @@ class Form extends Component
             $existingBlockPayload = $existingBlockPayload ?? [];
             $existingBlockPayload['category_source'] = (string) ($validated['form']['category_source'] ?? 'manual');
         }
+        if ((bool) ($validated['form']['show_campaign_period'] ?? false)) {
+            $existingBlockPayload = $existingBlockPayload ?? [];
+            $existingBlockPayload['show_campaign_period'] = true;
+        } elseif (is_array($existingBlockPayload)) {
+            unset($existingBlockPayload['show_campaign_period']);
+        }
         $selectedIds = collect((array) ($validated['form']['selected_item_ids'] ?? []))
             ->map(fn ($id) => (int) $id)
             ->filter()
@@ -642,6 +648,7 @@ class Form extends Component
             'form.slot_is_active' => ['boolean'],
             'form.slot_starts_at' => ['nullable', 'date'],
             'form.slot_ends_at' => ['nullable', 'date', 'after_or_equal:form.slot_starts_at'],
+            'form.show_campaign_period' => ['boolean'],
 
             'form.selected_item_ids' => ['nullable', 'array'],
             'form.selected_item_ids.*' => ['integer', 'min:1'],
@@ -684,6 +691,7 @@ class Form extends Component
             'slot_is_active' => true,
             'slot_starts_at' => '',
             'slot_ends_at' => '',
+            'show_campaign_period' => false,
 
             'selected_item_ids' => [],
         ];
@@ -746,6 +754,7 @@ class Form extends Component
         $this->form['slot_is_active'] = (bool) ($slot?->is_active ?? true);
         $this->form['slot_starts_at'] = $slot?->starts_at?->format('Y-m-d\\TH:i') ?? '';
         $this->form['slot_ends_at'] = $slot?->ends_at?->format('Y-m-d\\TH:i') ?? '';
+        $this->form['show_campaign_period'] = (bool) data_get($block->payload, 'show_campaign_period', false);
 
         $expectedItemType = $this->itemTypeForBlockType($block->type);
         $selected = $block->items;

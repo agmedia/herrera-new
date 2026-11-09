@@ -27,7 +27,7 @@ function harness(initial = []) {
             return this.children.filter((child) => key && child.dataset[key] !== undefined);
         },
     });
-    const selectors = ['search', 'results', 'spinner', 'lines', 'empty', 'footer', 'count', 'total', 'submit', 'initial', 'draft-status', 'announcement', 'clear', 'undo', 'suggestions', 'suggestions-panel', 'suggestion-items', 'bulk-lines', 'import', 'import-feedback', 'form'];
+    const selectors = ['search', 'results', 'spinner', 'lines', 'empty', 'footer', 'count', 'total', 'submit', 'initial', 'draft-status', 'announcement', 'clear', 'undo', 'suggestions', 'suggestions-panel', 'suggestion-items', 'bulk-lines', 'import', 'import-feedback', 'file', 'file-import', 'form'];
     const nodes = Object.fromEntries(selectors.map((key) => [key, node()]));
     nodes.initial.textContent = JSON.stringify(initial);
     nodes.suggestions.textContent = '{}';
@@ -43,9 +43,10 @@ function harness(initial = []) {
     const storage = new Map();
     const window = {location: {origin: 'https://store.test'}, setTimeout, clearTimeout, sessionStorage: {getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key)}};
     const fetch = (url, options) => new Promise((resolve, reject) => {
-        requests.push({url, options, body: options.body ? JSON.parse(options.body) : null, respond: (payload = {}, ok = true) => resolve({ok, status: ok ? 200 : 422, json: async () => payload}), reject});
+        requests.push({url, options, body: typeof options.body === 'string' ? JSON.parse(options.body) : options.body, respond: (payload = {}, ok = true) => resolve({ok, status: ok ? 200 : 422, json: async () => payload}), reject});
     });
-    vm.runInNewContext(script, {document, window, fetch, URL, AbortController, Intl, Promise});
+    const FormData = class extends Map { append(key, value) { this.set(key, value); } };
+    vm.runInNewContext(script, {document, window, fetch, URL, AbortController, Intl, Promise, FormData});
     return {nodes, requests, storage};
 }
 
@@ -111,4 +112,40 @@ test('bulk import preserves variant IDs and leaves only unresolved lines for cor
     assert.match(textTree(page.nodes['import-feedback']), /2\. MISSING: Not found/);
     assert.equal(page.nodes.import.disabled, false);
     page.requests[1].respond(); await settle();
+});
+
+test('file upload previews items, keeps unresolved rows for correction and never submits the order', async () => {
+    const page = harness([product()]);
+    const file = {name: 'narudzba.xlsx'};
+    page.nodes.file.files = [file];
+    page.nodes.file.value = 'narudzba.xlsx';
+    page.nodes['bulk-lines'].value = 'DRAFT; 8';
+    const importing = page.nodes['file-import'].emit('click');
+    assert.equal(page.requests[0].body.get('order_file'), file);
+    assert.equal(page.requests[0].options.headers['Content-Type'], undefined);
+    assert.equal(page.nodes.import.disabled, true);
+    await page.nodes['file-import'].emit('click');
+    assert.equal(page.requests.length, 1);
+    page.requests[0].respond({items: [product({key: '2:0', product_id: 2, identifier: 'IMPORTED', quantity: 3})], errors: [{line: 7, identifier: 'MISSING', quantity: '4', message: 'Not found'}], warnings: []});
+    await importing;
+    assert.equal(page.nodes.count.textContent, '2 stavki · 4 kom');
+    assert.equal(page.nodes['bulk-lines'].value, 'DRAFT; 8\nMISSING; 4');
+    assert.equal(page.nodes.file.value, '');
+    assert.equal(page.nodes.form.submitCount, 0);
+    assert.match(textTree(page.nodes['import-feedback']), /7\. MISSING: Not found/);
+    page.requests[1].respond(); await settle();
+});
+
+test('failed upload displays the validation message and preserves the current selection', async () => {
+    const page = harness([product()]);
+    page.nodes.file.files = [{name: 'too-large.xlsx'}];
+    page.nodes.file.value = 'too-large.xlsx';
+    const importing = page.nodes['file-import'].emit('click');
+    page.requests[0].respond({errors: {order_file: ['Najviše 100 artikala.']}}, false);
+    await importing;
+    assert.equal(page.nodes.count.textContent, '1 stavka · 1 kom');
+    assert.equal(page.nodes.file.value, 'too-large.xlsx');
+    assert.equal(page.requests.length, 1);
+    assert.equal(page.nodes['file-import'].disabled, false);
+    assert.match(textTree(page.nodes['import-feedback']), /Najviše 100 artikala/);
 });

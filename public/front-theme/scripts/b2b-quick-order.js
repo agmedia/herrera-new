@@ -570,21 +570,32 @@
         const bulkLines = builder.querySelector('[data-quick-order-bulk-lines]');
         const importButton = builder.querySelector('[data-quick-order-import]');
         const importFeedback = builder.querySelector('[data-quick-order-import-feedback]');
-        importButton?.addEventListener('click', async () => {
-            if (!bulkLines?.value.trim() || !builder.dataset.resolveUrl) return;
-            importButton.disabled = true;
+        const orderFile = builder.querySelector('[data-quick-order-file]');
+        const fileImportButton = builder.querySelector('[data-quick-order-file-import]');
+        let importing = false;
+        const importItems = async (file = null) => {
+            if (importing || !builder.dataset.resolveUrl || (!file && !bulkLines?.value.trim())) return;
+            importing = true;
+            if (importButton) importButton.disabled = true;
+            if (fileImportButton) fileImportButton.disabled = true;
             importFeedback.hidden = false;
             importFeedback.replaceChildren(element('p', '', builder.dataset.importingLabel));
-            const originalLines = bulkLines.value.split(/\r?\n/).filter((line) => line.trim() !== '');
+            const originalLines = (bulkLines?.value || '').split(/\r?\n/).filter((line) => line.trim() !== '');
             try {
+                const headers = {Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest'};
+                let body;
+                if (file) {
+                    body = new FormData();
+                    body.append('order_file', file);
+                } else {
+                    headers['Content-Type'] = 'application/json';
+                    body = JSON.stringify({lines: bulkLines.value});
+                }
                 const response = await fetch(builder.dataset.resolveUrl, {
-                    method: 'POST',
-                    headers: {Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
-                    credentials: 'same-origin',
-                    body: JSON.stringify({lines: bulkLines.value})
+                    method: 'POST', headers, credentials: 'same-origin', body
                 });
                 const payload = await response.json();
-                if (!response.ok) throw new Error(payload.errors?.lines?.[0] || payload.message || builder.dataset.importErrorLabel);
+                if (!response.ok) throw new Error(payload.errors?.order_file?.[0] || payload.errors?.lines?.[0] || payload.message || builder.dataset.importErrorLabel);
                 let addedCount = 0;
                 const overflow = [];
                 const overflowItems = [];
@@ -606,12 +617,26 @@
                     overflow.forEach((message) => list.appendChild(element('li', '', message)));
                     importFeedback.appendChild(list);
                 }
-                bulkLines.value = [...(payload.errors || []).map((issue) => originalLines[issue.line - 1]).filter(Boolean), ...overflowItems].join('\n');
+                const unresolvedLines = (payload.errors || []).map((issue) => file
+                    ? `${issue.identifier}; ${issue.quantity ?? 1}`
+                    : originalLines[issue.line - 1]).filter(Boolean);
+                if (bulkLines) bulkLines.value = file
+                    ? [...originalLines, ...unresolvedLines, ...overflowItems].join('\n')
+                    : [...unresolvedLines, ...overflowItems].join('\n');
+                if (file && orderFile) orderFile.value = '';
             } catch (error) {
                 importFeedback.replaceChildren(element('p', 'quick-order-import-error', error.message || builder.dataset.importErrorLabel));
             } finally {
-                importButton.disabled = false;
+                importing = false;
+                if (importButton) importButton.disabled = false;
+                if (fileImportButton) fileImportButton.disabled = false;
             }
+        };
+        importButton?.addEventListener('click', () => importItems());
+        fileImportButton?.addEventListener('click', () => {
+            const file = orderFile?.files?.[0];
+            if (file) return importItems(file);
+            orderFile?.focus();
         });
 
         builder.querySelector('[data-quick-order-form]')?.addEventListener('submit', async (event) => {

@@ -5,6 +5,7 @@
 return [
     'timezone' => 'Europe/Zagreb',
     'customer_days' => 2,
+    'international_customer_days' => 5,
     'holiday_buffer_days' => 5,
     'schedules' => [
         'as-schwabe' => ['as-Schwabe', [1, 15], 7, ['as schwabe', 'schwabe']],

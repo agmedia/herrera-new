@@ -208,7 +208,8 @@ fi
     --path=database/migrations/2026_11_09_122000_apply_herrera_client_defaults.php \
     --path=database/migrations/2026_11_09_130000_create_customer_catalog_feeds.php \
     --path=database/migrations/2026_11_09_140000_create_product_clearances.php \
-    --path=database/migrations/2026_11_09_150000_add_structured_return_receipts.php
+    --path=database/migrations/2026_11_09_150000_add_structured_return_receipts.php \
+    --path=database/migrations/2026_11_09_180000_create_sales_opportunity_snapshots.php
 "$php_bin" artisan supplier-catalogs:seed --publish
 "$php_bin" artisan supplier-catalogs:covers --apply
 "$php_bin" artisan config:cache

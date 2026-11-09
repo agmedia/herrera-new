@@ -98,9 +98,14 @@ class CheckoutController extends Controller
             $shippingCity,
             $billingCity,
         );
+        $showShippingAddress = $request->old('ship_to_different_address') === '1' || $request->old('use_billing_for_shipping') === '0';
+        $deliveryCountry = (string) ($showShippingAddress
+            ? $request->old('shipping_country_code', $shippingCountry)
+            : $request->old('billing_country_code', $billingCountry));
+        $deliveryShipping = $shippingMethods->firstWhere('code', (string) $request->old('shipping_method_code', $defaultShippingCode)) ?? $defaultShippingMethod;
 
         return view($this->frontendView($request, 'checkout.create'), [
-            'lines' => $this->cart->lines(),
+            'lines' => $this->cart->lines(countryCode: $deliveryCountry, pickup: $deliveryShipping?->service_type === 'pickup'),
             'summary' => $summary,
             'shippingMethods' => $shippingMethods,
             'paymentMethods' => $paymentMethods,
@@ -367,6 +372,10 @@ class CheckoutController extends Controller
         );
 
         return response()->json([
+            'delivery_estimates' => $this->cart->lines(countryCode: $shippingCountry, pickup: $effectiveShippingMethod?->service_type === 'pickup')
+                ->map(fn ($line) => ['key' => $line['key'], 'label' => $line['delivery']['label'] ?? '',
+                    'warehouse_date_label' => ! empty($line['delivery']['warehouse_date'])
+                        ? \Carbon\CarbonImmutable::parse($line['delivery']['warehouse_date'])->format('d.m.Y.') : null])->values()->all(),
             'shipping_methods' => $shippingMethods->map(fn ($method) => [
                 'code' => (string) $method->code,
                 'name' => (string) $method->name,

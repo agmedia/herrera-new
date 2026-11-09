@@ -242,6 +242,69 @@ class ClearanceFeatureTest extends TestCase
         Livewire::test(Clearance::class)->assertForbidden();
     }
 
+    public function test_admin_can_change_percentage_and_days_without_stacking_or_reviving_sold_products(): void
+    {
+        $active = $this->product('CONFIG-ACTIVE');
+        $candidate = $this->product('CONFIG-CANDIDATE', ['is_active' => false]);
+        $sold = $this->product('CONFIG-SOLD');
+        foreach ([$active, $candidate, $sold] as $product) {
+            $this->observe($product);
+        }
+        $service = $this->enable();
+        $service->run(true);
+        $sold->refresh()->update(['stock_qty' => 0]);
+        $service->reconcile($sold);
+        $this->actingAs($admin = User::factory()->create(['account_type' => 'staff']));
+        Bouncer::assign('superadmin')->to($admin);
+
+        Livewire::test(Clearance::class)
+            ->assertSee('Dana bez prodaje')->assertSee('Popust (%)')
+            ->set('settings.inactivity_days', 180)
+            ->set('settings.discount_percent', 35)
+            ->call('saveSettings')->assertHasNoErrors();
+
+        $this->assertSame(180, $service->inactivityDays());
+        $this->assertSame(35.0, $service->discountPercent());
+        $this->assertEquals(65, $service->price($active->fresh()));
+        $this->assertEquals(65, ProductGroupPrice::query()->where('product_id', $active->id)->sole()->price);
+        $this->assertEquals(35, data_get($active->fresh()->payload, 'clearance.discount_percent'));
+        $this->assertFalse(ProductClearance::query()->where('product_id', $candidate->id)->sole()->confirmed_company_scope);
+        $this->assertFalse($sold->fresh()->is_active);
+        $this->assertSame('sold_out', ProductClearance::query()->where('product_id', $sold->id)->sole()->status);
+        $candidate->update(['is_active' => true]);
+        $this->assertSame(0, $service->run(true)['activated']);
+
+        // A new report must cover the new threshold, not just be dated today.
+        ProductClearance::query()->where('product_id', $candidate->id)->update([
+            'coverage_from' => today()->subDays(180), 'last_outgoing_at' => null, 'confirmed_company_scope' => true,
+        ]);
+        $this->assertSame(1, $service->run(true)['activated']);
+        $this->assertEquals(65, app(ProductPricePresentationService::class)->forProduct($candidate->fresh())['current_net']);
+        $cart = app(CartService::class);
+        $this->assertTrue($cart->add($active->fresh(), 1));
+        $line = $cart->lines('hr')->sole();
+        $this->assertEquals(65, $line['unit_price']);
+        $this->assertSame('B2B35', $line['action_code']);
+    }
+
+    public function test_invalid_admin_rules_leave_settings_and_active_prices_unchanged(): void
+    {
+        $product = $this->product('INVALID-CONFIG');
+        $this->observe($product);
+        $service = $this->enable();
+        $service->run(true);
+        $this->actingAs($admin = User::factory()->create(['account_type' => 'staff']));
+        Bouncer::assign('superadmin')->to($admin);
+        foreach ([['inactivity_days', 0], ['inactivity_days', 366], ['inactivity_days', 2.5],
+            ['discount_percent', 0], ['discount_percent', 100], ['discount_percent', 25.555]] as [$field, $value]) {
+            Livewire::test(Clearance::class)->set('settings.'.$field, $value)->call('saveSettings')
+                ->assertHasErrors(['settings.'.$field]);
+        }
+        $this->assertSame(100, $service->inactivityDays());
+        $this->assertEquals(60, $service->discountPercent());
+        $this->assertEquals(40, $service->price($product->fresh()));
+    }
+
     private function enable(): ClearanceService
     {
         $category = Category::query()->firstOrCreate(['code' => 'clearance'], ['scope' => 'catalog']);

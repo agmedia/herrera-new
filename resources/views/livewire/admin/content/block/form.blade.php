@@ -115,12 +115,12 @@
 
             <div class="mt-3 grid gap-3 md:grid-cols-3">
                 <div>
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Starts At') }}</label>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Početak prikaza akcije') }}</label>
                     <input type="datetime-local" wire:model="form.slot_starts_at" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
                     @error('form.slot_starts_at') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Ends At') }}</label>
+                    <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Završetak prikaza akcije') }}</label>
                     <input type="datetime-local" wire:model="form.slot_ends_at" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
                     @error('form.slot_ends_at') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
@@ -138,6 +138,14 @@
                         <span class="admin-switch-label">{{ $form['slot_is_active'] ? __('Slot Active') : __('Slot Inactive') }}</span>
                     </button>
                 </div>
+            </div>
+            <div class="mt-4 space-y-2 rounded-xl bg-slate-50 p-4">
+                <label class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <input type="checkbox" wire:model="form.show_campaign_period" class="rounded border-slate-300">
+                    {{ __('Prikaži trajanje akcije uz banner') }}
+                </label>
+                <p class="text-xs text-slate-600">{{ __('Banner se automatski prikazuje od početka do završetka. Prazno polje znači da nema tog vremenskog ograničenja.') }} {{ __('Vremenska zona:') }} {{ config('app.timezone') }}.</p>
+                <p class="text-xs text-slate-600">{{ __('U sadržaj unesite opis akcije, a u CTA URL poveznicu na proizvode ili kategoriju. Cijene i popuste zasebno postavite u cjeniku ili akcijama.') }}</p>
             </div>
         </div>
 

@@ -18,7 +18,11 @@
     <div class="account-layout">
         @include('front.desktop.account.partials.nav', ['current' => $current])
 
-        <section class="min-w-0">
+        <section class="min-w-0" x-data="{ showEan: false }">
+            <label class="mb-4 inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
+                <input type="checkbox" x-model="showEan" class="rounded border-slate-300 text-cyan-700" data-toggle-ean>
+                {{ __('Prikaži EAN crtične kodove') }}
+            </label>
             <div class="overflow-hidden border border-slate-200 bg-white">
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[640px] text-sm">
@@ -26,6 +30,7 @@
                             <tr>
                                 <th class="px-4 py-3">{{ __('Artikl') }}</th>
                                 <th class="px-4 py-3">{{ __('Šifra') }}</th>
+                                <th class="px-4 py-3" x-show="showEan" x-cloak>{{ __('EAN kod') }}</th>
                                 <th class="px-4 py-3 text-right">{{ __('Vaša cijena') }}</th>
                                 <th class="px-4 py-3 text-right">{{ __('Akcija') }}</th>
                             </tr>
@@ -35,6 +40,7 @@
                                 <tr class="border-t border-slate-200">
                                     <td class="px-4 py-3 font-semibold text-slate-900">{{ $row['name'] }}</td>
                                     <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ $row['identifier'] }}</td>
+                                    <td class="px-4 py-3" x-show="showEan" x-cloak><x-ean-barcode :value="$row['barcode']" /></td>
                                     <td class="px-4 py-3 text-right font-semibold text-slate-900">
                                         @if ($canViewPrices)
                                         {{ \App\Support\Currency::format((float) ($row['price']['display_current'] ?? $row['price']['current_gross']), 'EUR') }}
@@ -56,7 +62,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="4" class="px-4 py-10 text-center text-slate-500">{{ __('Još nema artikala u ovoj grupi.') }}</td>
+                                    <td colspan="5" class="px-4 py-10 text-center text-slate-500">{{ __('Još nema artikala u ovoj grupi.') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>

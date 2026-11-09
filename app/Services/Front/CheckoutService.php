@@ -255,6 +255,7 @@ class CheckoutService
             $status,
             $locale,
             $shippingDestination,
+            $shippingCountryCode,
             $impersonation,
             $staffImpersonation,
         ): Order {
@@ -310,7 +311,7 @@ class CheckoutService
                 'shipping_postal_code' => (string) ($payload['shipping_postal_code'] ?? ''),
                 'shipping_city' => (string) ($payload['shipping_city'] ?? ''),
                 'shipping_state' => (string) ($payload['shipping_state'] ?? ''),
-                'shipping_country_code' => (string) ($payload['shipping_country_code'] ?? 'HR'),
+                'shipping_country_code' => strtoupper(trim($shippingCountryCode)),
 
                 'payment_method_code' => (string) $paymentMethod->code,
                 'payment_method_name' => (string) $paymentMethod->name,
@@ -395,8 +396,9 @@ class CheckoutService
                 if ($productOptionValueId && ! $optionRow) {
                     throw ValidationException::withMessages(['cart' => 'Odabrana varijanta više nije dostupna.']);
                 }
-                $deliveryEstimate = app(\App\Services\Shipping\SupplierDeliveryService::class)->estimate($product, $quantity, $optionRow, pickup: $shippingMethod->service_type === 'pickup');
+                $deliveryEstimate = app(\App\Services\Shipping\SupplierDeliveryService::class)->estimate($product, $quantity, $optionRow, pickup: $shippingMethod->service_type === 'pickup', countryCode: $shippingCountryCode);
                 $stockAllocation = app(OrderStockAllocationService::class)->reserve($product, $quantity, $optionRow);
+                $deliveryEstimate['fulfilments'] = app(\App\Services\Shipping\OrderFulfilmentPresentation::class)->snapshot($stockAllocation, $deliveryEstimate, $quantity, $product->unit_of_measure);
 
                 OrderItem::query()->create([
                     'order_id' => $order->id,
@@ -414,6 +416,7 @@ class CheckoutService
                     'sort_order' => $index++,
                     'payload' => [
                         'product_slug' => (string) ($translation?->slug ?? ''),
+                        'unit_of_measure' => (string) $product->unit_of_measure,
                         'inventory' => $stockAllocation,
                         'delivery' => $deliveryEstimate,
                         'pricing' => [

@@ -307,8 +307,9 @@ backups are retained in `/home/herrera/.herrera-staging-backups`.
 
 Deployment applies only the reviewed additive customer workflow/CRM, optional
 product-options, historical CRM payload, supplier catalogues, reference projects,
-customer offers and their scoped abilities migrations from 14 October 2026, while staging is in maintenance
-mode. It does not run other database migrations, re-import catalog/orders or modify
+customer offers and their scoped abilities migrations from 14 October 2026, plus
+the explicitly listed November catalogue, delivery, clearance, returns and sales
+opportunity upgrades, while staging is in maintenance mode. It does not run other database migrations, re-import catalog/orders or modify
 production. A file rollback keeps these additive tables and columns to preserve
 any CRM history already recorded. `supplier-catalogs:seed --publish` adds the five
 verified official catalogue links only when their codes do not exist; it never
@@ -328,6 +329,51 @@ per-article markers preserve later admin edits. Versioned illustrative covers an
 their ImageGen prompts are stored in `public/assets/blog/herrera`.
 See the [cPanel deployment guide](https://docs.cpanel.net/knowledge-base/web-services/guide-to-git-deployment/)
 for the two-button pull workflow.
+
+## Herrera November sales workflows
+
+- **Automatic clearance:** Admin → Integracije → Zalihe i cronovi controls the
+  category, inactivity period (1–365 days) and whole-number discount (1–99%).
+  Defaults remain 100 days and 60%. A saved percentage reprices existing active
+  clearance products from the full wholesale BASE, never from customer discounts.
+  Changing the period invalidates unactivated candidates until a new complete ERP
+  scan/import. Existing clearance products remain active until own stock is sold;
+  neither disabling automation nor changing the period restores sold products.
+  Explicit price history preserves the prior 30-day reference after repricing.
+- **Quick order:** B2B customers can upload a two-column XLSX or UTF-8 CSV
+  (SKU/EAN, quantity), at most 100 articles / 2 MB, into the editable preview.
+  A CSV template is included. Files never submit an order. Formula/external-link
+  and XML-complexity checks run before workbook loading, including a 128 MB
+  regression for heavily compressed shared strings.
+- **EAN and boxes:** purchased/favourite product tables optionally show validated
+  EAN-13 barcodes generated locally. Product logistics already stores package
+  quantities; active whole-box packages add their piece quantity through the
+  existing minimum, step and stock checks, retaining the normal per-unit price.
+- **Campaign banners:** content-block slots use the application timezone for
+  starts/ends. An optional visible campaign period follows the banner's own
+  schedule; its CTA can link to an action or category. Price actions are edited
+  separately. Source and guest-page caches change at schedule boundaries.
+- **Split delivery:** checkout stores own/supplier fulfilment quantities and ETAs
+  per order item. Customer/admin/email/print views show separate delivery lines
+  while retaining one financial item and one delivery charge. Own-stock transport
+  is 2 calendar days for HR, 5 abroad, or zero for collection. Old orders use only
+  their saved snapshots, never current inventory.
+- **SEO review drafts:** Katalog → Artikli → SEO offers Claude (`anthropic`) and
+  Grok (`xai`) suggestions for the selected product and locale. Configure the
+  chosen provider's existing `ANTHROPIC_API_KEY` / `XAI_API_KEY` server secret;
+  optional model overrides are `SEO_AI_ANTHROPIC_MODEL` / `SEO_AI_XAI_MODEL`.
+  No key is shown in the UI or committed. Generation is explicit, capped at
+  1,000 output tokens and ten calls per actor per minute. Suggestions populate
+  empty fields or explicitly replace both SEO fields only after review; the
+  product still must be saved. No bulk generation or automatic publication runs.
+- **Sales opportunities:** internal customer-scoped report uses a complete ERP
+  invoice/POS/credit-note snapshot, without adding delivery notes again. Default
+  ranking is the last 90 days, excluding the selected partner's net purchases in
+  365 days and newer confirmed webshop orders. It ranks by known buyers, then net
+  quantity, with a category filter. Buyer identities are HMACs, never names in
+  the analytical snapshot. `herrera:sync-sales-opportunities` performs the first
+  read-only ERP refresh; daily 05:30 Europe/Zagreb refreshes start only after a
+  successful snapshot. A failed scan retains the previous completed snapshot.
 
 ## Offers, supplier catalogues and reference projects
 

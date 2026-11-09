@@ -47,6 +47,8 @@ class CartController extends Controller
         $validated = $request->validate([
             'product_id' => ['required', 'integer', 'exists:products,id'],
             'product_option_value_id' => ['nullable', 'integer', Rule::exists('catalog_product_option_values', 'id')],
+            'product_package_id' => ['nullable', 'integer', Rule::exists('catalog_product_packages', 'id')],
+            'package_count' => ['nullable', 'integer', 'min:1', 'max:999'],
             'quantity' => ['nullable', 'integer', 'min:1', 'max:999'],
         ]);
 
@@ -113,15 +115,24 @@ class CartController extends Controller
             }
         }
 
-        $ok = $this->cart->add($product, (int) ($validated['quantity'] ?? 1), $optionValueId);
+        $package = isset($validated['product_package_id'])
+            ? $product->packages()->active()->where('package_type', 'box')->findOrFail((int) $validated['product_package_id'])
+            : null;
+        $requestedQuantity = (int) ($package ? ($validated['package_count'] ?? 1) : ($validated['quantity'] ?? 1));
+        $ok = $package
+            ? $this->cart->addPackage($product, $package, $requestedQuantity, $optionValueId)
+            : $this->cart->add($product, $requestedQuantity, $optionValueId);
 
-        $message = $ok ? __('ui.cart.status.added') : __('ui.cart.status.unavailable');
+        $message = $ok ? __('ui.cart.status.added') : ($package
+            ? __('Cijelu kutiju nije moguće dodati u traženoj količini. Provjerite dostupnost i minimalno pakiranje.')
+            : __('ui.cart.status.unavailable'));
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'ok' => $ok,
                 'message' => $message,
                 'summary' => $this->cart->summary(),
                 'confirmation' => app(B2BAccessService::class)->requiresApprovedAccount() ? 'notice' : 'modal',
+                'added_quantity' => $ok && $package ? (int) $package->quantity * $requestedQuantity : null,
             ], $ok ? 200 : 422);
         }
 

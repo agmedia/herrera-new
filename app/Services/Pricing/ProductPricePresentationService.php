@@ -139,6 +139,7 @@ class ProductPricePresentationService
                 $audienceStoredBase,
                 $user,
                 $groupPrice,
+                $clearancePrice !== null,
             );
             $lowest30DaysGross = (float) $this->taxPricing->grossFromStored($lowest30DaysStored, $product, user: $user);
         }
@@ -188,6 +189,7 @@ class ProductPricePresentationService
         float $storedBasePrice,
         ?User $user,
         ?ResolvedB2BPrice $groupPrice = null,
+        bool $clearance = false,
     ): float {
         $periodStart = now()->subDays(30);
         $periodEnd = now();
@@ -287,6 +289,23 @@ class ProductPricePresentationService
                 $candidate = $this->actionResolver->applyToPrice($historicalPrice, $action);
                 if ($candidate < $best) {
                     $best = $candidate;
+                }
+            }
+        }
+
+        if ($clearance) {
+            // A discount's new price cannot become its own previous-price
+            // reference. Keep its old price and the prices of earlier changes.
+            $history = ProductPriceHistory::query()->where('product_id', $product->getKey())
+                ->where('price_type', 'clearance')->where('source', 'automatic_clearance')
+                ->whereBetween('effective_at', [$periodStart, $periodEnd])
+                ->orderByDesc('effective_at')->orderByDesc('id')->get(['id', 'old_price', 'new_price']);
+            foreach ($history as $index => $entry) {
+                if ($entry->old_price !== null) {
+                    $best = min($best, (float) $entry->old_price);
+                }
+                if ($index > 0 && $entry->new_price !== null) {
+                    $best = min($best, (float) $entry->new_price);
                 }
             }
         }

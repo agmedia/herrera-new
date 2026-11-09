@@ -5,7 +5,9 @@ namespace Tests\Feature\Front;
 use App\Http\Controllers\Front\CatalogController;
 use App\Models\Catalog\Category\Category;
 use App\Models\Catalog\Product\Product;
+use App\Models\Catalog\Product\ProductClearance;
 use App\Models\Content\ContentBlock;
+use App\Services\Catalog\Clearance\ClearanceService;
 use App\Services\Content\ContentBlockResolver;
 use App\Services\Front\GuestStorefrontCache;
 use Illuminate\Support\Collection;
@@ -46,6 +48,32 @@ class StorefrontSourceCacheInvalidationTest extends TestCase
 
         $this->assertNotSame($revision, app(GuestStorefrontCache::class)->revision());
         $this->assertSame('Renamed category', $this->categories()->first()->translations->first()->name);
+    }
+
+    public function test_daily_clearance_activation_and_retirement_invalidate_guest_html_after_commit(): void
+    {
+        $category = $this->categoryWithProduct();
+        $product = $category->products()->sole();
+        ProductClearance::query()->create([
+            'product_id' => $product->id, 'source' => 'eracuni_company_export', 'source_fingerprint' => str_repeat('f', 64),
+            'coverage_from' => today()->subDays(100), 'snapshot_date' => today(), 'last_outgoing_at' => null,
+            'confirmed_company_scope' => true,
+        ]);
+        $service = app(ClearanceService::class);
+        $service->saveSettings(['enabled' => true, 'category_id' => $category->id]);
+        $cache = app(GuestStorefrontCache::class);
+        $this->assertTrue($cache->enabled());
+        $revision = $cache->revision();
+        $this->assertSame(1, $service->run(true)['activated']);
+        $this->assertNotSame($revision, $cache->revision());
+        $this->assertSame('active', data_get($product->fresh()->payload, 'clearance.status'));
+
+        // A quiet inventory write leaves retirement to the scheduled rule.
+        $product->updateQuietly(['stock_qty' => 0]);
+        $revision = $cache->revision();
+        $this->assertSame(1, $service->run(true)['retired']);
+        $this->assertNotSame($revision, $cache->revision());
+        $this->assertFalse($product->fresh()->is_active);
     }
 
     public function test_content_items_refresh_after_a_committed_bulk_update_without_a_block_observer(): void

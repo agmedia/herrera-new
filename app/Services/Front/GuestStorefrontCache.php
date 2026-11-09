@@ -2,6 +2,7 @@
 
 namespace App\Services\Front;
 
+use App\Services\Content\ContentBlockSchedule;
 use App\Support\AssetVersion;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Database\Events\QueryExecuted;
@@ -98,6 +99,7 @@ class GuestStorefrontCache
             'grid_cookie' => $gridCookie,
             'b2b_only' => true,
             'content_version' => Cache::get(config('content_blocks.cache.version_key', 'content_blocks:version'), 1),
+            'content_schedule' => app(ContentBlockSchedule::class)->context()['version'],
             'asset_version' => app(AssetVersion::class)->current(),
             'revision' => $this->revision(),
         ];
@@ -123,7 +125,7 @@ class GuestStorefrontCache
         $this->store()->put($key, [
             'html' => str_replace($csrfToken, $marker, $html),
             'csrf_marker' => $marker,
-        ], min(3600, max(1, (int) config('storefront_cache.ttl_seconds', 120))));
+        ], app(ContentBlockSchedule::class)->expiresAt(min(3600, max(1, (int) config('storefront_cache.ttl_seconds', 120)))));
     }
 
     private function store(): Repository

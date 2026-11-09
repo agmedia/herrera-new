@@ -25,6 +25,10 @@ Schedule::command('herrera:sync-clearance-sales --apply --run-clearance')
     ->when(fn () => (bool) app(\App\Services\Catalog\Clearance\ClearanceService::class)->settings()['enabled']
         && app(\App\Services\Integrations\Stock\StockSyncSettingsService::class)->configured('eracuni'));
 
+Schedule::command('herrera:sync-sales-opportunities')->dailyAt('05:30')->timezone('Europe/Zagreb')->withoutOverlapping(120)
+    ->when(fn () => app(\App\Services\Integrations\Stock\StockSyncSettingsService::class)->configured('eracuni')
+        && DB::table('sales_opportunity_snapshots')->where('status', 'completed')->exists());
+
 Schedule::command('herrera:sync-stock esperanza --cron')
     ->cron(\App\Support\Integrations\Stock\StockSyncRegistry::get('esperanza')['schedule'])->timezone('Europe/Zagreb')->withoutOverlapping(60)
     ->when(fn () => app(\App\Services\Integrations\Stock\StockSyncSettingsService::class)->configured('esperanza')

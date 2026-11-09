@@ -255,7 +255,7 @@
                                             @if ($item->sku)
                                                 <p class="mt-1 text-xs text-slate-500">SKU: {{ $item->sku }}</p>
                                             @endif
-                                            @if (data_get($item->payload, 'delivery.label'))<p class="mt-1 text-xs text-emerald-800">{{ __('Procjena isporuke pri naručivanju') }}: {{ data_get($item->payload, 'delivery.label') }}</p>@endif
+                                            @include('shared.order-fulfilments', ['fulfilments' => $item->fulfilmentRows()])
                                         </div>
                                     </div>
                                 </td>

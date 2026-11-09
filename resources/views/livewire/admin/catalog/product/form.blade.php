@@ -164,6 +164,29 @@
         @if ($activeTab === 'seo')
         <div class="admin-panel admin-form-panel p-6">
             <p class="admin-section-title">{{ __('SEO & Payload') }}</p>
+            <div class="mt-4 rounded-xl border border-cyan-100 bg-cyan-50 p-4">
+                <p class="text-sm font-semibold">{{ __('AI prijedlog SEO naslova i opisa') }}</p>
+                <p class="mt-1 text-xs text-slate-600">{{ __('Claude ili Grok predlaže tekst prema podacima ovog artikla i odabranom jeziku. Pregledajte točnost prije spremanja. Ručni tekst i podaci artikla ostaju sačuvani dok ne prihvatite prijedlog i spremite artikl.') }}</p>
+                <div class="mt-3 flex flex-wrap items-end gap-3">
+                    <label class="text-xs font-semibold">{{ __('AI servis') }}
+                        <select wire:model="seoAiProvider" class="admin-select mt-1 block rounded-lg border-slate-300 text-sm">
+                            @foreach (\App\Services\Seo\ProductSeoSuggestions::PROVIDERS as $provider => $label)
+                                <option value="{{ $provider }}">{{ $label }}{{ app(\App\Services\Seo\ProductSeoSuggestions::class)->availability()[$provider] ? '' : ' — '.__('nije povezan') }}</option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <button type="button" wire:click="generateSeoSuggestion" wire:loading.attr="disabled" wire:target="generateSeoSuggestion" class="rounded-lg bg-cyan-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{{ __('Pripremi AI prijedlog') }}</button>
+                    <span wire:loading wire:target="generateSeoSuggestion" class="text-xs text-slate-600">{{ __('Pripremam prijedlog…') }}</span>
+                </div>
+                @error('seoAi') <p role="alert" class="mt-2 text-sm text-rose-700">{{ $message }}</p> @enderror
+                @if ($seoAiSuggestion)
+                    <dl class="mt-3 space-y-2 rounded-lg bg-white p-3 text-sm"><div><dt class="font-semibold">{{ __('Predloženi naslov') }}</dt><dd>{{ $seoAiSuggestion['meta_title'] }}</dd></div><div><dt class="font-semibold">{{ __('Predloženi opis') }}</dt><dd>{{ $seoAiSuggestion['meta_description'] }}</dd></div></dl>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <button type="button" wire:click="applySeoSuggestion" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold">{{ __('Popuni prazna SEO polja') }}</button>
+                        <button type="button" wire:click="applySeoSuggestion(true)" wire:confirm="{{ __('Zamijeniti postojeći SEO naslov i opis ovim prijedlogom? Promjena se sprema tek spremanjem artikla.') }}" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold">{{ __('Zamijeni oba SEO polja') }}</button>
+                    </div>
+                @endif
+            </div>
             <div class="mt-4">
                 <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Meta Title') }}</label>
                 <input type="text" wire:model="form.meta_title" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" />
@@ -593,6 +616,7 @@
             </div>
 
             <div class="mt-6 space-y-4">
+                <p class="text-sm text-slate-600">{{ __('Za naručivanje cijele kutije dodajte aktivno pakiranje vrste Kutija i unesite broj osnovnih jedinica u kutiji. Jedinica mjere mora odgovarati proizvodu; cijena ostaje po osnovnoj jedinici. Minimalna količina i korak naručivanja podešavaju se zasebno.') }}</p>
                 @forelse ($packages as $index => $package)
                     <div wire:key="product-package-{{ $package['id'] ?? 'new-'.$index }}" class="rounded-xl border border-slate-200 bg-white p-4">
                         <div class="mb-3 flex items-center justify-between gap-3">

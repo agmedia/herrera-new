@@ -895,6 +895,17 @@
                     renderShippingOptions(payload.shipping_methods || [], String(totals.shipping_method_code || ''));
                     renderPaymentOptions(payload.payment_methods || [], String(totals.payment_method_code || ''));
                     renderCheckoutTotals(totals);
+                    const deliveryNodes = Array.from(checkoutForm.querySelectorAll('[data-cart-line-delivery]'));
+                    (payload.delivery_estimates || []).forEach(function (estimate) {
+                        const node = deliveryNodes.find(function (candidate) { return candidate.dataset.cartLineDelivery === String(estimate.key); });
+                        if (!node) return;
+                        const label = node.querySelector('[data-delivery-label]');
+                        const pickup = node.querySelector('[data-delivery-pickup]');
+                        const warehouseDate = node.querySelector('[data-delivery-warehouse-date]');
+                        if (label) label.textContent = String(estimate.label || '');
+                        if (warehouseDate) warehouseDate.textContent = String(estimate.warehouse_date_label || '');
+                        if (pickup) pickup.hidden = !estimate.warehouse_date_label;
+                    });
                     initBoxNowWidget();
                 } catch (error) {
                     // Keep existing options on network/request errors.

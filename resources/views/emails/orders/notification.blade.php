@@ -128,7 +128,11 @@
                                     @if (!empty($item['option_label']))
                                         <div class="sku">{{ __('mail.orders.option') }}: {{ $item['option_label'] }}</div>
                                     @endif
-                                    @if (!empty($item['delivery_label']))<div class="sku">{{ __('Procjena isporuke') }}: {{ $item['delivery_label'] }}</div>@endif
+                                    @if (!empty($item['fulfilments']))
+                                        @include('shared.order-fulfilments', ['fulfilments' => $item['fulfilments']])
+                                    @elseif (!empty($item['delivery_label']))
+                                        <div class="sku">{{ __('Procjena isporuke') }}: {{ $item['delivery_label'] }}</div>
+                                    @endif
                                 </td>
                                 <td class="num">{{ $item['quantity'] }}</td>
                                 <td class="num">{{ $item['unit_price'] }}</td>

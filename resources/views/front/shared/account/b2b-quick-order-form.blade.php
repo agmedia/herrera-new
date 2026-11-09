@@ -94,8 +94,13 @@
             </div>
 
             <details class="quick-order-bulk">
-                <summary>{{ __('Imate popis šifri? Zalijepite više artikala odjednom') }}</summary>
+                <summary>{{ __('Uvezite XLSX/CSV ili zalijepite popis artikala') }}</summary>
                 <div class="quick-order-bulk-content">
+                    <label for="quick-order-file">{{ __('Uvoz iz Excel ili CSV datoteke') }}</label>
+                    <p id="quick-order-file-help">{{ __('Najviše 100 artikala i 2 MB. Prvi stupac: naša šifra, SKU ili EAN. Drugi stupac: količina od 1 do 999. Čita se prvi list XLSX datoteke; zaglavlje šifra/EAN i količina nije obavezno. EAN kodove spremite kao tekst kako biste sačuvali početne nule. Uvoz priprema stavke za pregled, a narudžbu potvrđujete na blagajni.') }}</p>
+                    <p><a href="{{ asset('front-theme/downloads/quick-order-template.csv') }}" download>{{ __('Preuzmi CSV predložak') }}</a></p>
+                    <input id="quick-order-file" type="file" accept=".xlsx,.csv" aria-describedby="quick-order-file-help" data-quick-order-file>
+                    <button type="button" class="quick-order-secondary" data-quick-order-file-import>{{ __('Provjeri datoteku i dodaj artikle') }}</button>
                     <label for="quick-order-bulk-lines">{{ __('Šifra, SKU ili barkod i količina, jedan artikl po retku') }}</label>
                     <p id="quick-order-bulk-help">{{ __('Format: šifra; količina. Možete kopirati i dva stupca iz Excela. Bez količine dodaje se 1 komad. Za artikle s varijantama unesite SKU varijante.') }}</p>
                     <textarea id="quick-order-bulk-lines" rows="4" maxlength="20000" placeholder="SKU-001; 5&#10;SKU-002; 2" aria-describedby="quick-order-bulk-help" data-quick-order-bulk-lines></textarea>

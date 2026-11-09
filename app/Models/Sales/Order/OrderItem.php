@@ -59,4 +59,9 @@ class OrderItem extends Model
     {
         return $this->belongsTo(ProductOptionValue::class, 'product_option_value_id');
     }
+
+    public function fulfilmentRows(): array
+    {
+        return app(\App\Services\Shipping\OrderFulfilmentPresentation::class)->forItem($this);
+    }
 }

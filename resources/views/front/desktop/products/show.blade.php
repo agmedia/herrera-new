@@ -433,6 +433,7 @@
                 class="mt-6 space-y-4"
                 data-product-detail-form
                 data-product-delivery-url="{{ route('products.delivery', $product) }}"
+                data-product-delivery-country="{{ app(\App\Services\Shipping\CustomerDeliveryDestination::class)->country(auth()->user()) }}"
                 data-ga4-add-to-cart-form
                 data-ga4-item-id="{{ (string) ($product->sku ?: $product->id) }}"
                 data-ga4-item-name="{{ $translation?->name ?? $product->code }}"
@@ -444,7 +445,7 @@
                 data-product-stock-visible="{{ $canViewStock ? '1' : '0' }}"
                 data-product-default-local-available="{{ ($product->hasVisibleOptionRows() ? $product->hasAvailableOptionRows() : $localStockQuantity > 0) ? '1' : '0' }}"
                 data-product-default-supplier-available="{{ ! $product->hasVisibleOptionRows() && $supplierStockQuantity > 0 ? '1' : '0' }}"
-                data-product-delivery-local="{{ __('stock.local_delivery') }}"
+                data-product-delivery-local="{{ app(\App\Services\Shipping\SupplierDeliveryService::class)->localDeliveryLabel() }}"
                 data-product-delivery-supplier="{{ app(\App\Services\Shipping\SupplierDeliveryService::class)->estimate($product, max(1, (int) $product->minimum_order_quantity))['label'] }}"
                 data-product-delivery-unavailable="{{ __('ui.product.unavailable') }}"
                 @if ($canViewStock)
@@ -612,6 +613,9 @@
                         <x-fa-icon name="heart" style="{{ $isWishlisted ? 'solid' : 'regular' }}" class="h-5 w-5" />
                     </button>
                 </div>
+                @if ($isPurchasable)
+                    @include('front.partials.product-box-ordering', ['boxProduct' => $product])
+                @endif
             </form>
             @else
                 <button type="submit" form="wishlist-product-{{ $product->id }}" class="product-card-wishlist product-detail-wishlist mt-5 {{ $isWishlisted ? 'is-active' : '' }}" aria-label="{{ $isWishlisted ? __('ui.wishlist.remove') : __('ui.wishlist.add') }}" data-wishlist-button>

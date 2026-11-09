@@ -362,6 +362,12 @@ return [
         'admin.users.statistics' => [
             'view' => ['users.list.view'],
         ],
+        'admin.users.opportunities.refresh' => [
+            'mutate' => ['integrations.eracuni.manage'],
+        ],
+        'admin.users.opportunities' => [
+            'view' => ['sales.opportunities.view'],
+        ],
         'admin.users.edit' => [
             'view' => ['users.profile.update'],
             'mutate' => ['users.profile.update'],

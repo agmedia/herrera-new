@@ -8,6 +8,7 @@ use App\Models\Catalog\Product\ProductClearance;
 use App\Services\Catalog\Clearance\ClearanceService;
 use App\Services\Catalog\Clearance\CompanyOutgoingImport;
 use App\Services\Catalog\Clearance\CompanySalesClearanceSync;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -47,10 +48,22 @@ class Clearance extends Component
     {
         $this->authorizeManage();
         $this->action(function (): string {
-            app(ClearanceService::class)->saveSettings($this->settings);
+            try {
+                app(ClearanceService::class)->saveSettings($this->settings);
+            } catch (ValidationException $exception) {
+                throw ValidationException::withMessages(collect($exception->errors())
+                    ->mapWithKeys(fn ($messages, $field) => ['settings.'.$field => $messages])->all());
+            }
+            $this->settings = app(ClearanceService::class)->settings();
+            $this->candidatePreview = null;
 
             return 'Postavke rasprodaje su spremljene.';
         });
+    }
+
+    public function updatedSettings(): void
+    {
+        $this->candidatePreview = null;
     }
 
     public function refreshCompanySales(): void

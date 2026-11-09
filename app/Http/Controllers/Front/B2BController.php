@@ -9,6 +9,7 @@ use App\Models\Catalog\Product\ProductOptionValue;
 use App\Models\Sales\Order\Order;
 use App\Models\Sales\Order\OrderItem;
 use App\Models\User\B2BAccount;
+use App\Services\Front\B2BQuickOrderFileReader;
 use App\Services\Front\B2BQuickOrderSearchService;
 use App\Services\Front\CartService;
 use App\Services\Front\CartStaffAccess;
@@ -165,28 +166,37 @@ class B2BController extends Controller
     public function resolveQuickOrder(Request $request): JsonResponse
     {
         $this->approvedAccount($request);
-        $validated = $request->validate(['lines' => ['required', 'string', 'max:20000']]);
-        $lines = array_values(array_filter(preg_split('/\R/u', $validated['lines']), fn ($line) => trim($line) !== ''));
-        if (count($lines) > 100) {
-            throw ValidationException::withMessages(['lines' => __('Unesite najviše 100 redaka odjednom.')]);
+        $validated = $request->validate([
+            'lines' => ['required_without:order_file', 'prohibits:order_file', 'nullable', 'string', 'max:20000'],
+            'order_file' => ['required_without:lines', 'prohibits:lines', 'nullable', 'file', 'max:2048', 'mimes:csv,txt,xlsx', 'extensions:csv,xlsx'],
+        ]);
+        if ($request->hasFile('order_file')) {
+            $rows = app(B2BQuickOrderFileReader::class)->read($request->file('order_file'));
+        } else {
+            $lines = array_values(array_filter(preg_split('/\R/u', $validated['lines']), fn ($line) => trim($line) !== ''));
+            if (count($lines) > 100) {
+                throw ValidationException::withMessages(['lines' => __('Unesite najviše 100 redaka odjednom.')]);
+            }
+            $rows = array_map(fn ($line, $index) => ['line' => $index + 1, 'parts' => preg_split('/[;\t,]/', trim($line))], $lines, array_keys($lines));
         }
 
         $items = [];
         $errors = [];
         $warnings = [];
-        foreach ($lines as $index => $line) {
-            $parts = preg_split('/[;\t,]/', trim($line));
+        foreach ($rows as $row) {
+            $parts = $row['parts'];
+            $lineNumber = $row['line'];
             $identifier = trim($parts[0] ?? '');
             $quantityText = trim($parts[1] ?? '1');
             if ($identifier === '' || mb_strlen($identifier) > 191 || count($parts) > 2 || ! preg_match('/^[0-9]{1,3}$/', $quantityText) || (int) $quantityText < 1) {
-                $errors[] = ['line' => $index + 1, 'identifier' => $identifier, 'message' => __('Koristite format šifra; količina, s količinom od 1 do 999.')];
+                $errors[] = ['line' => $lineNumber, 'identifier' => $identifier, 'quantity' => $quantityText, 'message' => __('Koristite format šifra; količina, s količinom od 1 do 999.')];
 
                 continue;
             }
 
             $resolved = $this->quickOrderSearch->resolve($identifier, $request->user(), (int) $quantityText);
             if (isset($resolved['error'])) {
-                $errors[] = ['line' => $index + 1, 'identifier' => $identifier, 'message' => $resolved['error']];
+                $errors[] = ['line' => $lineNumber, 'identifier' => $identifier, 'quantity' => $quantityText, 'message' => $resolved['error']];
 
                 continue;
             }
@@ -204,7 +214,7 @@ class B2BController extends Controller
             }
             $items[$item['key']] = $item;
             if ($resolved['warning']) {
-                $warnings[] = ['line' => $index + 1, 'identifier' => $identifier, 'message' => $resolved['warning']];
+                $warnings[] = ['line' => $lineNumber, 'identifier' => $identifier, 'message' => $resolved['warning']];
             }
         }
 
@@ -453,6 +463,7 @@ class B2BController extends Controller
             ->with([
                 'taxRate',
                 'categories:id',
+                'packages',
                 'translations' => fn ($query) => $query->whereIn('locale', [$locale, $fallbackLocale]),
             ])
             ->get()
@@ -466,6 +477,7 @@ class B2BController extends Controller
                     'product' => $product,
                     'name' => (string) ($translation?->name ?: $product->code),
                     'identifier' => (string) ($product->sku ?: $product->code),
+                    'barcode' => trim((string) $product->barcode) ?: trim((string) data_get($product->payload, 'opencart.ean')),
                     'price' => $this->prices->forProduct($product, $user),
                 ];
             })

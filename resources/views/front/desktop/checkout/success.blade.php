@@ -30,6 +30,18 @@
             </div>
         </dl>
 
+        <section class="mt-6 border border-slate-200 bg-slate-50 p-4">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-700">{{ __('Procjena isporuke po artiklima') }}</h2>
+            <div class="mt-3 space-y-3">
+                @foreach ($order->items as $item)
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900">{{ $item->name }}</p>
+                        @include('shared.order-fulfilments', ['fulfilments' => $item->fulfilmentRows()])
+                    </div>
+                @endforeach
+            </div>
+        </section>
+
         @if (!empty($bankTransfer) && (!empty($bankTransfer['receiver_iban']) || $bankInstructions !== ''))
             <section class="mt-6 border border-slate-200 bg-slate-50 p-4">
                 <h2 class="text-sm font-semibold uppercase tracking-wide text-slate-700">{{ __('ui.checkout.success.bank_transfer_title') }}</h2>

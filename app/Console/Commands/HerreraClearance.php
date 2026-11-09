@@ -10,7 +10,7 @@ class HerreraClearance extends Command
 {
     protected $signature = 'herrera:clearance {--apply : Primijeni pregledane kandidate i deaktiviraj prodanu vlastitu zalihu}';
 
-    protected $description = 'Pregled ili obrada rasprodaje 100 dana bez ukupnih ERP izlaza; bez potvrđenih podataka ne dodaje kandidate.';
+    protected $description = 'Pregled ili obrada rasprodaje prema postavkama; bez potvrđenih ukupnih ERP izlaza ne dodaje kandidate.';
 
     public function handle(ClearanceService $service): int
     {

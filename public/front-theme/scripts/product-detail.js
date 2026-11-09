@@ -643,6 +643,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const timer = setTimeout(async function () {
             const params = new URLSearchParams();
             params.set('quantity', String(currentQty(form)));
+            if (form.dataset.productDeliveryCountry) params.set('country_code', form.dataset.productDeliveryCountry);
             const selected = new FormData(form).get('product_option_value_id');
             if (selected) params.set('product_option_value_id', String(selected));
             try {
@@ -879,9 +880,9 @@ document.addEventListener('DOMContentLoaded', function () {
         return window.ShopOrderQuantity.normalize(input, input?.value);
     };
 
-    const confirmAdded = function (form, payload) {
+    const confirmAdded = function (form, payload, quantity) {
         if (window.TermolCartModal) {
-            window.TermolCartModal.confirm(form, selectedOptionLabel(form), currentQty(form), payload);
+            window.TermolCartModal.confirm(form, selectedOptionLabel(form), quantity || currentQty(form), payload);
         }
     };
 
@@ -928,6 +929,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const formData = new FormData(form);
+            const boxSubmitter = event.submitter && event.submitter.hasAttribute('data-product-box-quantity')
+                ? event.submitter
+                : null;
+            if (boxSubmitter) {
+                formData.set('product_package_id', String(boxSubmitter.value));
+                formData.set('package_count', '1');
+            }
 
             try {
                 const response = await fetch(form.action, {
@@ -962,10 +970,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 }));
 
                 if (window.ShopAnalytics && typeof window.ShopAnalytics.trackAddToCartFromForm === 'function') {
-                    window.ShopAnalytics.trackAddToCartFromForm(form, currentQty(form), selectedOptionLabel(form));
+                    window.ShopAnalytics.trackAddToCartFromForm(form, payload.added_quantity || currentQty(form), selectedOptionLabel(form));
                 }
 
-                confirmAdded(form, payload);
+                confirmAdded(form, payload, payload.added_quantity);
             } catch (error) {
                 // Keep UI stable on network errors.
             }

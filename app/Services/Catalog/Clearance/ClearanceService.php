@@ -6,7 +6,9 @@ use App\Models\Catalog\Category\Category;
 use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Product\ProductClearance;
 use App\Models\Catalog\Product\ProductGroupPrice;
+use App\Models\Catalog\Product\ProductPriceHistory;
 use App\Models\User\CustomerGroup;
+use App\Services\Front\CartService;
 use App\Services\Integrations\SupplierCatalog\SupplierCatalogService;
 use App\Services\Settings\SystemSettingsService;
 use Illuminate\Support\Facades\Cache;
@@ -23,18 +25,75 @@ class ClearanceService
 
     public function settings(): array
     {
-        return array_replace(['enabled' => false, 'category_id' => ''], (array) app(SystemSettingsService::class)->get('catalog_automatic_clearance', []));
+        return array_replace(['enabled' => false, 'category_id' => '', 'inactivity_days' => self::INACTIVITY_DAYS,
+            'discount_percent' => self::DISCOUNT_PERCENT], (array) app(SystemSettingsService::class)->get('catalog_automatic_clearance', []));
     }
 
     public function saveSettings(array $settings): void
     {
-        $settings = Validator::make($settings, ['enabled' => 'required|boolean', 'category_id' => ['required', 'integer', Rule::exists('categories', 'id')->where('scope', 'catalog')]])->validate();
+        $settings = Validator::make(array_replace($this->settings(), $settings), [
+            'enabled' => 'required|boolean',
+            'category_id' => ['required', 'integer', Rule::exists('categories', 'id')->where('scope', 'catalog')],
+            'inactivity_days' => 'required|integer|min:1|max:365',
+            'discount_percent' => 'required|integer|min:1|max:99',
+        ], [], ['inactivity_days' => 'broj dana bez prodaje', 'discount_percent' => 'postotak popusta'])->validate();
+        $settings['inactivity_days'] = (int) $settings['inactivity_days'];
+        $settings['discount_percent'] = (float) $settings['discount_percent'];
         $salesState = app(CompanySalesClearanceSync::class)->state();
         $freshApi = ($salesState['status'] ?? null) === 'completed' && ($salesState['as_of'] ?? null) === today()->toDateString();
-        if ($settings['enabled'] && ! $freshApi && ! ProductClearance::query()->where('confirmed_company_scope', true)->whereDate('snapshot_date', today())->exists()) {
+        if ($settings['enabled'] && ! $this->settings()['enabled'] && ! $freshApi && ! ProductClearance::query()->where('confirmed_company_scope', true)->whereDate('snapshot_date', today())->exists()) {
             throw new RuntimeException('Prije uključivanja potreban je svjež potvrđen izvještaj ukupnih izlaza iz e-Računa. Prodaja samo s webshopa nije dovoljna.');
         }
-        app(SystemSettingsService::class)->put('catalog_automatic_clearance', $settings);
+        Cache::lock('catalog:automatic-clearance', 600)->block(1, function () use ($settings): void {
+            app(SystemSettingsService::class)->clearRuntimeCache();
+            $previous = $this->settings();
+            DB::transaction(function () use ($settings, $previous): void {
+                if ((int) $previous['inactivity_days'] !== $settings['inactivity_days']) {
+                    // A report fetched for a different rule must not silently
+                    // open new discounts before a fresh ERP scan/import.
+                    ProductClearance::query()->where('status', 'observed')->update(['confirmed_company_scope' => false]);
+                }
+                if ((float) $previous['discount_percent'] !== $settings['discount_percent']) {
+                    ProductClearance::query()->where('status', 'active')->select(['id', 'product_id'])
+                        ->chunkById(50, function ($rows) use ($settings, $previous): void {
+                            foreach ($rows as $row) {
+                                $product = Product::query()->whereKey($row->product_id)->lockForUpdate()->first();
+                                if (! $product) {
+                                    continue;
+                                }
+                                $payload = $product->payload ?? [];
+                                $payload['clearance']['discount_percent'] = $settings['discount_percent'];
+                                $product->updateQuietly(['payload' => $payload]);
+                                $base = $this->fullBase($product);
+                                $newPrice = $base * (1 - $settings['discount_percent'] / 100);
+                                $this->recordPrice($product, $base * (1 - $previous['discount_percent'] / 100), $newPrice, 'settings_changed', $settings);
+                                ProductGroupPrice::query()->where('product_id', $product->id)->where('is_active', true)
+                                    ->where('payload->source', 'automatic_clearance')
+                                    ->update(['price' => $newPrice]);
+                            }
+                        });
+                }
+                app(SystemSettingsService::class)->put('catalog_automatic_clearance', $settings);
+            });
+            app(SystemSettingsService::class)->flush();
+        });
+        CartService::forgetRequestSnapshot();
+        app(\App\Services\Front\GuestStorefrontCache::class)->invalidate();
+    }
+
+    public function inactivityDays(): int
+    {
+        return (int) $this->settings()['inactivity_days'];
+    }
+
+    public function discountPercent(): float
+    {
+        return (float) $this->settings()['discount_percent'];
+    }
+
+    public function actionCode(): string
+    {
+        return 'B2B'.rtrim(rtrim(number_format($this->discountPercent(), 2, '.', ''), '0'), '.');
     }
 
     public function price(Product $product, ?float $base = null): ?float
@@ -43,7 +102,7 @@ class ClearanceService
             return null;
         }
 
-        return max(0.0, $this->fullBase($product, $base) * 0.4);
+        return max(0.0, $this->fullBase($product, $base) * (1 - $this->discountPercent() / 100));
     }
 
     public function fullBase(Product $product, ?float $fallback = null): float
@@ -54,16 +113,17 @@ class ClearanceService
     /** A dry run never creates categories, groups, prices or product flags. */
     public function run(bool $apply = false, ?string $requiredSourceFingerprint = null): array
     {
-        $settings = $this->settings();
-        if (! $settings['enabled']) {
-            return ['eligible' => 0, 'activated' => 0, 'retired' => 0, 'stale_or_unproven' => 0, 'disabled' => true, 'applied' => $apply];
-        }
-        $category = Category::query()->where('scope', 'catalog')->find($settings['category_id']);
-        if (! $category) {
-            throw new RuntimeException('Odaberite postojeću kategoriju Rasprodaja prije obrade.');
-        }
+        return Cache::lock('catalog:automatic-clearance', 600)->block(1, function () use ($apply, $requiredSourceFingerprint): array {
+            app(SystemSettingsService::class)->clearRuntimeCache();
+            $settings = $this->settings();
+            if (! $settings['enabled']) {
+                return ['eligible' => 0, 'activated' => 0, 'retired' => 0, 'stale_or_unproven' => 0, 'disabled' => true, 'applied' => $apply];
+            }
+            $category = Category::query()->where('scope', 'catalog')->find($settings['category_id']);
+            if (! $category) {
+                throw new RuntimeException('Odaberite postojeću kategoriju Rasprodaja prije obrade.');
+            }
 
-        return Cache::lock('catalog:automatic-clearance', 600)->block(1, function () use ($apply, $category, $requiredSourceFingerprint): array {
             $counts = ['eligible' => 0, 'activated' => 0, 'retired' => 0, 'stale_or_unproven' => 0];
             $salesState = app(CompanySalesClearanceSync::class)->state();
             $verifiedZero = ($salesState['status'] ?? null) === 'completed' && ($salesState['as_of'] ?? null) === today()->toDateString()
@@ -142,7 +202,7 @@ class ClearanceService
 
     private function proven(ProductClearance $clearance): bool
     {
-        $cutoff = $clearance->snapshot_date->copy()->subDays(self::INACTIVITY_DAYS);
+        $cutoff = $clearance->snapshot_date->copy()->subDays($this->inactivityDays());
         if ($clearance->source === CompanySalesClearanceSync::SOURCE) {
             $state = app(CompanySalesClearanceSync::class)->state();
             if (($state['status'] ?? null) !== 'completed' || ($state['fingerprint'] ?? null) !== $clearance->source_fingerprint
@@ -166,12 +226,28 @@ class ClearanceService
         if ($categoryAdded) {
             $product->categories()->attach($category->id, ['is_primary' => false, 'sort_order' => 0]);
         }
-        ProductGroupPrice::query()->create(['product_id' => $product->id, 'customer_group_id' => $group->id, 'minimum_quantity' => 1, 'price' => $fullBase * 0.4,
+        ProductGroupPrice::query()->create(['product_id' => $product->id, 'customer_group_id' => $group->id, 'minimum_quantity' => 1, 'price' => $fullBase * (1 - $this->discountPercent() / 100),
             'currency_code' => app(SupplierCatalogService::class)->storeCurrency(), 'is_active' => true, 'payload' => ['source' => 'automatic_clearance', 'clearance_id' => $clearance->id]]);
         $clearance->update(['status' => 'active', 'base_price_at_activation' => $fullBase, 'category_id' => $category->id, 'category_added' => $categoryAdded, 'customer_group_id' => $group->id, 'activated_at' => now()]);
         $payload = $product->payload ?? [];
-        $payload['clearance'] = ['status' => 'active', 'discount_percent' => self::DISCOUNT_PERCENT, 'group' => 'B2B60', 'source' => $clearance->source, 'snapshot_date' => $clearance->snapshot_date->toDateString(), 'activated_at' => now()->toIso8601String()];
+        $payload['clearance'] = ['status' => 'active', 'discount_percent' => $this->discountPercent(), 'inactivity_days' => $this->inactivityDays(), 'group' => 'B2B60', 'source' => $clearance->source, 'snapshot_date' => $clearance->snapshot_date->toDateString(), 'activated_at' => now()->toIso8601String()];
         $product->updateQuietly(['payload' => $payload]);
+        $this->recordPrice($product, $fullBase, $fullBase * (1 - $this->discountPercent() / 100), 'activated', $this->settings());
+    }
+
+    private function recordPrice(Product $product, float $oldPrice, float $newPrice, string $event, array $settings): void
+    {
+        if (round($oldPrice, 4) === round($newPrice, 4)) {
+            return;
+        }
+        ProductPriceHistory::query()->create([
+            'product_id' => $product->id, 'price_type' => 'clearance',
+            'old_price' => $oldPrice, 'new_price' => $newPrice,
+            'currency_code' => app(SupplierCatalogService::class)->storeCurrency(),
+            'effective_at' => now(), 'source' => 'automatic_clearance', 'changed_by' => auth()->id(),
+            'payload' => ['event' => $event, 'discount_percent' => $settings['discount_percent'],
+                'inactivity_days' => $settings['inactivity_days']],
+        ]);
     }
 
     private function retire(Product $product, ProductClearance $clearance): void

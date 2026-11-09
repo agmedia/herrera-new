@@ -27,6 +27,8 @@ class ContentBlockResolver
         $targetRef = $targetRef !== '' ? $targetRef : null;
         $frontendVariant = in_array($frontendVariant, ['desktop', 'mobile'], true) ? $frontendVariant : null;
         $version = (int) Cache::get($this->versionKey(), 1);
+        $schedule = app(ContentBlockSchedule::class);
+        $scheduleContext = $schedule->context($placement);
 
         $cacheKey = sprintf(
             'content_blocks:v%s:%s:%s:%s:%s:%s:%s',
@@ -38,6 +40,7 @@ class ContentBlockResolver
             $frontendVariant ?: 'all',
             $strictVariant ? 'strict' : 'fallback'
         );
+        $cacheKey .= ':schedule:'.$scheduleContext['version'];
 
         $ttlSeconds = (int) config('content_blocks.cache.ttl_seconds', 3600);
         if ((bool) config('storefront_cache.enabled', false)) {
@@ -52,7 +55,7 @@ class ContentBlockResolver
 
         return Cache::remember(
             $cacheKey,
-            $ttlSeconds,
+            $schedule->expiresAt($ttlSeconds, $placement, $scheduleContext),
             function () use ($placement, $locale, $targetType, $targetRef, $frontendVariant, $strictVariant): Collection {
                 $baseQuery = ContentBlockSlot::query()
                     ->with([

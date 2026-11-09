@@ -16,7 +16,7 @@ class HerreraSyncClearanceSales extends Command
         {--run-clearance : Nakon uspješne provjere primijeni uključeno pravilo rasprodaje}
         {--enable : Nakon uspješne provjere uključi pravilo s kategorijom Rasprodaja}';
 
-    protected $description = 'Provjeri 100 dana ukupne prodaje tvrtke iz e-Računa, uključujući POS račune i otpremnice.';
+    protected $description = 'Provjeri ukupnu prodaju tvrtke iz e-Računa za razdoblje iz postavki rasprodaje, uključujući POS račune i otpremnice.';
 
     public function handle(CompanySalesClearanceSync $sync): int
     {
@@ -42,7 +42,7 @@ class HerreraSyncClearanceSales extends Command
                 $this->info('Automatska rasprodaja je uključena.');
             }
             $this->info($result['applied'] ? 'Potpuna provjera ERP prodaje je spremljena.' : 'Pregled bez izmjene proizvoda ili dokaza rasprodaje.');
-            $this->table(['Dokumenti', 'API pozivi', 'Bez prodaje 100 dana', 'Nedavna prodaja', 'Nepotvrđena veza/zaliha'], [[
+            $this->table(['Dokumenti', 'API pozivi', 'Bez prodaje u provjerenom razdoblju', 'Nedavna prodaja', 'Nepotvrđena veza/zaliha'], [[
                 $result['document_count'], $result['request_count'], $result['observed'], $result['recent'], $result['unproven'],
             ]]);
             if (isset($result['clearance'])) {

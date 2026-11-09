@@ -12,7 +12,7 @@ class EracuniCompanySalesException extends RuntimeException
     public function __construct(string $message, array $context = [])
     {
         $safe = [];
-        if (in_array($context['method'] ?? null, EracuniCompanySalesClient::SOURCES, true)) {
+        if (in_array($context['method'] ?? null, array_unique([...EracuniCompanySalesClient::SOURCES, ...EracuniCompanySalesClient::FINANCIAL_SOURCES]), true)) {
             $safe['method'] = $context['method'];
         }
         if (in_array($context['pass'] ?? null, ['document', 'supply', 'issued'], true)) {

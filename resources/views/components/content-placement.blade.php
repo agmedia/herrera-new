@@ -308,6 +308,7 @@
                 'comments' => $comments,
             ])
         @endif
+        @include('front.content-blocks.campaign-period', ['block' => $block, 'slot' => $slot])
     @if ($wrapperClasses !== '' || $wrapperStyle !== '')
         </div>
     @endif

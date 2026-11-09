@@ -5,6 +5,7 @@ namespace App\Services\Front;
 use App\Models\Catalog\Action\CatalogAction;
 use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Product\ProductOptionValue;
+use App\Models\Catalog\Product\ProductPackage;
 use App\Models\Settings\Local\TaxRate;
 use App\Services\Catalog\ActionResolverService;
 use App\Services\Pricing\B2BAccessService;
@@ -72,7 +73,7 @@ class CartService
     /**
      * @return Collection<int, array<string, mixed>>
      */
-    public function lines(?string $locale = null, ?string $couponCode = null): Collection
+    public function lines(?string $locale = null, ?string $couponCode = null, ?string $countryCode = null, bool $pickup = false): Collection
     {
         if (! app(B2BAccessService::class)->canViewPrices(auth()->user())) {
             return collect();
@@ -88,12 +89,13 @@ class CartService
         $fallbackLocale = (string) config('app.locale');
         $couponCode = $couponCode === null ? $this->couponCode() : strtoupper(trim($couponCode));
         $user = auth()->user();
+        $countryCode = app(\App\Services\Shipping\CustomerDeliveryDestination::class)->country($user, $countryCode);
 
         $request = app('request');
         $account = $user?->getRelations()['b2bAccount'] ?? null;
         $group = $account?->getRelations()['customerGroup'] ?? null;
         $snapshotKey = hash('sha256', serialize([
-            $items, $locale, $fallbackLocale, $couponCode,
+            $items, $locale, $fallbackLocale, $couponCode, $countryCode, $pickup,
             $user?->getAttributes(),
             $account?->getAttributes(), $group?->getAttributes(),
             $user?->relationLoaded('customerGroups') ? $user->customerGroups->map->getAttributes()->all() : null,
@@ -263,7 +265,7 @@ class CartService
                 'option_value_label' => $optionMeta['value'],
                 'sku' => (string) ($optionRow?->sku ?: $product->sku ?: ''),
                 'quantity' => $qty,
-                'delivery' => app(\App\Services\Shipping\SupplierDeliveryService::class)->estimate($product, $qty, $optionRow),
+                'delivery' => app(\App\Services\Shipping\SupplierDeliveryService::class)->estimate($product, $qty, $optionRow, pickup: $pickup, countryCode: $countryCode),
                 'catalog_unit_price' => $catalogUnitPrice,
                 'base_unit_price' => $baseUnitPrice,
                 'unit_price' => $unitPrice,
@@ -279,7 +281,7 @@ class CartService
                 'monetary_precision' => $precision,
                 'display_includes_tax' => ! $displayNet,
                 'tax_rate' => $taxRateValue,
-                'action_code' => $clearancePrice !== null ? 'B2B60' : $resolvedAction?->code,
+                'action_code' => $clearancePrice !== null ? app(\App\Services\Catalog\Clearance\ClearanceService::class)->actionCode() : $resolvedAction?->code,
                 'price_source' => match (true) {
                     $clearancePrice !== null => 'clearance',
                     $groupPrice !== null && $resolvedAction !== null => 'b2b_action',
@@ -451,6 +453,32 @@ class CartService
         self::forgetRequestSnapshot();
 
         return true;
+    }
+
+    /** Add complete boxes as basic units, never silently shorten a box to remaining stock. */
+    public function addPackage(Product $product, ProductPackage $package, int $boxes = 1, ?int $productOptionValueId = null): bool
+    {
+        app(B2BAccessService::class)->ensureCanPurchase(auth()->user());
+
+        $units = (float) $package->quantity;
+        if (! $product->is_active || ! $package->is_active || (int) $package->product_id !== (int) $product->id
+            || $package->package_type !== 'box' || $package->unit_of_measure !== $product->unit_of_measure
+            || $units < 2 || $units > 999 || floor($units) !== $units || $boxes < 1 || $boxes > 999) {
+            return false;
+        }
+        $option = $this->resolveProductOptionValue($product, $productOptionValueId);
+        if (((int) $productOptionValueId > 0 || $this->requiresOptionSelection($product)) && ! $option) {
+            return false;
+        }
+        $quantity = (int) $units * $boxes;
+        $key = $this->lineKey((int) $product->id, $option?->id);
+        $target = (int) ($this->raw()[$key]['quantity'] ?? 0) + $quantity;
+        $stock = $option ? (int) $option->stock_qty : $product->availableStockQuantity();
+        if ($target > 999 || $target > $stock || $this->normalizeOrderQuantity($product, $target, $stock) !== $target) {
+            return false;
+        }
+
+        return $this->add($product, $quantity, $productOptionValueId);
     }
 
     public function set(Product $product, int $quantity, ?int $productOptionValueId = null): bool

@@ -44,7 +44,7 @@ class ContentBlockSlot extends Model
                 $q->whereNull('starts_at')->orWhere('starts_at', '<=', $now);
             })
             ->where(function (Builder $q) use ($now): void {
-                $q->whereNull('ends_at')->orWhere('ends_at', '>=', $now);
+                $q->whereNull('ends_at')->orWhere('ends_at', '>', $now);
             });
     }
 }

@@ -211,6 +211,7 @@ class StoreNotificationService
                 'sku' => (string) $item->sku,
                 'option_label' => $optionLabel,
                 'delivery_label' => data_get($item->payload, 'delivery.label'),
+                'fulfilments' => $item->fulfilmentRows(),
                 'quantity' => (int) $item->quantity,
                 'unit_price' => $this->formatMoney((float) $item->unit_price, $currency),
                 'line_total' => $this->formatMoney((float) $item->line_total, $currency),

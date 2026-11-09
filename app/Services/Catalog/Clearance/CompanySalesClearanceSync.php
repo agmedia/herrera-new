@@ -35,7 +35,8 @@ class CompanySalesClearanceSync
 
         return Cache::lock('catalog:clearance-company-sales-sync', 7200)->block(1, function () use ($apply, $runClearance, $actorId): array {
             $asOf = today()->toDateString();
-            $from = today()->subDays(ClearanceService::INACTIVITY_DAYS)->toDateString();
+            $inactivityDays = app(ClearanceService::class)->inactivityDays();
+            $from = today()->subDays($inactivityDays)->toDateString();
             $settings = app(SystemSettingsService::class);
             $stage = 'sales';
             if ($apply) {
@@ -65,7 +66,12 @@ class CompanySalesClearanceSync
                 }
                 $fingerprint = hash('sha256', json_encode([$sales['fingerprint'], $warehouse], JSON_THROW_ON_ERROR));
                 $stage = 'snapshot';
-                $result = Cache::lock('catalog:automatic-clearance', 600)->block(1, function () use ($warehouse, $recent, $fingerprint, $from, $asOf, $apply, $actorId): array {
+                $result = Cache::lock('catalog:automatic-clearance', 600)->block(1, function () use ($warehouse, $recent, $fingerprint, $from, $asOf, $apply, $actorId, $inactivityDays): array {
+                    app(SystemSettingsService::class)->clearRuntimeCache();
+                    if (app(ClearanceService::class)->inactivityDays() !== $inactivityDays) {
+                        throw new RuntimeException('Tijekom dohvata promijenjeno je razdoblje rasprodaje. Ponovite provjeru za novo razdoblje.');
+                    }
+
                     return DB::transaction(function () use ($warehouse, $recent, $fingerprint, $from, $asOf, $apply, $actorId): array {
                         $identities = [];
                         Product::query()->select(['id', 'code', 'payload'])->chunkById(self::PRODUCT_CHUNK_SIZE, function ($products) use ($warehouse, &$identities): void {
@@ -136,7 +142,7 @@ class CompanySalesClearanceSync
                     });
                 });
                 $result += ['status' => 'completed', 'source' => self::SOURCE, 'coverage_from' => $from, 'as_of' => $asOf,
-                    'fingerprint' => $fingerprint, 'document_count' => (int) ($sales['document_count'] ?? 0),
+                    'fingerprint' => $fingerprint, 'inactivity_days' => $inactivityDays, 'document_count' => (int) ($sales['document_count'] ?? 0),
                     'request_count' => (int) ($sales['request_count'] ?? 0), 'sources' => $sales['sources'] ?? [],
                     'unlinked_line_count' => (int) ($sales['unlinked_line_count'] ?? 0),
                     'completed_at' => now()->toIso8601String(), 'applied' => $apply];

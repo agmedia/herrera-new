@@ -51,6 +51,24 @@ class CompanySalesClearanceSyncTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_erp_fetch_and_candidate_proof_use_configured_inactivity_period(): void
+    {
+        $product = $this->product('CUSTOM-PERIOD');
+        $category = Category::query()->create(['scope' => 'catalog', 'code' => 'clearance']);
+        app(ClearanceService::class)->saveSettings(['enabled' => false, 'category_id' => $category->id,
+            'inactivity_days' => 180, 'discount_percent' => 25]);
+        $this->sources([['identifier' => 'CUSTOM-PERIOD', 'quantity' => 10]]);
+
+        $result = app(CompanySalesClearanceSync::class)->run(true);
+
+        $this->assertSame(180, $result['inactivity_days']);
+        $this->assertSame(today()->subDays(180)->toDateString(), $result['coverage_from']);
+        $service = app(ClearanceService::class);
+        $service->saveSettings(['enabled' => true, 'category_id' => $category->id]);
+        $this->assertSame(1, $service->run(true)['activated']);
+        $this->assertEquals(75, $service->price($product->fresh()));
+    }
+
     public function test_large_payload_catalogue_stays_bounded_and_preserves_cross_chunk_identity_and_snapshot_rules(): void
     {
         $shadowed = $this->product('EARLY', ['payload' => ['eracuni' => ['productCode' => 'SHARED']]]);
@@ -365,10 +383,11 @@ class CompanySalesClearanceSyncTest extends TestCase
 
     private function sources(array $stockRows, array $salesOverrides = [], int $times = 1, array $stockOverrides = []): void
     {
+        $days = app(ClearanceService::class)->inactivityDays();
         $this->mock(EracuniCompanySalesClient::class)->shouldReceive('fetch')->times($times)
-            ->withArgs(fn ($from, $asOf) => CarbonImmutable::parse($from)->isSameDay(today()->subDays(100)) && CarbonImmutable::parse($asOf)->isSameDay(today()))
+            ->withArgs(fn ($from, $asOf) => CarbonImmutable::parse($from)->isSameDay(today()->subDays($days)) && CarbonImmutable::parse($asOf)->isSameDay(today()))
             ->andReturn(array_replace([
-                'complete' => true, 'coverage_from' => today()->subDays(100)->toDateString(), 'as_of' => today()->toDateString(),
+                'complete' => true, 'coverage_from' => today()->subDays($days)->toDateString(), 'as_of' => today()->toDateString(),
                 'recent_product_codes' => ['RECENT'], 'document_count' => 3, 'request_count' => 8,
                 'sources' => ['SalesInvoiceList', 'POSSalesInvoiceList', 'DeliveryNoteList'], 'fingerprint' => str_repeat('b', 64),
             ], $salesOverrides));

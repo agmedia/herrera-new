@@ -1270,6 +1270,7 @@
                     $usersListActive = request()->routeIs('admin.users') || request()->routeIs('admin.users.edit') || request()->routeIs('admin.users.show');
                     $usersB2BActive = request()->routeIs('admin.users.b2b');
                     $usersStatisticsActive = request()->routeIs('admin.users.statistics');
+                    $usersOpportunitiesActive = request()->routeIs('admin.users.opportunities*');
                     $usersGroupsActive = request()->routeIs('admin.users.groups*');
                     $usersAccessActive = $canManageUsersAccess && request()->routeIs('admin.users.access');
                     $usersActivityActive = request()->routeIs('admin.users.activity');
@@ -1287,7 +1288,7 @@
                     $canViewUserLoyalty = $userLoyaltyEnabled
                         && auth()->user()
                         && (auth()->user()->isA('superadmin') || auth()->user()->can('users.loyalty.view'));
-                    $usersOpen = $usersListActive || $usersB2BActive || $usersStatisticsActive || $usersGroupsActive || $usersAccessActive || $usersActivityActive || $usersNewsletterActive || ($userLoyaltyEnabled && $usersLoyaltyActive);
+                    $usersOpen = $usersListActive || $usersB2BActive || $usersStatisticsActive || $usersOpportunitiesActive || $usersGroupsActive || $usersAccessActive || $usersActivityActive || $usersNewsletterActive || ($userLoyaltyEnabled && $usersLoyaltyActive);
                     $canAdminAbility = static fn (string $ability): bool => auth()->user()
                         && (auth()->user()->isA('superadmin') || auth()->user()->can($ability));
                     $catalogLinks = [
@@ -1967,6 +1968,11 @@
                                             <span class="sidebar-dot"></span>
                                             <span>{{ __('Statistike kupaca i artikala') }}</span>
                                         </span>
+                                    </a>
+                                @endif
+                                @if (auth()->user()->isA('superadmin') || auth()->user()->can('sales.opportunities.view'))
+                                    <a href="{{ route('admin.users.opportunities') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ $usersOpportunitiesActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
+                                        <span class="flex items-center gap-2"><span class="sidebar-dot"></span><span>{{ __('Prodajne prilike') }}</span></span>
                                     </a>
                                 @endif
                                 @if ($canManageUserGroups)

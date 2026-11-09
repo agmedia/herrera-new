@@ -19,6 +19,7 @@ use App\Services\Integrations\Eprel\EprelSettingsService;
 use App\Services\Integrations\Msan\EprelClient;
 use App\Services\Integrations\Msan\EprelException;
 use App\Services\Integrations\Msan\EprelProductLookupService;
+use App\Services\Seo\ProductSeoSuggestions;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -61,6 +62,11 @@ class Form extends Component
     public string $eprelLookupSearchBy = EprelProductLookupService::SEARCH_AUTO;
 
     public string $eprelLookupQuery = '';
+
+    public string $seoAiProvider = 'anthropic';
+
+    #[Locked]
+    public ?array $seoAiSuggestion = null;
 
     public array $form = [
         'code' => '',
@@ -107,7 +113,43 @@ class Form extends Component
 
     public function updatedFormLocale(): void
     {
+        $this->seoAiSuggestion = null;
         $this->loadTranslationForLocale();
+    }
+
+    public function generateSeoSuggestion(ProductSeoSuggestions $suggestions): void
+    {
+        $this->authorizeSeoSuggestion();
+        $this->resetErrorBag('seoAi');
+        $this->seoAiSuggestion = null;
+        try {
+            $this->seoAiSuggestion = $suggestions->generate($this->form, $this->seoAiProvider, (int) auth()->id());
+        } catch (\RuntimeException $exception) {
+            $this->addError('seoAi', $exception->getMessage());
+        }
+    }
+
+    public function applySeoSuggestion(bool $replaceExisting = false): void
+    {
+        $this->authorizeSeoSuggestion();
+        if (! $this->seoAiSuggestion || ! hash_equals($this->seoAiSuggestion['fingerprint'], app(ProductSeoSuggestions::class)->fingerprint($this->form))) {
+            $this->seoAiSuggestion = null;
+            $this->addError('seoAi', __('Podaci artikla promijenjeni su nakon generiranja. Pripremite novi prijedlog.'));
+
+            return;
+        }
+        foreach (['meta_title', 'meta_description'] as $field) {
+            if ($replaceExisting || trim((string) ($this->form[$field] ?? '')) === '') {
+                $this->form[$field] = $this->seoAiSuggestion[$field];
+            }
+        }
+        $this->dispatch('notify', type: 'success', message: __('Prijedlog je prenesen u obrazac. Pregledajte ga i spremite artikl.'));
+    }
+
+    private function authorizeSeoSuggestion(): void
+    {
+        $actor = auth()->user();
+        abort_unless($actor && ($actor->isA('superadmin') || $actor->can($this->productId ? 'catalog.products.update' : 'catalog.products.create')), 403);
     }
 
     public function updatedEprelLookupGroup(): void

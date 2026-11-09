@@ -17,6 +17,9 @@
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     @include('admin.users.partials.impersonate-button', ['customer' => $user])
+                    @if ($user->b2bAccount?->status === \App\Models\User\B2BAccount::STATUS_APPROVED && (auth()->user()->isA('superadmin') || auth()->user()->can('sales.opportunities.view')))
+                        <a href="{{ route('admin.users.opportunities', ['user_id' => $user->id]) }}" class="rounded-xl border border-cyan-300 px-4 py-2 text-sm font-semibold text-cyan-800">{{ __('Prodajne prilike') }}</a>
+                    @endif
                     @if ($loyaltyEnabled)
                         <a href="{{ route('admin.users.loyalty', ['user_id' => $user->id]) }}" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">{{ __('Loyalty Ledger') }}</a>
                     @endif

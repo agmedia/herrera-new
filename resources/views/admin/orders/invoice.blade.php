@@ -77,6 +77,7 @@
                                 <td class="px-2 py-2">
                                     <div class="font-medium">{{ $item->name }}</div>
                                     <div class="text-xs text-slate-500">{{ $item->sku ?: $item->code ?: '-' }}</div>
+                                    @include('shared.order-fulfilments', ['fulfilments' => $item->fulfilmentRows()])
                                 </td>
                                 <td class="px-2 py-2 text-center">{{ $item->quantity }}</td>
                                 <td class="px-2 py-2 text-right">{{ \App\Support\Currency::format((float) $item->unit_price, $order->currency_code) }}</td>

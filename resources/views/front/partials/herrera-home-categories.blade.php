@@ -1,20 +1,27 @@
 @php
     $locale = (string) ($locale ?? app()->getLocale());
     $fallbackLocale = (string) ($fallbackLocale ?? config('app.locale'));
-    $categories = $categories ?? \App\Models\Catalog\Category\Category::query()
-        ->where('scope', \App\Models\Catalog\Category\Category::SCOPE_CATALOG)
-        ->currentlyVisible()
-        ->whereNull('parent_id')
-        ->with(['translations', 'media'])
-        ->orderBy('sort_order')
-        ->orderBy('id')
-        ->get();
+    if (! isset($categories)) {
+        $rootCategories = \App\Models\Catalog\Category\Category::query()
+            ->where('scope', \App\Models\Catalog\Category\Category::SCOPE_CATALOG)
+            ->currentlyVisible()
+            ->whereNull('parent_id')
+            ->with(['translations', 'media'])
+            ->orderBy('sort_order')
+            ->orderBy('id');
+        if (request()->routeIs('home')) {
+            app(\App\Services\Content\FeaturedCategoriesService::class)->excludeClearance($rootCategories);
+        }
+        $categories = $rootCategories->get();
+    }
     $categoryTitle = trim((string) ($title ?? __('herrera.categories')));
     $categorySubtitle = trim((string) ($subtitle ?? ''));
     $categoryCtaLabel = trim((string) ($ctaLabel ?? __('herrera.all_categories')));
     $categoryCtaUrl = trim((string) ($ctaUrl ?? route('categories.index')));
     $showCategoryModuleHeading = (bool) ($showCategoryHeading ?? true);
+    $supportFields = $categorySupportFields ?? [];
     $showHerreraCategorySupport = (bool) ($showCategorySupport ?? request()->routeIs('home'))
+        && (bool) ($supportFields['support_visible'] ?? true)
         && str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera');
     $preferWebp = (bool) ($storeSettings['images']['use_webp'] ?? false);
     $categoryIcons = [
@@ -108,16 +115,27 @@
                 </a>
             @endforeach
             @if ($showHerreraCategorySupport)
-                <article class="herrera-category-tile herrera-category-support" aria-label="{{ __('herrera.category_support.title') }}" data-herrera-category-support>
+                @php
+                    $supportEyebrow = (string) ($supportFields['support_eyebrow'] ?? __('herrera.category_support.eyebrow'));
+                    $supportTitle = (string) ($supportFields['support_title'] ?? __('herrera.category_support.title'));
+                    $supportDescription = (string) ($supportFields['support_description'] ?? __('herrera.category_support.description'));
+                    $supportContactLabel = (string) ($supportFields['support_contact_label'] ?? __('herrera.category_support.contact'));
+                    $supportRegisterLabel = (string) ($supportFields['support_register_label'] ?? __('herrera.category_support.register'));
+                    $supportContactUrl = \App\Support\HerreraHomeWidgets::safeUrl($supportFields['support_contact_url'] ?? null, route('contact.create'));
+                    $supportRegisterUrl = \App\Support\HerreraHomeWidgets::safeUrl($supportFields['support_register_url'] ?? null, route('front.auth.b2b-register'));
+                @endphp
+                <article class="herrera-category-tile herrera-category-support" aria-label="{{ $supportTitle ?: __('herrera.category_support.title') }}" data-herrera-category-support>
                     <div class="herrera-category-support-copy">
-                        <p class="herrera-category-support-eyebrow">{{ __('herrera.category_support.eyebrow') }}</p>
-                        <h3>{{ __('herrera.category_support.title') }}</h3>
-                        <p class="herrera-category-support-description">{{ __('herrera.category_support.description') }}</p>
+                        @if ($supportEyebrow !== '')<p class="herrera-category-support-eyebrow">{{ $supportEyebrow }}</p>@endif
+                        @if ($supportTitle !== '')<h3>{{ $supportTitle }}</h3>@endif
+                        @if ($supportDescription !== '')<p class="herrera-category-support-description">{{ $supportDescription }}</p>@endif
                     </div>
-                    <div class="herrera-category-support-actions">
-                        <a class="herrera-category-support-contact" href="{{ route('contact.create') }}">{{ __('herrera.category_support.contact') }}</a>
-                        <a class="herrera-category-support-register" href="{{ route('front.auth.b2b-register') }}">{{ __('herrera.category_support.register') }}</a>
-                    </div>
+                    @if ($supportContactLabel !== '' || $supportRegisterLabel !== '')
+                        <div class="herrera-category-support-actions">
+                            @if ($supportContactLabel !== '')<a class="herrera-category-support-contact" href="{{ $supportContactUrl }}">{{ $supportContactLabel }}</a>@endif
+                            @if ($supportRegisterLabel !== '')<a class="herrera-category-support-register" href="{{ $supportRegisterUrl }}">{{ $supportRegisterLabel }}</a>@endif
+                        </div>
+                    @endif
                 </article>
             @endif
         </div>

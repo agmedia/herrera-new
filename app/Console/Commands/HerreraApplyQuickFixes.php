@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Services\Import\HerreraBlogRefreshService;
 use App\Services\Import\HerreraBlogRelatedProductsService;
-use App\Services\Import\HerreraHomeBlogCarouselService;
+use App\Services\Import\HerreraHomeWidgetsService;
 use App\Services\Import\HerreraQuickFixConfigurationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +18,7 @@ class HerreraApplyQuickFixes extends Command
     public function handle(
         HerreraQuickFixConfigurationService $configuration,
         HerreraBlogRefreshService $blog,
-        HerreraHomeBlogCarouselService $carousel,
+        HerreraHomeWidgetsService $widgets,
         HerreraBlogRelatedProductsService $relatedProducts,
     ): int {
         $database = DB::connection()->getDatabaseName();
@@ -37,7 +37,7 @@ class HerreraApplyQuickFixes extends Command
         $this->info($applied ? 'Herrera quick-fix settings applied.' : 'Herrera quick-fix settings already applied; administrator edits preserved.');
         $configuration->applyFilterDefaults();
         $this->info('Blog articles refreshed: '.$blog->apply());
-        $carousel->apply();
+        $this->info($widgets->apply() ? 'Herrera homepage widgets configured.' : 'Herrera homepage widgets already configured.');
         $this->info('Blog product selections added: '.$relatedProducts->apply());
 
         return self::SUCCESS;

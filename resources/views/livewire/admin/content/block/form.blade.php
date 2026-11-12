@@ -3,7 +3,7 @@
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Content / Blocks v2') }}</p>
-                <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{{ $this->isEdit ? __('Edit Block') : __('Create Block') }}</h1>
+                <h1 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">{{ $this->homepageWidget && $this->isEdit ? $form['name'] : ($this->isEdit ? __('Edit Block') : __('Create Block')) }}</h1>
                 <p class="mt-2 text-sm text-slate-600">{{ __('Simple builder: choose type, set slot, pick items, and publish.') }}</p>
             </div>
             <div class="flex items-center gap-2">
@@ -20,7 +20,7 @@
             <div class="mt-4 grid gap-3 md:grid-cols-4">
                 <div>
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Code') }}</label>
-                    <input type="text" wire:model="form.code" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-mono" />
+                    <input type="text" wire:model="form.code" @readonly($fixedHomepageWidget) class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-mono" />
                     @error('form.code') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
 
@@ -32,7 +32,7 @@
 
                 <div>
                     <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Type') }}</label>
-                    <select wire:model.live="form.type" data-tom-select data-tom-no-search="1" class="admin-select w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
+                    <select wire:model.live="form.type" @disabled($fixedHomepageWidget) data-tom-select data-tom-no-search="1" class="admin-select w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
                         @foreach ($types as $typeKey => $typeLabel)
                             <option value="{{ $typeKey }}" @selected(($form['type'] ?? '') === $typeKey)>{{ $typeLabel }}</option>
                         @endforeach
@@ -172,19 +172,22 @@
                     <div>
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('CTA URL') }}</label>
                         <input type="text" wire:model="form.cta_url" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm" placeholder="{{ __('/shop or https://...') }}" />
+                        @error('form.cta_url') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                     </div>
                 </div>
 
-                @if (in_array(($form['type'] ?? ''), ['five_star_reviews_carousel', 'blogs_carousel'], true))
+                @if (in_array(($form['type'] ?? ''), ['five_star_reviews_carousel', 'blogs_carousel', 'herrera_curated_products', 'herrera_popular_products'], true))
                     <div class="mt-3">
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                             @if (($form['type'] ?? '') === 'blogs_carousel')
                                 {{ __('Number of blog posts to show') }}
+                            @elseif (in_array($form['type'], ['herrera_curated_products', 'herrera_popular_products'], true))
+                                {{ __('Broj artikala u widgetu') }}
                             @else
                                 {{ __('Number of comments to show') }}
                             @endif
                         </label>
-                        <input type="number" min="1" max="50" wire:model="form.items_limit" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm md:max-w-[220px]" />
+                        <input type="number" min="1" max="{{ ($form['code'] ?? '') === 'herrera-home-blog' ? 12 : 50 }}" wire:model="form.items_limit" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm md:max-w-[220px]" />
                         @error('form.items_limit') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
 
                         @if (($form['type'] ?? '') === 'blogs_carousel')
@@ -355,13 +358,17 @@
                 <div class="mt-4 md:max-w-md">
                     <label for="featured-category-source" class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Kategorije u modulu') }}</label>
                     <select id="featured-category-source" wire:model.live="form.category_source" class="admin-select w-full rounded-xl border border-slate-300 px-3 py-2 text-sm">
-                        <option value="all_root">{{ __('Sve glavne kategorije') }}</option>
+                        <option value="all_root">{{ $this->homepageWidget ? __('Sve glavne kategorije osim Rasprodaje') : __('Sve glavne kategorije') }}</option>
                         <option value="manual">{{ __('Ručni odabir i redoslijed') }}</option>
                     </select>
                     <p class="mt-2 text-xs text-slate-500">{{ __('Sve glavne kategorije prikazuju se prema redoslijedu u katalogu. Ručnim odabirom možete složiti vlastiti popis i redoslijed.') }}</p>
                     @error('form.category_source') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
             </div>
+        @endif
+
+        @if ($this->homepageWidgetFields !== [])
+            @include('livewire.admin.content.block.homepage-widget-fields', ['fields' => $this->homepageWidgetFields])
         @endif
 
         @if ($this->isItemBlock && !(($form['type'] ?? '') === 'featured_categories' && ($form['category_source'] ?? 'manual') === 'all_root'))
@@ -382,6 +389,8 @@
                         {{ __('Choose one category. Products are loaded automatically from it and its subcategories.') }}
                     @elseif (($form['type'] ?? '') === 'featured_categories')
                         {{ __('Choose and order the categories shown in this module.') }}
+                    @elseif (($form['type'] ?? '') === 'herrera_curated_products' || ($form['code'] ?? '') === 'herrera-home-brands')
+                        {{ __('Odaberite stavke i njihov redoslijed. Prazan popis koristi automatski odabir.') }}
                     @elseif (($form['type'] ?? '') === 'popular_brands')
                         {{ __('Choose and order the brands shown in this module.') }}
                     @else

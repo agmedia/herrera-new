@@ -7,17 +7,37 @@
     @php
         $resolver = app(\App\Services\Content\ContentBlockResolver::class);
         $locale = app()->getLocale();
+        $isHerreraHome = str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera');
+        $isManagedHerreraHome = $isHerreraHome
+            && app(\App\Services\Settings\SystemSettingsService::class)->get('herrera_home_widgets_2026_11_applied', false);
+        $homeVariant = $isManagedHerreraHome && ! empty($isMobileDevice) ? 'mobile' : 'desktop';
 
-        $homeHeroBlocks = $resolver->forPlacement('home.hero', $locale, null, null, 'desktop');
-        $homeHeroBenefitsBlocks = $resolver->forPlacement('home.hero_benefits', $locale, null, null, 'desktop');
-        $homeBeforeProductsBlocks = $resolver->forPlacement('home.before_products', $locale, null, null, 'desktop');
-        $homeCategoriesBlocks = $resolver->forPlacement('home.categories', $locale, null, null, 'desktop');
-        $homeAfterProductsBlocks = $resolver->forPlacement('home.after_products', $locale, null, null, 'desktop');
-        $homeBottomBlocks = $resolver->forPlacement('home.bottom', $locale, null, null, 'desktop');
+        $resolveHomePlacement = function (string $placement) use ($resolver, $locale, $homeVariant, $isManagedHerreraHome) {
+            $items = $resolver->forPlacement($placement, $locale, frontendVariant: $homeVariant);
+            if (! $isManagedHerreraHome || ! $items->contains(fn ($item) => $item['slot']->frontend_variant === $homeVariant)) {
+                return $items;
+            }
+
+            // A device-specific slot overrides the shared slot of the same
+            // block, while the other built-in widgets keep their own slots.
+            $sharedWidgets = $resolver->forPlacement($placement, $locale)->filter(fn ($item) => in_array($item['block']->type, [
+                'herrera_hero', 'herrera_curated_products', 'herrera_popular_products', 'herrera_registration',
+            ], true) || in_array($item['block']->code, \App\Support\HerreraHomeWidgets::FIXED_CODES, true));
+
+            return $items->concat($sharedWidgets)->unique('block.id')->sortBy([
+                ['slot.sort_order', 'asc'], ['slot.id', 'asc'],
+            ])->values();
+        };
+
+        $homeHeroBlocks = $resolveHomePlacement('home.hero');
+        $homeHeroBenefitsBlocks = $resolveHomePlacement('home.hero_benefits');
+        $homeBeforeProductsBlocks = $resolveHomePlacement('home.before_products');
+        $homeCategoriesBlocks = $resolveHomePlacement('home.categories');
+        $homeAfterProductsBlocks = $resolveHomePlacement('home.after_products');
+        $homeBottomBlocks = $resolveHomePlacement('home.bottom');
         $homeBottomIsInstagramOnly = $homeBottomBlocks->isNotEmpty()
             && $homeBottomBlocks->every(fn ($item) => (string) data_get($item, 'block.type') === 'instagram_curated_grid');
-        $isHerreraHome = str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera');
-        $hasManagedHerreraHomeCategories = $isHerreraHome
+        $hasManagedHerreraHomeCategories = $isHerreraHome && ! $isManagedHerreraHome
             && \Illuminate\Support\Facades\Schema::hasTable('content_block_slots')
             && \Illuminate\Support\Facades\Schema::hasTable('content_blocks')
             && \App\Models\Content\ContentBlockSlot::query()
@@ -72,7 +92,7 @@
             }
         }
 
-        $useHerreraHomeFallback = $isHerreraHome && $homeHeroBlocks->isEmpty();
+        $useHerreraHomeFallback = $isHerreraHome && ! $isManagedHerreraHome && $homeHeroBlocks->isEmpty();
         $hasHomeBrandsBlock = collect([$homeHeroBlocks, $homeHeroBenefitsBlocks, $homeCategoriesBlocks, $homeBeforeProductsBlocks, $homeAfterProductsBlocks, $homeBottomBlocks])
             ->flatten(1)
             ->contains(fn ($item) => (string) data_get($item, 'block.type') === 'popular_brands');
@@ -120,10 +140,9 @@
 
     @if ($useHerreraHomeFallback && ! $hasHomeBrandsBlock)
         @include('front.partials.herrera-home', ['herreraHomeSection' => 'brands'])
-        @include('front.partials.herrera-popular-products')
     @endif
 
-    @if ($isHerreraHome && ! $hasHomeBrandsBlock)
+    @if ($isHerreraHome && ! $isManagedHerreraHome && ! $hasHomeBrandsBlock)
         @include('front.partials.herrera-popular-products')
     @endif
 

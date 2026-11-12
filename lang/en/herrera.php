@@ -33,6 +33,7 @@ return [
     'products' => 'From our range',
     'products_eyebrow' => 'Selected from our range',
     'popular_products' => 'Most popular in the last 30 days',
+    'popular_products_period' => 'Most popular in the last :days days',
     'popular_products_eyebrow' => 'Most frequently ordered products',
     'all_products' => 'All products',
     'brands_eyebrow' => 'Selected brands',
@@ -73,6 +74,8 @@ return [
         'login' => 'B2B sign in',
     ],
     'blog' => [
+        'title' => 'Advice and news',
+        'all' => 'All articles',
         'eyebrow' => 'From our blog',
         'subtitle' => 'Herrera news, advice and inspiration for your projects.',
         'illustration' => 'Illustrative view of lighting in an interior.',

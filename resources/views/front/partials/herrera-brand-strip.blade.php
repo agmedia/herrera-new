@@ -1,16 +1,24 @@
 @php
+    $brandStripPayload = \App\Support\HerreraHomeWidgets::payload($herreraWidgetBlock ?? null, $herreraWidgetTranslation ?? null);
+    $brandStripTitle = $herreraWidgetTranslation?->title ?? __('herrera.brands_title');
+    $brandStripSubtitle = $herreraWidgetTranslation?->subtitle ?? '';
+    $brandStripEyebrow = $brandStripPayload['eyebrow'] ?? __('herrera.brands_eyebrow');
+    $brandStripCtaLabel = $herreraWidgetTranslation?->cta_label ?? __('herrera.brands_all');
+    $brandStripCtaUrl = \App\Support\HerreraHomeWidgets::safeUrl($herreraWidgetTranslation?->cta_url ?? '', route('manufacturers.index'));
+    $brandStripHeadingId = 'herrera-brand-strip-title'.(isset($herreraWidgetBlock) ? '-'.$herreraWidgetBlock->id : '');
     $brandStripLocale = (string) app()->getLocale();
     $brandStripFallbackLocale = (string) config('app.locale');
     $brandStripLogoMap = (array) config('manufacturer-logo-assets', []);
     $brandStripPriority = array_flip(array_keys((array) config('herrera-brand-logos', [])));
-    $brandStripManufacturers = \App\Models\Catalog\Manufacturer\Manufacturer::query()
+    $brandStripHasManualSelection = isset($herreraManualManufacturers);
+    $brandStripManufacturers = $herreraManualManufacturers ?? \App\Models\Catalog\Manufacturer\Manufacturer::query()
         ->where('is_active', true)
         ->whereHas('products', fn ($query) => $query->where('is_active', true))
         ->with(['translations', 'media'])
         ->orderBy('sort_order')
         ->orderBy('id')
         ->get();
-    $brandStripItems = $brandStripManufacturers->map(function ($manufacturer) use ($brandStripLogoMap, $brandStripPriority, $brandStripLocale, $brandStripFallbackLocale) {
+    $brandStripItems = $brandStripManufacturers->map(function ($manufacturer) use ($brandStripLogoMap, $brandStripPriority, $brandStripLocale, $brandStripFallbackLocale, $brandStripHasManualSelection) {
         $translation = collect([$brandStripLocale, $brandStripFallbackLocale])->unique()
             ->map(fn ($locale) => $manufacturer->translations->firstWhere('locale', $locale))
             ->first(fn ($item) => $item && trim((string) $item->slug) !== '');
@@ -33,7 +41,7 @@
 
         // Only real uploaded logos or verified local artwork belong in the carousel.
         // Imported manufacturer image fields may contain product photos.
-        if (! $hasUploadedLogo && ! $localBrandKey) {
+        if (! $brandStripHasManualSelection && ! $hasUploadedLogo && ! $localBrandKey) {
             return null;
         }
 
@@ -49,7 +57,11 @@
             'variant' => $resolvedLogo['variant'],
             'priority' => $brandStripPriority[$brandKey] ?? count($brandStripPriority),
         ];
-    })->filter()->sortBy('priority')->values();
+    })->filter();
+    if (! $brandStripHasManualSelection) {
+        $brandStripItems = $brandStripItems->sortBy('priority');
+    }
+    $brandStripItems = $brandStripItems->values();
     $brandStripCount = $brandStripItems->count();
     $brandStripPrevious = trim(str_replace(['&laquo;', '&raquo;'], '', __('pagination.previous')));
     $brandStripNext = trim(str_replace(['&laquo;', '&raquo;'], '', __('pagination.next')));
@@ -68,6 +80,11 @@
 @endphp
 
 @if ($brandStripItems->isNotEmpty())
+    @once('herrera-home-b2b-styles')
+        @push('styles')
+            <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-home-b2b.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-home-b2b.css')) }}">
+        @endpush
+    @endonce
     @once
         @push('styles')
             <link rel="stylesheet" href="{{ asset('front-theme/styles/herrera-brand-strip.css') }}?v={{ filemtime(public_path('front-theme/styles/herrera-brand-strip.css')) }}">
@@ -75,15 +92,16 @@
     @endonce
     @include('front.partials.splide-assets')
 
-    <section class="herrera-home-section herrera-brand-strip" aria-labelledby="herrera-brand-strip-title">
-        <div class="splide herrera-brand-carousel" data-herrera-brand-carousel data-herrera-home-carousel data-splide='@json($brandStripOptions)' aria-labelledby="herrera-brand-strip-title" style="--herrera-brand-columns: {{ $brandStripOptions['perPage'] }}; --herrera-brand-laptop-columns: {{ $brandStripOptions['breakpoints'][1439]['perPage'] }}; --herrera-brand-tablet-columns: {{ $brandStripOptions['breakpoints'][1023]['perPage'] }}; --herrera-brand-mobile-columns: {{ $brandStripOptions['breakpoints'][767]['perPage'] }};">
+    <section class="herrera-home-section herrera-brand-strip" aria-labelledby="{{ $brandStripHeadingId }}">
+        <div class="splide herrera-brand-carousel" data-herrera-brand-carousel data-herrera-home-carousel data-splide='@json($brandStripOptions)' aria-labelledby="{{ $brandStripHeadingId }}" style="--herrera-brand-columns: {{ $brandStripOptions['perPage'] }}; --herrera-brand-laptop-columns: {{ $brandStripOptions['breakpoints'][1439]['perPage'] }}; --herrera-brand-tablet-columns: {{ $brandStripOptions['breakpoints'][1023]['perPage'] }}; --herrera-brand-mobile-columns: {{ $brandStripOptions['breakpoints'][767]['perPage'] }};">
             <div class="herrera-home-heading herrera-brand-strip__heading">
                 <div>
-                    <p class="herrera-home-section-eyebrow">{{ __('herrera.brands_eyebrow') }}</p>
-                    <h2 id="herrera-brand-strip-title">{{ __('herrera.brands_title') }}</h2>
+                    @if ($brandStripEyebrow !== '')<p class="herrera-home-section-eyebrow">{{ $brandStripEyebrow }}</p>@endif
+                    <h2 id="{{ $brandStripHeadingId }}">{{ $brandStripTitle }}</h2>
+                    @if ($brandStripSubtitle !== '')<p class="mt-2 text-sm">{{ $brandStripSubtitle }}</p>@endif
                 </div>
                 <div class="herrera-brand-strip__actions">
-                    <a class="herrera-brand-strip__all" href="{{ route('manufacturers.index') }}">{{ __('herrera.brands_all') }} <x-fa-icon name="arrow-right" /></a>
+                    <a class="herrera-brand-strip__all" href="{{ $brandStripCtaUrl }}">{{ $brandStripCtaLabel }} <x-fa-icon name="arrow-right" /></a>
                     @if ($brandStripCount > 1)
                         <div class="splide__arrows">
                             <button class="splide__arrow splide__arrow--prev" type="button" aria-label="{{ $brandStripPrevious }}" disabled><x-fa-icon name="chevron-right" style="solid" /></button>
@@ -104,7 +122,11 @@
                                 data-herrera-brand="{{ $brandStripItem['key'] }}"
                             >
                                 <span class="herrera-brand-strip__image {{ $brandStripItem['variant'] !== '' ? 'herrera-brand-strip__image--'.$brandStripItem['variant'] : '' }}">
-                                    <img src="{{ $brandStripItem['logo'] }}" alt="{{ $brandStripItem['name'] }}" width="160" height="64" loading="lazy" decoding="async">
+                                    @if ($brandStripItem['logo'])
+                                        <img src="{{ $brandStripItem['logo'] }}" alt="{{ $brandStripItem['name'] }}" width="160" height="64" loading="lazy" decoding="async">
+                                    @else
+                                        <span>{{ $brandStripItem['name'] }}</span>
+                                    @endif
                                 </span>
                             </a>
                         </div>

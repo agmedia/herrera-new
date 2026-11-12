@@ -2,9 +2,13 @@
     <div class="admin-panel admin-search-panel p-6">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-                <h1 class="text-xl font-semibold tracking-tight">{{ __('Content Blocks') }}</h1>
-                <p class="mt-1 text-sm text-slate-600">{{ __('Unified builder: block, primary slot, and selected items.') }}</p>
-                <p class="mt-2 text-xs text-slate-500">{{ __('Items per page') }}: <span class="admin-chip">{{ $perPage }}</span></p>
+                <h1 class="text-xl font-semibold tracking-tight">{{ $herreraManager ? __('Widgeti i blokovi') : __('Content Blocks') }}</h1>
+                @if (! $herreraManager)
+                    <p class="mt-1 text-sm text-slate-600">{{ __('Unified builder: block, primary slot, and selected items.') }}</p>
+                @endif
+                @if (! $herreraManager || $rows->total() > 0)
+                    <p class="mt-2 text-xs text-slate-500">{{ __('Items per page') }}: <span class="admin-chip">{{ $perPage }}</span></p>
+                @endif
             </div>
             <div class="flex w-full gap-2 sm:w-auto sm:items-end">
                 <div class="w-full sm:w-80">
@@ -19,19 +23,68 @@
                 </div>
                 <div class="w-full sm:w-44">
                     <label for="content-block-surface" class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Surface') }}</label>
-                    <select id="content-block-surface" wire:model="surface" data-tom-select data-tom-no-search="1" class="admin-select w-full rounded-xl border px-3 py-2 text-sm">
+                    <select id="content-block-surface" wire:model.live="surface" data-tom-select data-tom-no-search="1" class="admin-select w-full rounded-xl border px-3 py-2 text-sm">
                         <option value="all">{{ __('All') }}</option>
                         <option value="desktop">{{ __('Desktop') }}</option>
                         <option value="mobile">{{ __('Mobile') }}</option>
                     </select>
                 </div>
-                <a href="{{ route('admin.content.blocks.create') }}" class="inline-flex h-10 items-center rounded-xl bg-cyan-700 px-4 text-sm font-semibold text-white hover:bg-cyan-800">{{ __('Create') }}</a>
+                @if ($canCreateBlocks)
+                    <a href="{{ route('admin.content.blocks.create') }}" class="inline-flex h-10 items-center rounded-xl bg-cyan-700 px-4 text-sm font-semibold text-white hover:bg-cyan-800">{{ __('Create') }}</a>
+                @endif
             </div>
         </div>
     </div>
 
-    <div class="admin-panel admin-panel-soft p-5">
-        <h2 class="admin-section-title">{{ __('Items') }}</h2>
+    @if ($homeWidgetGroups->isNotEmpty())
+        <section class="admin-panel admin-form-panel p-5" data-herrera-widget-manager>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <h2 class="text-lg font-semibold text-slate-900">{{ __('Raspored početne stranice') }}</h2>
+                <a href="{{ route('home') }}" target="_blank" rel="noopener" class="rounded-lg border border-cyan-200 px-3 py-2 text-sm font-semibold text-cyan-800 hover:bg-cyan-50">{{ __('Otvori početnu') }} ↗</a>
+            </div>
+            @foreach ($homeWidgetGroups as $placement => $group)
+                <div class="mt-5" data-home-widget-placement="{{ $placement }}">
+                    <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{{ $group['label'] }}</h3>
+                    <ol class="divide-y divide-slate-200 rounded-xl border border-slate-200">
+                        @foreach ($group['rows'] as $widget)
+                            @php
+                                $widgetSlot = $widget['slot'];
+                                $widgetBlock = $widgetSlot->block;
+                                $widgetActive = $widgetSlot->is_active && $widgetBlock->is_active;
+                                $widgetSurface = match ($widgetSlot->frontend_variant) {
+                                    'desktop' => __('Desktop'),
+                                    'mobile' => __('Mobile'),
+                                    default => __('Svi uređaji'),
+                                };
+                            @endphp
+                            <li class="flex flex-wrap items-center gap-3 px-4 py-3" wire:key="herrera-home-widget-{{ $widgetSlot->id }}">
+                                <div class="min-w-0 flex-1">
+                                    <p class="font-semibold text-slate-900">{{ $widgetBlock->name }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ $widgetSurface }}</p>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    @if ($canUpdateBlocks)
+                                        <button type="button" wire:click="moveHomeWidget({{ $widgetSlot->id }}, 'up')" @disabled(! $widget['canMoveUp']) aria-label="{{ __('Pomakni gore') }} – {{ $widgetBlock->name }}" class="rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:opacity-30">↑</button>
+                                        <button type="button" wire:click="moveHomeWidget({{ $widgetSlot->id }}, 'down')" @disabled(! $widget['canMoveDown']) aria-label="{{ __('Pomakni dolje') }} – {{ $widgetBlock->name }}" class="rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:opacity-30">↓</button>
+                                    @endif
+                                    @if ($canUpdateBlocks && $widgetBlock->is_active)
+                                        <button type="button" wire:click="toggleHomeWidget({{ $widgetSlot->id }})" aria-label="{{ __('Promijeni vidljivost') }} – {{ $widgetBlock->name }}" aria-pressed="{{ $widgetActive ? 'true' : 'false' }}" class="rounded-lg border px-3 py-2 text-xs font-semibold {{ $widgetActive ? 'border-cyan-200 bg-cyan-50 text-cyan-800' : 'border-slate-300 bg-slate-100 text-slate-500' }}">{{ $widgetActive ? __('Uključen') : __('Isključen') }}</button>
+                                    @else
+                                        <span class="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">{{ $widgetActive ? __('Uključen') : __('Isključen') }}</span>
+                                    @endif
+                                    @include('livewire.admin.content.block.index-actions', ['actionBlock' => $widgetBlock, 'actionSlot' => $widgetSlot])
+                                </div>
+                            </li>
+                        @endforeach
+                    </ol>
+                </div>
+            @endforeach
+        </section>
+    @endif
+
+    @if (! $herreraManager || $rows->total() > 0)
+    <div class="admin-panel admin-panel-soft p-5" @if ($herreraManager) data-herrera-other-blocks @endif>
+        <h2 class="admin-section-title">{{ $herreraManager ? __('Ostali blokovi') : __('Items') }}</h2>
 
         <div class="mt-4 overflow-x-auto">
             <table class="admin-items-table min-w-full text-sm">
@@ -53,7 +106,9 @@
                     @forelse ($rows as $row)
                         @php
                             $title = $row->translations->first()?->title;
-                            $primarySlot = $row->slots->first();
+                            $otherSlots = $herreraManager ? $row->slots->filter(fn ($slot) => ! array_key_exists($slot->placement, config('herrera_home_widgets.placements'))
+                                || $slot->target_type !== null || $slot->target_ref !== null) : $row->slots;
+                            $primarySlot = $otherSlots->first(fn ($slot) => $surface === 'all' || in_array($slot->frontend_variant, [null, 'all', $surface], true)) ?? $otherSlots->first();
                         @endphp
                         <tr>
                             <td class="px-3 py-2 font-mono text-xs text-slate-700">{{ $row->code }}</td>
@@ -72,11 +127,11 @@
                             </td>
                             <td class="px-3 py-2 text-xs text-slate-700">
                                 @php
-                                    $surface = (string) ($primarySlot?->frontend_variant ?? 'all');
+                                    $rowSurface = (string) ($primarySlot?->frontend_variant ?? 'all');
                                 @endphp
-                                @if ($surface === 'desktop')
+                                @if ($rowSurface === 'desktop')
                                     {{ __('Desktop') }}
-                                @elseif ($surface === 'mobile')
+                                @elseif ($rowSurface === 'mobile')
                                     {{ __('Mobile') }}
                                 @else
                                     {{ __('All') }}
@@ -93,11 +148,7 @@
                                 </span>
                             </td>
                             <td class="px-3 py-2 text-right">
-                                <div class="inline-flex items-center gap-1">
-                                    <button type="button" wire:click="openPreview({{ $row->id }})" class="rounded-lg border border-cyan-200 px-2 py-1 text-xs font-semibold text-cyan-800 hover:bg-cyan-50">{{ __('Preview') }}</button>
-                                    <a href="{{ route('admin.content.blocks.edit', ['block' => $row->id]) }}" class="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100">{{ __('Edit') }}</a>
-                                    <button type="button" wire:click="delete({{ $row->id }})" wire:confirm="{{ __('Delete this content block?') }}" class="rounded-lg border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50">{{ __('Delete') }}</button>
-                                </div>
+                                @include('livewire.admin.content.block.index-actions', ['actionBlock' => $row, 'actionSlot' => $primarySlot])
                             </td>
                         </tr>
                     @empty
@@ -113,13 +164,19 @@
             {{ $rows->links() }}
         </div>
     </div>
+    @endif
+
+    @if ($herreraManager && $homeWidgetGroups->isEmpty() && $rows->total() === 0)
+        <div class="admin-panel p-6 text-sm text-slate-500" role="status">{{ $search !== '' || $surface !== 'all' ? __('Nema blokova za odabrane filtre.') : __('No content blocks yet.') }}</div>
+    @endif
 
     @if ($previewBlock)
         @php
             $previewTranslation = $previewBlock->translations->firstWhere('locale', $locale)
                 ?? $previewBlock->translations->firstWhere('locale', config('app.locale'));
-            $previewPlacement = (string) ($previewBlock->slots->first()?->placement ?? 'home.hero');
-            $previewVariant = (string) ($previewBlock->slots->first()?->frontend_variant ?? 'all');
+            $previewSlot = $previewBlock->slots->firstWhere('id', $previewSlotId) ?? $previewBlock->slots->first();
+            $previewPlacement = (string) ($previewSlot?->placement ?? 'home.hero');
+            $previewVariant = (string) ($previewSlot?->frontend_variant ?? 'all');
             $frontVariant = in_array($previewVariant, ['desktop', 'mobile'], true) ? $previewVariant : 'desktop';
             $frontPreviewUrl = route('home', [
                 'preview_block' => $previewBlock->id,

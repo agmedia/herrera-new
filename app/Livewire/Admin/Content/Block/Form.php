@@ -9,10 +9,12 @@ use App\Models\Content\Blog\BlogPost;
 use App\Models\Content\ContentBlock;
 use App\Services\Content\ContentBlockResolver;
 use App\Services\Content\FeaturedCategoriesService;
+use App\Support\HerreraHomeWidgets;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 
 class Form extends Component
@@ -43,6 +45,7 @@ class Form extends Component
     private const ITEM_TYPE_MAP = [
         'products' => 'product',
         'products_carousel' => 'product',
+        'herrera_curated_products' => 'product',
         'category_products_carousel' => 'category',
         'featured_categories' => 'category',
         'categories' => 'category',
@@ -52,7 +55,11 @@ class Form extends Component
         'blogs' => 'blog',
     ];
 
+    #[Locked]
     public ?int $blockId = null;
+
+    #[Locked]
+    public bool $fixedHomepageWidget = false;
 
     public array $form = [];
 
@@ -125,6 +132,24 @@ class Form extends Component
     public function getIsEditProperty(): bool
     {
         return (bool) $this->blockId;
+    }
+
+    public function getHomepageWidgetProperty(): bool
+    {
+        return $this->fixedHomepageWidget || HerreraHomeWidgets::usesDatabaseEditor(
+            (string) ($this->form['type'] ?? ''),
+            (string) ($this->form['code'] ?? ''),
+            (string) ($this->form['slot_placement'] ?? ''),
+        );
+    }
+
+    public function getHomepageWidgetFieldsProperty(): array
+    {
+        if (($this->form['type'] ?? '') === 'blogs_carousel' && ($this->form['code'] ?? '') !== 'herrera-home-blog') {
+            return [];
+        }
+
+        return $this->homepageWidget ? config('herrera_home_widgets.fields')[$this->form['type']] ?? [] : [];
     }
 
     public function getCurrentItemTypeProperty(): ?string
@@ -283,6 +308,19 @@ class Form extends Component
             }
         }
 
+        if ($this->lastType !== $type && str_starts_with($type, 'herrera_')) {
+            $this->form['slot_frontend_variant'] = 'all';
+            $this->form['slot_placement'] = match ($type) {
+                'herrera_hero' => 'home.hero',
+                'herrera_curated_products' => 'home.before_products',
+                default => 'home.after_products',
+            };
+            $this->form['items_limit'] = 8;
+        }
+        if ($this->lastType !== $type) {
+            $this->loadHomepageWidgetFields();
+        }
+
         $currentItemType = $this->itemTypeForBlockType($type);
         $existingType = $this->itemTypeForBlockType($this->lastType);
 
@@ -384,6 +422,7 @@ class Form extends Component
         $isEdit = $this->blockId !== null;
         $existingBlockPayload = null;
         $translationPayload = [];
+        $existingBlock = null;
         if ($this->blockId) {
             $existingBlock = ContentBlock::query()
                 ->with(['translations' => fn ($q) => $q->where('locale', (string) $validated['form']['locale'])])
@@ -392,6 +431,39 @@ class Form extends Component
             $translationPayload = is_array($existingBlock?->translations->first()?->payload ?? null)
                 ? $existingBlock->translations->first()->payload
                 : [];
+        }
+        $type = (string) $validated['form']['type'];
+        $code = (string) $validated['form']['code'];
+        if ($existingBlock && in_array($existingBlock->code, HerreraHomeWidgets::FIXED_CODES, true)
+            && ($code !== $existingBlock->code || $type !== $existingBlock->type)) {
+            $this->addError('form.code', __('Kod i tip ugrađenog widgeta su fiksni.'));
+
+            return null;
+        }
+        $databaseEditor = $this->homepageWidget;
+        $ctaUrl = $validated['form']['cta_url'] ?? null;
+        if ($databaseEditor && filled($ctaUrl) && HerreraHomeWidgets::safeUrl($ctaUrl) === '') {
+            $this->addError('form.cta_url', __('Unesite poveznicu koja počinje s /, #, http:// ili https://.'));
+
+            return null;
+        }
+
+        if ($databaseEditor) {
+            $widgetFields = [];
+            foreach ($this->homepageWidgetFields as $key => $field) {
+                $value = data_get($validated, 'form.widget_fields.'.$key);
+                $value = match ($field['type'] ?? 'text') {
+                    'checkbox' => (bool) ($value ?? $field['default']),
+                    'number' => (int) ($value ?? $field['default']),
+                    default => trim((string) $value),
+                };
+                if (in_array($key, ['eyebrow', 'days'], true)) {
+                    $translationPayload[$key] = $value;
+                } else {
+                    $widgetFields[$key] = $value;
+                }
+            }
+            $translationPayload['widget_fields'] = $widgetFields;
         }
 
         $bgCss = trim((string) ($validated['form']['bg_css'] ?? ''));
@@ -488,7 +560,8 @@ class Form extends Component
             return null;
         }
 
-        if ($itemType !== null && $selectedIds === [] && ! $automaticCategories) {
+        $automaticHomepageItems = $type === 'herrera_curated_products' || $code === 'herrera-home-brands';
+        if ($itemType !== null && $selectedIds === [] && ! $automaticCategories && ! $automaticHomepageItems) {
             $this->addError('form.selected_item_ids', __('Select at least one item for this block type.'));
             $this->dispatch('notify', type: 'warning', message: __('Select at least one item.'));
 
@@ -525,7 +598,8 @@ class Form extends Component
             $selectedIds,
             $userId,
             $oldCode,
-            $isEdit
+            $isEdit,
+            $databaseEditor
         ): void {
             $blockData = [
                 'code' => trim((string) $validated['form']['code']),
@@ -559,14 +633,16 @@ class Form extends Component
             $this->savePrimarySlot($block, $validated, $userId);
             $this->syncBlockItems($block, $itemType, $selectedIds);
 
-            $template = trim((string) ($validated['form']['template_body'] ?? ''));
-            if ($template === '') {
-                $template = $this->defaultTemplateForType((string) $block->type);
-            }
-            $this->writeTemplateFile((string) $block->code, $template);
+            if (! $databaseEditor) {
+                $template = trim((string) ($validated['form']['template_body'] ?? ''));
+                if ($template === '') {
+                    $template = $this->defaultTemplateForType((string) $block->type);
+                }
+                $this->writeTemplateFile((string) $block->code, $template);
 
-            if ($oldCode !== null && $oldCode !== '' && $oldCode !== $block->code) {
-                $this->deleteTemplateFile($oldCode);
+                if ($oldCode !== null && $oldCode !== '' && $oldCode !== $block->code) {
+                    $this->deleteTemplateFile($oldCode);
+                }
             }
 
             activity('content_blocks')
@@ -608,7 +684,7 @@ class Form extends Component
      */
     private function rules(): array
     {
-        return [
+        $rules = [
             'form.code' => ['required', 'string', 'max:120', 'alpha_dash', Rule::unique('content_blocks', 'code')->ignore($this->blockId)],
             'form.name' => ['required', 'string', 'max:180'],
             'form.type' => ['required', Rule::in(array_keys($this->types))],
@@ -621,7 +697,7 @@ class Form extends Component
             'form.cta_url' => ['nullable', 'string', 'max:2048'],
             'form.bg_css' => ['nullable', 'string', 'max:6000'],
             'form.custom_classes' => ['nullable', 'string', 'max:1000'],
-            'form.items_limit' => ['nullable', 'integer', 'min:1', 'max:50'],
+            'form.items_limit' => ['nullable', 'integer', 'min:1', ($this->form['code'] ?? '') === 'herrera-home-blog' ? 'max:12' : 'max:50'],
             'form.manufacturer_ids' => ['nullable', 'array'],
             'form.manufacturer_ids.*' => ['integer', Rule::exists('catalog_manufacturers', 'id')],
             'form.product_sort' => ['nullable', Rule::in(self::CATEGORY_PRODUCT_SORTS)],
@@ -653,6 +729,20 @@ class Form extends Component
             'form.selected_item_ids' => ['nullable', 'array'],
             'form.selected_item_ids.*' => ['integer', 'min:1'],
         ];
+        foreach ($this->homepageWidgetFields as $key => $field) {
+            $rules['form.widget_fields.'.$key] = match ($field['type'] ?? 'text') {
+                'checkbox' => ['boolean'],
+                'number' => ['nullable', 'integer', 'min:1', 'max:'.$field['max']],
+                'url' => ['nullable', 'string', 'max:2048', function ($attribute, $value, $fail): void {
+                    if (filled($value) && HerreraHomeWidgets::safeUrl($value) === '') {
+                        $fail(__('Unesite poveznicu koja počinje s /, #, http:// ili https://.'));
+                    }
+                }],
+                default => ['nullable', 'string', 'max:600'],
+            };
+        }
+
+        return $rules;
     }
 
     private function resetForm(): void
@@ -675,6 +765,7 @@ class Form extends Component
             'bg_css' => '',
             'custom_classes' => '',
             'items_limit' => 6,
+            'widget_fields' => [],
             'manufacturer_ids' => [],
             'product_sort' => 'category_order',
             'category_source' => 'manual',
@@ -722,6 +813,7 @@ class Form extends Component
         $this->form['code'] = $block->code;
         $this->form['name'] = $block->name;
         $this->form['type'] = $block->type;
+        $this->fixedHomepageWidget = in_array($block->code, HerreraHomeWidgets::FIXED_CODES, true);
         $this->form['category_source'] = FeaturedCategoriesService::source(is_array($block->payload) ? $block->payload : null);
         $this->form['is_active'] = (bool) $block->is_active;
         $this->form['locale'] = $preferredLocale;
@@ -739,7 +831,7 @@ class Form extends Component
         $this->form['manufacturer_ids'] = $this->manufacturerIdsFromPayload($translationPayload);
         $this->form['product_sort'] = $this->categoryProductSortFromPayload($translationPayload);
         $this->form['reviews_featured_only'] = (bool) ($translationPayload['reviews_featured_only'] ?? false);
-        $blogSource = (string) ($translationPayload['blog_source'] ?? 'latest');
+        $blogSource = (string) ($translationPayload['blog_source'] ?? data_get($block->payload, 'blog_source', 'latest'));
         $this->form['blog_source'] = in_array($blogSource, ['latest', 'featured'], true)
             ? $blogSource
             : 'latest';
@@ -755,6 +847,10 @@ class Form extends Component
         $this->form['slot_starts_at'] = $slot?->starts_at?->format('Y-m-d\\TH:i') ?? '';
         $this->form['slot_ends_at'] = $slot?->ends_at?->format('Y-m-d\\TH:i') ?? '';
         $this->form['show_campaign_period'] = (bool) data_get($block->payload, 'show_campaign_period', false);
+        $this->loadHomepageWidgetFields(HerreraHomeWidgets::payload($block, $translation));
+        if ($this->homepageWidget) {
+            $this->form['items_limit'] = (int) data_get($translationPayload, 'items_limit', data_get($block->payload, 'items_limit', $this->homepageItemsLimit()));
+        }
 
         $expectedItemType = $this->itemTypeForBlockType($block->type);
         $selected = $block->items;
@@ -796,6 +892,7 @@ class Form extends Component
 
         if (! $translation) {
             $this->clearTranslationFields();
+            $this->loadHomepageWidgetFields((array) $block->payload);
 
             return;
         }
@@ -812,11 +909,15 @@ class Form extends Component
         $this->form['manufacturer_ids'] = $this->manufacturerIdsFromPayload($translationPayload);
         $this->form['product_sort'] = $this->categoryProductSortFromPayload($translationPayload);
         $this->form['reviews_featured_only'] = (bool) ($translationPayload['reviews_featured_only'] ?? false);
-        $blogSource = (string) ($translationPayload['blog_source'] ?? 'latest');
+        $blogSource = (string) ($translationPayload['blog_source'] ?? data_get($block->payload, 'blog_source', 'latest'));
         $this->form['blog_source'] = in_array($blogSource, ['latest', 'featured'], true)
             ? $blogSource
             : 'latest';
         $this->form['material_craftsmanship'] = $this->materialCraftsmanshipFormValues($translationPayload);
+        $this->loadHomepageWidgetFields(HerreraHomeWidgets::payload($block, $translation));
+        if ($this->homepageWidget) {
+            $this->form['items_limit'] = (int) data_get($translationPayload, 'items_limit', data_get($block->payload, 'items_limit', $this->homepageItemsLimit()));
+        }
     }
 
     private function clearTranslationFields(): void
@@ -827,12 +928,30 @@ class Form extends Component
         $this->form['cta_url'] = '';
         $this->form['bg_css'] = '';
         $this->form['custom_classes'] = '';
-        $this->form['items_limit'] = 6;
+        $this->form['items_limit'] = $this->homepageItemsLimit();
         $this->form['manufacturer_ids'] = [];
         $this->form['product_sort'] = 'category_order';
         $this->form['reviews_featured_only'] = false;
         $this->form['blog_source'] = 'latest';
         $this->form['material_craftsmanship'] = $this->materialCraftsmanshipFormValues(null);
+        $this->loadHomepageWidgetFields();
+    }
+
+    private function homepageItemsLimit(): int
+    {
+        return in_array($this->form['type'] ?? '', ['herrera_curated_products', 'herrera_popular_products'], true) ? 8 : 6;
+    }
+
+    private function loadHomepageWidgetFields(array $payload = []): void
+    {
+        $this->form['widget_fields'] = [];
+        foreach ($this->homepageWidgetFields as $key => $field) {
+            $default = isset($field['translation'])
+                ? __($field['translation'], [], (string) $this->form['locale'])
+                : ($field['default'] ?? '');
+            $path = in_array($key, ['eyebrow', 'days'], true) ? $key : 'widget_fields.'.$key;
+            $this->form['widget_fields'][$key] = data_get($payload, $path, $default);
+        }
     }
 
     /**

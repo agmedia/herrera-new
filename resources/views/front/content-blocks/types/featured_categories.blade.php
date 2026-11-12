@@ -17,6 +17,7 @@
         'subtitle' => $subtitle,
         'ctaLabel' => $ctaLabel,
         'ctaUrl' => $ctaUrl,
+        'categorySupportFields' => (array) data_get(\App\Support\HerreraHomeWidgets::payload($block, $translation), 'widget_fields', []),
     ])
 @else
 <section class="featured-categories storefront-widget-wide" data-featured-categories>

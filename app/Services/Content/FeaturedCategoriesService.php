@@ -5,6 +5,8 @@ namespace App\Services\Content;
 use App\Models\Catalog\Category\Category;
 use App\Models\Catalog\Product\Product;
 use App\Models\Content\ContentBlock;
+use App\Services\Catalog\Clearance\ClearanceService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 class FeaturedCategoriesService
@@ -18,8 +20,14 @@ class FeaturedCategoriesService
         return in_array($source, self::SOURCES, true) ? $source : 'manual';
     }
 
-    public function forBlock(ContentBlock $block, string $locale, string $fallbackLocale, bool $hideOutOfStockProducts = false, bool $includeCounts = true): Collection
-    {
+    public function forBlock(
+        ContentBlock $block,
+        string $locale,
+        string $fallbackLocale,
+        bool $hideOutOfStockProducts = false,
+        bool $includeCounts = true,
+        bool $excludeClearance = false,
+    ): Collection {
         $source = self::source(is_array($block->payload) ? $block->payload : null);
         $selectedIds = $block->items
             ->where('item_type', 'category')
@@ -48,6 +56,9 @@ class FeaturedCategoriesService
 
         if ($source === 'all_root') {
             $query->whereNull('parent_id')->orderBy('sort_order')->orderBy('id');
+            if ($excludeClearance) {
+                $this->excludeClearance($query);
+            }
         } else {
             $query->whereIn('id', $selectedIds);
         }
@@ -83,5 +94,17 @@ class FeaturedCategoriesService
         });
 
         return $categories;
+    }
+
+    public function excludeClearance(Builder $query): Builder
+    {
+        $clearanceCategoryId = (int) app(ClearanceService::class)->settings()['category_id'];
+
+        return $query
+            ->when($clearanceCategoryId > 0, fn (Builder $categories) => $categories->whereKeyNot($clearanceCategoryId))
+            ->where(fn (Builder $categories) => $categories->whereNull('code')->orWhereNotIn('code', ['rasprodaja', 'clearance']))
+            ->whereDoesntHave('translations', fn (Builder $translations) => $translations
+                ->where('locale', 'hr')
+                ->where(fn (Builder $croatian) => $croatian->where('slug', 'rasprodaja')->orWhere('name', 'Rasprodaja')));
     }
 }

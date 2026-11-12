@@ -1,10 +1,12 @@
 @php
     $blogLocale = (string) app()->getLocale();
     $blogFallbackLocale = (string) config('app.locale');
-    $blogPayload = array_replace((array) ($block->payload ?? []), (array) ($translation?->payload ?? []));
+    $blogPayload = \App\Support\HerreraHomeWidgets::payload($block, $translation);
     $blogTitle = trim((string) ($translation?->title ?: $block->name));
+    $blogSubtitle = trim((string) ($translation?->subtitle ?? ''));
+    $blogEyebrow = $blogPayload['eyebrow'] ?? __('herrera.blog.eyebrow');
     $blogCtaLabel = trim((string) ($translation?->cta_label ?: __('ui.blog.view_all')));
-    $blogCtaUrl = trim((string) ($translation?->cta_url ?: route('blog.index')));
+    $blogCtaUrl = \App\Support\HerreraHomeWidgets::safeUrl($translation?->cta_url, route('blog.index'));
     $blogPosts = \App\Models\Content\Blog\BlogPost::query()
         ->where('is_active', true)
         ->where(fn ($query) => $query->whereNull('published_at')->orWhere('published_at', '<=', now()))
@@ -48,8 +50,13 @@
     <div class="splide herrera-home-blog-carousel" @if ($blogPosts->isNotEmpty()) data-herrera-home-carousel @endif data-herrera-blog-carousel data-post-count="{{ $blogCount }}" data-splide='@json($blogOptions)' aria-labelledby="{{ $blogHeadingId }}" style="--blog-columns: {{ $blogDesktopColumns }}; --blog-tablet-columns: {{ $blogTabletColumns }};">
         <div class="herrera-home-heading">
             <div>
-                <p class="herrera-home-section-eyebrow">{{ __('herrera.blog.eyebrow') }}</p>
+                @if ($blogEyebrow !== '')
+                    <p class="herrera-home-section-eyebrow">{{ $blogEyebrow }}</p>
+                @endif
                 <h2 id="{{ $blogHeadingId }}">{{ $blogTitle }}</h2>
+                @if ($blogSubtitle !== '')
+                    <p>{{ $blogSubtitle }}</p>
+                @endif
             </div>
             <div class="herrera-home-product-actions">
                 @if ($blogCtaLabel !== '' && $blogCtaUrl !== '')

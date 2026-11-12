@@ -7,7 +7,9 @@ use App\Models\Catalog\Product\Product;
 use App\Models\Content\ContentBlock;
 use App\Models\Sales\Order\Order;
 use App\Models\Settings\Local\OrderStatus;
+use App\Models\User;
 use App\Services\Front\PopularProductsService;
+use App\Services\Import\HerreraHomeWidgetsService;
 use App\Services\Settings\SystemSettingsService;
 use Carbon\Carbon;
 use DOMDocument;
@@ -15,6 +17,7 @@ use DOMXPath;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ViewErrorBag;
+use Silber\Bouncer\BouncerFacade as Bouncer;
 use Tests\TestCase;
 
 class HerreraPopularProductsFeatureTest extends TestCase
@@ -223,6 +226,74 @@ class HerreraPopularProductsFeatureTest extends TestCase
         $this->assertSame(1, $xpath->query('//main//*[@data-herrera-popular-products]')->count());
         $this->assertSame(1, $xpath->query('(//main//*[@data-popular-brands])[1]/following-sibling::*[1][@data-herrera-popular-products]')->count());
         $this->assertSame(0, $xpath->query('//*[@data-herrera-popular-products]//*[@data-product-card-form]')->count());
+    }
+
+    public function test_seeded_home_uses_widget_content_selection_and_schedule_without_recreating_disabled_sections(): void
+    {
+        $manufacturer = $this->manufacturer();
+        $manual = $this->product('admin-selected', ['manufacturer_id' => $manufacturer->id]);
+        $recent = $this->product('in-window');
+        $old = $this->product('outside-window');
+        $this->item($this->order(), $recent);
+        $this->item($this->order(null, ['placed_at' => now()->subDays(10)]), $old, 50);
+        app(HerreraHomeWidgetsService::class)->apply();
+
+        $hero = ContentBlock::query()->where('code', 'herrera-home-hero')->sole();
+        $hero->translations()->where('locale', 'hr')->update(['title' => 'Uređeni uvod', 'cta_url' => '/shop']);
+        $curated = ContentBlock::query()->where('code', 'herrera-home-featured-products')->sole();
+        $curated->items()->create(['item_type' => 'product', 'item_id' => $manual->id, 'sort_order' => 0]);
+        $popular = ContentBlock::query()->where('code', 'herrera-home-popular-products')->sole();
+        $popular->translation('hr')->firstOrFail()->update(['payload' => ['items_limit' => 1, 'days' => 5]]);
+
+        $response = $this->get(route('home'))->assertOk()->assertSee('Uređeni uvod')
+            ->assertSeeInOrder(['data-herrera-home-products', 'data-herrera-brand-carousel', 'data-herrera-popular-products', 'data-herrera-home-registration'], false)
+            ->assertSee('Najpopularnije u zadnjih 5 dana')
+            ->assertDontSee('Popular outside-window');
+        $xpath = $this->xpath($response->getContent());
+        $this->assertSame('/shop', $xpath->query('//*[@data-herrera-b2b-hero]//a[contains(@class,"herrera-hero-primary-action")]')->item(0)?->getAttribute('href'));
+        $this->assertSame(1, $xpath->query('//*[@data-herrera-home-products]//*[@data-product-card]')->count());
+        $this->assertStringContainsString('Popular admin-selected', $xpath->query('//*[@data-herrera-home-products]')->item(0)?->textContent ?? '');
+        $this->assertSame(1, $xpath->query('//*[@data-herrera-popular-products]//*[@data-product-card]')->count());
+
+        $hero->update(['is_active' => false]);
+        $curated->delete();
+        $popular->slots()->firstOrFail()->update(['starts_at' => now()->addHour()]);
+        $this->get(route('home'))->assertOk()
+            ->assertDontSee('data-herrera-b2b-hero', false)
+            ->assertDontSee('data-herrera-home-products', false)
+            ->assertDontSee('data-herrera-popular-products', false)
+            ->assertSee('data-herrera-home-registration', false);
+
+        $registration = ContentBlock::query()->where('code', 'herrera-home-registration')->sole();
+        $admin = User::factory()->create();
+        Bouncer::assign('superadmin')->to($admin);
+        $this->actingAs($admin)->get(route('home'))->assertOk()->assertDontSee('data-herrera-home-registration', false);
+        $this->get(route('home', ['preview_block' => $registration->id, 'preview_placement' => 'home.after_products']))
+            ->assertOk()->assertSee('data-herrera-home-registration', false);
+    }
+
+    public function test_shared_home_widgets_stay_visible_alongside_device_specific_slots_without_duplicates(): void
+    {
+        $manufacturer = $this->manufacturer();
+        $this->product('brand-article', ['manufacturer_id' => $manufacturer->id]);
+        app(HerreraHomeWidgetsService::class)->apply();
+
+        $brands = ContentBlock::query()->where('code', 'herrera-home-brands')->sole();
+        $brands->slots()->create(['placement' => 'home.after_products', 'frontend_variant' => 'mobile', 'is_active' => true, 'sort_order' => 0]);
+        $this->block('desktop-special', 'rich_text', 'home.after_products', 'Desktop custom widget');
+        $this->block('shared-generic', 'rich_text', 'home.after_products', 'Shared generic widget')
+            ->slots()->firstOrFail()->update(['frontend_variant' => 'all']);
+
+        $desktop = $this->get(route('home'))->assertOk()
+            ->assertSeeInOrder(['Desktop custom widget', 'data-herrera-brand-carousel', 'data-herrera-home-registration'], false)
+            ->assertDontSee('Shared generic widget');
+        $mobile = $this->withHeaders(['User-Agent' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148'])
+            ->get(route('home'))->assertOk()
+            ->assertSeeInOrder(['data-herrera-brand-carousel', 'data-herrera-home-registration'], false)
+            ->assertDontSee('Desktop custom widget')->assertDontSee('Shared generic widget');
+        foreach ([$desktop, $mobile] as $response) {
+            $this->assertSame(1, $this->xpath($response->getContent())->query('//main//*[@data-herrera-brand-carousel]')->count());
+        }
     }
 
     private function manufacturer(): Manufacturer

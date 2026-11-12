@@ -75,8 +75,9 @@
 
         $categories = collect();
         $isFeaturedCategories = (string) $block->type === 'featured_categories';
-        $usesHerreraCategoryTiles = $isFeaturedCategories && $overrideView === ''
+        $isHerreraFeaturedCategories = $isFeaturedCategories
             && str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera');
+        $usesHerreraCategoryTiles = $isHerreraFeaturedCategories && $overrideView === '';
         if ($isFeaturedCategories) {
             $categories = app(\App\Services\Content\FeaturedCategoriesService::class)->forBlock(
                 $block,
@@ -84,6 +85,7 @@
                 $fallbackLocale,
                 $hideOutOfStockProducts,
                 includeCounts: ! $usesHerreraCategoryTiles,
+                excludeClearance: $isHerreraFeaturedCategories && str_starts_with((string) $slot?->placement, 'home.'),
             );
         } elseif ($categoryIds !== []) {
             $categoryRelations = [

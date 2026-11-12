@@ -12,10 +12,10 @@ use Illuminate\Support\Facades\DB;
 class PopularProductsService
 {
     /** @return Collection<int, Product> */
-    public function forStorefront(string $locale, string $fallbackLocale, int $limit = 8): Collection
+    public function forStorefront(string $locale, string $fallbackLocale, int $limit = 8, int $days = 30): Collection
     {
         $end = now();
-        $start = $end->copy()->subDays(30);
+        $start = $end->copy()->subDays(max(1, min(365, $days)));
         $locales = array_unique([$locale, $fallbackLocale]);
 
         // Imported orders retain their original placement date and status codes.
@@ -49,7 +49,7 @@ class PopularProductsService
             ->orderByDesc('popularity.order_count')
             ->orderByDesc('popularity.ordered_quantity')
             ->orderBy('products.id')
-            ->limit(max(1, min(24, $limit)))
+            ->limit(max(1, min(50, $limit)))
             ->withStorefrontEnergyData()
             ->withApprovedCommentSummary($locales)
             ->with([

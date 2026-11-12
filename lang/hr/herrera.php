@@ -26,6 +26,7 @@ return [
     'products' => 'Iz našeg asortimana',
     'products_eyebrow' => 'Odabrano iz ponude',
     'popular_products' => 'Najpopularnije u zadnjih 30 dana',
+    'popular_products_period' => 'Najpopularnije u zadnjih :days dana',
     'popular_products_eyebrow' => 'Najčešće naručivani artikli',
     'all_products' => 'Svi proizvodi',
     'brands_eyebrow' => 'Odabrani brandovi',
@@ -73,6 +74,8 @@ return [
         'login' => 'B2B prijava',
     ],
     'blog' => [
+        'title' => 'Savjeti i novosti',
+        'all' => 'Svi članci',
         'eyebrow' => 'Iz našeg bloga',
         'subtitle' => 'Novosti iz Herrere, savjeti i inspiracija za vaše projekte.',
         'illustration' => 'Ilustrativni prikaz rasvjete u prostoru.',

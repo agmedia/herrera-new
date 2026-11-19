@@ -1,6 +1,8 @@
 <?php
 
+use Illuminate\Database\Connection;
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\MySqlConnection;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Schema\Builder;
 use Illuminate\Support\Facades\Schema;
@@ -16,7 +18,7 @@ return new class extends Migration
         if (! $schema->hasColumn('orders', 'sales_session_id')) {
             $schema->table('orders', fn (Blueprint $table) => $table->foreignId('sales_session_id')->nullable());
         }
-        $this->ensureReferences($schema, 'orders', ['sales_session_id' => ['customer_sales_sessions', 'set null']]);
+        $this->ensureOrderSessionReference($schema);
 
         $db->table('customer_sales_sessions')->whereIn('order_id', $db->table('customer_sales_sessions')->select('order_id')
             ->whereNotNull('order_id')->groupBy('order_id')->havingRaw('COUNT(*) = 1'))->chunkById(500, function ($rows) use ($db) {
@@ -80,6 +82,46 @@ return new class extends Migration
         }
         if (! $json || ! $column['nullable']) {
             throw new RuntimeException("Existing {$table}.location must be nullable JSON.");
+        }
+    }
+
+    private function ensureOrderSessionReference(Builder $schema): void
+    {
+        $db = $schema->getConnection();
+        $this->checkOrderSessions($db);
+
+        if (! $db instanceof MySqlConnection || collect($schema->getForeignKeys('orders'))->contains('columns', ['sales_session_id'])) {
+            $this->ensureReferences($schema, 'orders', ['sales_session_id' => ['customer_sales_sessions', 'set null']]);
+
+            return;
+        }
+
+        $grammar = $db->getQueryGrammar();
+        $orders = $grammar->wrapTable('orders');
+        $sessions = $grammar->wrapTable('customer_sales_sessions');
+        // InnoDB would otherwise make a full copy of orders to validate the foreign key.
+        $db->statement('SET @herrera_orders_fk_checks = @@SESSION.foreign_key_checks');
+        try {
+            $db->statement('SET SESSION foreign_key_checks = 0');
+            $db->statement("ALTER TABLE {$orders} ADD CONSTRAINT orders_sales_session_id_foreign
+                FOREIGN KEY (sales_session_id) REFERENCES {$sessions} (id) ON DELETE SET NULL, ALGORITHM=INPLACE");
+        } finally {
+            $db->statement('SET SESSION foreign_key_checks = @herrera_orders_fk_checks');
+        }
+
+        // Catch writes between the initial check and the DDL. Retries check existing keys too.
+        $this->checkOrderSessions($db);
+    }
+
+    private function checkOrderSessions(Connection $db): void
+    {
+        $orphan = $db->table('orders')->useWritePdo()
+            ->leftJoin('customer_sales_sessions', 'customer_sales_sessions.id', '=', 'orders.sales_session_id')
+            ->whereNotNull('orders.sales_session_id')->whereNull('customer_sales_sessions.id')
+            ->first(['orders.id', 'orders.sales_session_id']);
+
+        if ($orphan !== null) {
+            throw new RuntimeException("Order {$orphan->id} references missing customer sales session {$orphan->sales_session_id}.");
         }
     }
 

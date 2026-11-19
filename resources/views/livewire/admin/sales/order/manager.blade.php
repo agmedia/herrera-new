@@ -61,6 +61,9 @@
                         <input type="date" wire:model.live="dateTo" class="admin-search-input w-full rounded-xl border px-3 py-2 text-sm" />
                     </div>
                 </div>
+                @if ($customerType !== 'B2B' && $dateFrom && $dateTo && $dateFrom <= $dateTo && (auth()->user()->isA('superadmin') || (auth()->user()->can('sales.orders.view') && auth()->user()->can('integrations.eracuni.manage'))))
+                    <a href="{{ route('admin.orders.erp-cost-centres', ['from' => $dateFrom, 'to' => $dateTo]) }}" class="mt-3 inline-block text-sm font-semibold text-cyan-800 hover:underline">Preuzmi sva B2C mjesta troška za razdoblje (CSV)</a>
+                @endif
             </div>
         </div>
     </div>

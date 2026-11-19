@@ -299,11 +299,11 @@ class CustomerWorkflowAndCrmFeatureTest extends TestCase
         $this->actingAs($customer);
         app(\App\Services\UserTracking\UserTrackingService::class)->track('customer_login');
         $this->actingAs($admin);
-        $filter = ['customer' => $customer->id, 'rep' => $rep->id];
-        $this->get(route('admin.users.sales-reports', $filter + ['tab'=>'sales']))->assertOk()
-            ->assertViewHas('totals', fn ($totals) => (int) $totals->sole()->orders_count === 2 && (float) $totals->sole()->net === 140.0);
-        $this->get(route('admin.users.sales-reports', $filter + ['tab'=>'visits']))->assertOk()->assertSee('46.02')->assertSee('16.55');
-        $this->get(route('admin.users.sales-reports', $filter + ['tab'=>'logins']))->assertOk()->assertSee('Prijava kupca');
+        $filter = ['buyer' => $customer->id, 'rep' => $rep->id];
+        $this->get(route('admin.users.rep-statistics', $filter + ['section' => 'personal']))->assertOk()
+            ->assertViewHas('rows', fn ($rows) => $rows->sole()['count'] === 2 && $rows->sole()['net'] === 140.0);
+        $this->get(route('admin.users.rep-statistics', $filter + ['section' => 'visits']))->assertOk()->assertSee('46.02')->assertSee('16.55');
+        $this->get(route('admin.users.rep-statistics', $filter + ['section' => 'buyers']))->assertOk()->assertSee('Prijava kupca');
     }
 
     public function test_contact_can_record_any_catalog_sku_and_rejects_unknown_items_before_saving(): void
@@ -334,10 +334,12 @@ class CustomerWorkflowAndCrmFeatureTest extends TestCase
         $this->order($buyer, 250, 50)->forceFill(['created_by' => $admin->id,
             'payload' => $audit + ['staff_impersonation' => ['admin_id' => $admin->id, 'staff_id' => $rep->id]]])->save();
         $this->order($buyer, 125, 25);
-        $this->actingAs($admin)->get(route('admin.users.sales-reports', ['customer' => $buyer->id, 'rep' => $rep->id]))
-            ->assertOk()->assertViewHas('totals', fn ($totals) => $totals->sole()->orders_count === 1 && (float) $totals->sole()->net === 40.0);
-        $this->get(route('admin.users.sales-reports', ['customer' => $buyer->id]))
-            ->assertOk()->assertViewHas('totals', fn ($totals) => $totals->sole()->orders_count === 2 && (float) $totals->sole()->net === 140.0);
+        $this->assign($rep, $buyer);
+        $filter = ['buyer' => $buyer->id, 'rep' => $rep->id];
+        $this->actingAs($admin)->get(route('admin.users.rep-statistics', $filter + ['section' => 'personal']))
+            ->assertOk()->assertViewHas('rows', fn ($rows) => $rows->sole()['count'] === 1 && $rows->sole()['net'] === 40.0);
+        $this->get(route('admin.users.rep-statistics', $filter))
+            ->assertOk()->assertViewHas('rows', fn ($rows) => $rows->sole()['count'] === 2 && $rows->sole()['net'] === 140.0);
     }
 
     public function test_portfolio_turnover_includes_self_orders_and_counts_shared_customers_once(): void
@@ -352,12 +354,13 @@ class CustomerWorkflowAndCrmFeatureTest extends TestCase
         $this->assign($second, $other);
         $this->order($shared, 125, 25);
         $this->order($other, 50, 10);
-        $this->actingAs($admin)->get(route('admin.users.sales-reports', ['scope' => 'portfolio']))->assertOk()
-            ->assertViewHas('totals', fn ($totals) => (int) $totals->sole()->orders_count === 2 && (float) $totals->sole()->net === 140.0);
-        $this->get(route('admin.users.sales-reports', ['scope' => 'portfolio', 'rep' => $first->id]))->assertOk()
-            ->assertViewHas('totals', fn ($totals) => (float) $totals->sole()->net === 100.0);
-        $this->actingAs($first)->get(route('admin.users.sales-reports', ['scope' => 'portfolio', 'rep' => $second->id]))
-            ->assertOk()->assertViewHas('rows', fn ($rows) => $rows->count() === 1 && $rows->first()->customer_user_id === $shared->id);
+        $this->actingAs($admin)->get(route('admin.users.rep-statistics', ['rep' => $second->id]))->assertOk()
+            ->assertViewHas('rows', fn ($rows) => $rows->sum('count') === 2 && $rows->sum('net') === 140.0);
+        $this->get(route('admin.users.rep-statistics', ['rep' => $first->id]))->assertOk()
+            ->assertViewHas('rows', fn ($rows) => $rows->sole()['net'] === 100.0);
+        $this->actingAs($first)->get(route('admin.users.rep-statistics', ['rep' => $second->id]))->assertNotFound();
+        $this->get(route('admin.users.rep-statistics', ['rep' => $first->id]))->assertOk()
+            ->assertViewHas('rows', fn ($rows) => $rows->sole()['buyer_id'] == $shared->id);
     }
 
     private function staff(string $role): User

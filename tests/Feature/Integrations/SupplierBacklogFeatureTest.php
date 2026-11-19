@@ -210,6 +210,27 @@ class SupplierBacklogFeatureTest extends TestCase
         }
     }
 
+    public function test_known_manual_supplier_defaults_keep_linked_xml_products_and_later_use_authoritative_zero(): void
+    {
+        app(\App\Services\Settings\SystemSettingsService::class)->put('store_brand_name', 'Herrera');
+        $brand = Manufacturer::create(['code' => 'portwest']);
+        $manual = Product::create(['code' => 'manual', 'sku' => 'MAN', 'manufacturer_id' => $brand->id, 'stock_qty' => 3]);
+        $linked = Product::create(['code' => 'linked', 'sku' => 'LINK', 'manufacturer_id' => $brand->id, 'supplier_stock_qty' => 4]);
+        $link = ['supplier' => 'master', 'name' => 'XML', 'is_current' => true];
+        \Illuminate\Support\Facades\DB::table('supplier_catalog_items')->insert($link + ['product_id' => $linked->id, 'sku' => 'LINK', 'external_id' => 'LINK']);
+        $service = app(FixedSupplierAvailabilityService::class);
+        $service->applyKnownSuppliersWithoutXml();
+        $this->assertSame(100000, $manual->fresh()->supplier_stock_qty);
+        $this->assertSame(4, $linked->fresh()->supplier_stock_qty);
+        \Illuminate\Support\Facades\DB::table('supplier_catalog_items')->insert($link + ['product_id' => $manual->id, 'sku' => 'MAN', 'external_id' => 'MAN']);
+        app(StockSyncSettingsService::class)->saveConnection('master', ['url' => 'https://feeds.example.test/master']);
+        Http::fake(['feeds.example.test/*' => Http::response('<products><product><code>MAN</code><stock>0</stock></product></products>')]);
+        $this->assertSame('completed', app(StockSyncService::class)->run('master', 'manual')->status);
+        $this->assertSame(0, $manual->fresh()->supplier_stock_qty);
+        $this->assertSame(3, $manual->fresh()->stock_qty);
+        $this->assertNull(data_get($manual->fresh()->payload, 'supplier_availability.mode'));
+    }
+
     public function test_fixed_supplier_policy_rejects_synchronized_supplier_selection(): void
     {
         $brand = Manufacturer::query()->create(['code' => 'videx']);

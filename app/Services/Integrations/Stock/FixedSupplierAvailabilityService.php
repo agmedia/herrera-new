@@ -4,17 +4,46 @@ namespace App\Services\Integrations\Stock;
 
 use App\Models\Catalog\Manufacturer\Manufacturer;
 use App\Models\Catalog\Product\Product;
+use App\Models\Integrations\SupplierDeliverySchedule;
+use App\Services\Settings\SystemSettingsService;
 use App\Support\Integrations\Stock\StockSyncRegistry;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use RuntimeException;
 
 class FixedSupplierAvailabilityService
 {
     public const QUANTITY = 100000;
 
-    public function run(array $manufacturerIds, bool $apply = false, ?int $actorId = null): array
+    public function applyKnownSuppliersWithoutXml(): void
+    {
+        if (! Str::contains(Str::lower((string) app(SystemSettingsService::class)->get('store_brand_name')), 'herrera')) {
+            return;
+        }
+
+        $names = [];
+        foreach (SupplierDeliverySchedule::all() as $supplier) {
+            $aliases = [$supplier->supplier, $supplier->name, ...($supplier->aliases ?? [])];
+            if (! collect($aliases)->contains(fn ($alias) => $this->synchronizedName($alias))) {
+                foreach ($aliases as $alias) {
+                    $names[Str::slug($alias)] = true;
+                }
+            }
+        }
+        foreach (Manufacturer::with('translations')->get() as $manufacturer) {
+            $labels = [$manufacturer->code, ...$manufacturer->translations->pluck('name')->all()];
+            if (data_get($manufacturer->payload, 'supplier_availability.mode') === 'fixed'
+                || $this->synchronizedManufacturer($manufacturer)
+                || ! collect($labels)->contains(fn ($label) => isset($names[Str::slug($label)]))) {
+                continue;
+            }
+            $this->run([$manufacturer->id], apply: true, preserveOverrides: true);
+        }
+    }
+
+    public function run(array $manufacturerIds, bool $apply = false, ?int $actorId = null, bool $preserveOverrides = false): array
     {
         Validator::make(['ids' => $manufacturerIds], ['ids' => 'required|array|min:1|max:100', 'ids.*' => 'required|integer|distinct|exists:catalog_manufacturers,id'])->validate();
         $manufacturers = Manufacturer::query()->with('translations')->whereIn('id', $manufacturerIds)->get();
@@ -24,16 +53,23 @@ class FixedSupplierAvailabilityService
             }
         }
 
-        return Cache::lock('herrera-stock-sync:supplier_stock_qty', 600)->block(1, function () use ($manufacturerIds, $manufacturers, $apply, $actorId): array {
-            return DB::transaction(function () use ($manufacturerIds, $manufacturers, $apply, $actorId): array {
+        return Cache::lock('herrera-stock-sync:supplier_stock_qty', 600)->block(1, function () use ($manufacturerIds, $manufacturers, $apply, $actorId, $preserveOverrides): array {
+            return DB::transaction(function () use ($manufacturerIds, $manufacturers, $apply, $actorId, $preserveOverrides): array {
                 $changed = $preserved = 0;
                 $byId = $manufacturers->keyBy('id');
-                Product::query()->whereIn('manufacturer_id', $manufacturerIds)->lockForUpdate()->chunkById(300, function ($products) use (&$changed, &$preserved, $byId, $apply, $actorId): void {
+                Product::query()->withExists('currentSupplierLinks')
+                    ->addSelect(['previous_xml_stock' => DB::table('stock_sync_items')->join('stock_sync_runs', 'stock_sync_runs.id', '=', 'stock_sync_items.run_id')
+                        ->whereColumn('stock_sync_items.product_id', 'products.id')->where('stock_sync_runs.supplier', '!=', 'eracuni')
+                        ->where('stock_sync_runs.status', 'completed')->whereIn('stock_sync_items.status', ['updated', 'unchanged'])
+                        ->selectRaw('1')->limit(1)])
+                    ->whereIn('manufacturer_id', $manufacturerIds)->lockForUpdate()->chunkById(300, function ($products) use (&$changed, &$preserved, $byId, $apply, $actorId, $preserveOverrides): void {
                     foreach ($products as $product) {
-                        $source = data_get($product->payload, 'supplier_catalog.supplier') ?: data_get($product->payload, 'catalog_origin');
-                        if (is_string($source) && isset(StockSyncRegistry::all()[$source])) {
+                        if ($product->previous_xml_stock || $this->usesSupplierFeed($product)) {
                             $preserved++;
 
+                            continue;
+                        }
+                        if ($preserveOverrides && data_get($product->payload, 'supplier_availability.mode') === 'fixed') {
                             continue;
                         }
                         $changed++;
@@ -59,9 +95,32 @@ class FixedSupplierAvailabilityService
     {
         $manufacturer = $product->manufacturer_id ? Manufacturer::query()->find($product->manufacturer_id) : null;
         if ($manufacturer && data_get($manufacturer->payload, 'supplier_availability.mode') === 'fixed'
-            && ! isset(StockSyncRegistry::all()[data_get($product->payload, 'supplier_catalog.supplier') ?? data_get($product->payload, 'catalog_origin') ?? ''])) {
+            && ! $this->usesSupplierFeed($product)) {
             $this->set($product, (int) data_get($manufacturer->payload, 'supplier_availability.quantity', self::QUANTITY), $manufacturer->code, $product->updated_by);
         }
+    }
+
+    public function usesSupplierFeed(Product $product, ?string $onlySupplier = null): bool
+    {
+        $sources = [
+            data_get($product->payload, 'supplier_catalog.supplier'), data_get($product->payload, 'catalog_origin'),
+            data_get($product->payload, 'delivery.supplier'),
+        ];
+        $feeds = StockSyncRegistry::all();
+        foreach ($sources as $source) {
+            $key = Str::slug((string) $source);
+            $key = match ($key) {
+                'enovatek' => 'enovalite', 'vip', 'vipelectro', 'master-vip' => 'master', 'allegro' => 'videx', default => $key,
+            };
+            if (($feeds[$key]['target'] ?? null) === 'supplier_stock_qty' && ($onlySupplier === null || $key === $onlySupplier)) {
+                return true;
+            }
+        }
+        if ($onlySupplier === null && isset($product->current_supplier_links_exists)) {
+            return (bool) $product->current_supplier_links_exists;
+        }
+
+        return $product->currentSupplierLinks()->when($onlySupplier, fn ($query) => $query->where('supplier', $onlySupplier))->exists();
     }
 
     /** Manual CSV changes only quantities of products explicitly assigned fixed availability. */
@@ -93,9 +152,9 @@ class FixedSupplierAvailabilityService
 
         return Cache::lock('herrera-stock-sync:supplier_stock_qty', 600)->block(1, function () use ($rows, $apply): array {
             return DB::transaction(function () use ($rows, $apply): array {
-                $products = Product::query()->whereIn('sku', array_keys($rows))->lockForUpdate()->get();
+                $products = Product::query()->withExists('currentSupplierLinks')->whereIn('sku', array_keys($rows))->lockForUpdate()->get();
                 if ($products->count() !== count($rows) || $products->pluck('sku')->unique()->count() !== $products->count()
-                    || $products->contains(fn ($product) => data_get($product->payload, 'supplier_availability.mode') !== 'fixed')) {
+                    || $products->contains(fn ($product) => data_get($product->payload, 'supplier_availability.mode') !== 'fixed' || $this->usesSupplierFeed($product))) {
                     throw new RuntimeException('Sve šifre moraju jednoznačno pripadati artiklima s odabranom fiksnom raspoloživosti. Ništa nije spremljeno.');
                 }
                 if ($apply) {
@@ -118,15 +177,20 @@ class FixedSupplierAvailabilityService
 
     private function synchronizedManufacturer(Manufacturer $manufacturer): bool
     {
-        $normalize = static fn (string $name): string => preg_replace('/[^a-z0-9]/', '', strtolower($name));
         $names = [$manufacturer->code, ...$manufacturer->translations->pluck('name')->all()];
+
+        return collect($names)->contains(fn ($name) => $this->synchronizedName($name));
+    }
+
+    private function synchronizedName(string $name): bool
+    {
         // Imported manufacturer labels also contain the supplier's combined
         // legacy names ("Master - VIP", "Videx / Allegro"). These aliases
         // identify the same XML integration, never separate manual suppliers.
         $synchronized = ['videx', 'allegro', 'videxallegro', 'allegrovidex', 'dpm', 'braytron', 'vipelectro', 'master', 'vip',
             'mastervip', 'vipmaster', 'vipelectromaster', 'mastervipelectro', 'vipelectrovip', 'vipelectromastervip', 'mastervipvipelectro',
-            'esperanza', 'vayox', 'enovalite', 'brock'];
+            'esperanza', 'vayox', 'enovalite', 'enovatek', 'brock'];
 
-        return collect($names)->contains(fn ($name) => in_array($normalize($name), $synchronized, true));
+        return in_array(preg_replace('/[^a-z0-9]/', '', strtolower(Str::ascii($name))), $synchronized, true);
     }
 }

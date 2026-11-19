@@ -18,6 +18,9 @@
                     <p class="mt-2 text-sm text-slate-600">{{ __('Pratite vrijednost narudžbi, kupce koji se vraćaju i najtraženije artikle.') }}</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
+                    @if (auth()->user()->isA('superadmin') || auth()->user()->can('sales.opportunities.view'))
+                        <a href="{{ route('admin.users.rep-statistics') }}" class="rounded-xl border border-cyan-300 px-4 py-2.5 text-sm font-semibold text-cyan-800">Statistika komercijalista</a>
+                    @endif
                     @if ($selectedCustomer)
                         <a href="{{ route('admin.users.statistics', array_merge($customerParameters, ['tab' => 'invoices'])) }}" class="rounded-xl border border-cyan-300 px-4 py-2.5 text-sm font-semibold text-cyan-800">{{ __('Fakture e-Računi') }}</a>
                         <a href="{{ route('admin.users.show', $selectedCustomer) }}" class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">{{ __('Profil kupca') }}</a>

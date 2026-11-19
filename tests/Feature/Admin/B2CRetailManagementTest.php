@@ -174,16 +174,17 @@ class B2CRetailManagementTest extends TestCase
         $this->assertSame(['WEB-TEST-1', '', 'web'], array_slice($rows[1], 0, 3));
     }
 
-    public function test_category_action_combines_selected_brand_and_current_supplier(): void
+    public function test_category_action_applies_to_all_brands_of_the_current_supplier(): void
     {
         config(['commerce.b2b_only' => false]);
         app(SystemSettingsService::class)->put('catalog_use_actions', true);
         $category = \App\Models\Catalog\Category\Category::create(['code' => 'indoor', 'scope' => 'catalog', 'is_active' => true]);
         $brand = Manufacturer::create(['code' => 'lamp', 'is_active' => true]);
+        $secondBrand = Manufacturer::create(['code' => 'other-brand', 'is_active' => true]);
         $products = [];
-        foreach (['match', 'wrong-brand', 'old-supplier', 'other-category'] as $code) {
+        foreach (['match', 'second-brand', 'old-supplier', 'other-category'] as $code) {
             $product = Product::create(['code' => $code, 'sku' => $code, 'stock_qty' => 10, 'is_active' => true,
-                'base_price' => 100, 'manufacturer_id' => $code === 'wrong-brand' ? null : $brand->id]);
+                'base_price' => 100, 'manufacturer_id' => $code === 'second-brand' ? $secondBrand->id : $brand->id]);
             if ($code !== 'other-category') {
                 $product->categories()->attach($category);
             }
@@ -195,11 +196,11 @@ class B2CRetailManagementTest extends TestCase
             ->set('form.code', 'videx-lamp')->set('form.locale', 'hr')->set('form.title', 'Unutarnja rasvjeta')
             ->set('form.type', CatalogAction::TYPE_PERCENTAGE)->set('form.discount_value', '10')
             ->set('form.target_type', CatalogAction::TARGET_CATEGORY)->set('form.target_ids', [$category->id])
-            ->set('form.filter_manufacturer_id', $brand->id)->set('form.filter_supplier', 'videx')
+            ->set('form.filter_supplier', 'videx')
             ->set('form.is_active', true)->call('save')->assertHasNoErrors();
         foreach ($products as $code => $product) {
             $price = app(ProductPricePresentationService::class)->forProduct($product, null);
-            $this->assertSame($code === 'match' ? 90.0 : 100.0, $price['current_net'], $code);
+            $this->assertSame(in_array($code, ['match', 'second-brand'], true) ? 90.0 : 100.0, $price['current_net'], $code);
         }
     }
 

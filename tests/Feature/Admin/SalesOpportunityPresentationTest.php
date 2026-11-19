@@ -151,10 +151,10 @@ class SalesOpportunityPresentationTest extends TestCase
         $this->assertDatabaseCount('customer_product_presentations', 1);
         $this->get(route('admin.users.opportunities', ['user_id' => $this->partner->id, 'unpresented' => 1]))
             ->assertOk()->assertViewHas('products', fn ($products) => $products->total() === 0);
-        $this->get(route('admin.users.sales-reports', ['tab' => 'products', 'customer' => $this->partner->id]))->assertOk()
+        $this->get(route('admin.users.rep-statistics', ['section' => 'products', 'buyer' => $this->partner->id, 'rep' => $this->manager->id]))->assertOk()
             ->assertSee('LED-DEMO')->assertSee('Predstavljen na sastanku')->assertSee('45.82')->assertSee('15.99');
         $other = $this->customer('Nedodijeljeni partner', '22222222222');
-        $this->get(route('admin.users.sales-reports', ['tab' => 'products', 'customer' => $other->id]))->assertForbidden();
+        $this->get(route('admin.users.rep-statistics', ['section' => 'products', 'buyer' => $other->id, 'rep' => $this->manager->id]))->assertNotFound();
         $this->post(route('admin.users.opportunities.products'), array_merge($data, ['user_id' => $other->id]))->assertForbidden();
     }
 

@@ -1,7 +1,7 @@
 <x-admin-layout :title="__('Prodajne prilike')">
     <div class="space-y-6">
     @if (auth()->user()?->isA('superadmin') || auth()->user()?->can('sales.opportunities.view'))
-        <a href="{{ route('admin.users.sales-reports', ['customer' => $customerId ?? null, 'tab' => auth()->user()->isA('superadmin') || auth()->user()->can('sales.orders.view') ? 'sales' : 'sessions']) }}" class="inline-block rounded-lg border px-3 py-2 font-semibold text-cyan-800">Izvještaji po kupcima i komercijalistima</a>
+        <a href="{{ route('admin.users.rep-statistics') }}" class="inline-block rounded-lg border px-3 py-2 font-semibold text-cyan-800">Statistika komercijalista</a>
     @endif
 
         <section class="admin-panel p-5 sm:p-6">

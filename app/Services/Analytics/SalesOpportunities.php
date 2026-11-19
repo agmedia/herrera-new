@@ -25,37 +25,9 @@ class SalesOpportunities
         $this->authorize();
         app(OrderManagerAccess::class)->assertCustomer($customer);
         abort_unless($customer->b2bAccount?->status === B2BAccount::STATUS_APPROVED, 422);
-        $customer->loadMissing('profile', 'addresses');
-        $identity = app(SalesOpportunitySync::class)->buyerIdentity([
-            'buyerTaxNumber' => $customer->b2bAccount->oib ?: $customer->b2bAccount->vat_id ?: $customer->profile?->oib,
-            'buyerCountry' => $customer->b2bAccount->country_code ?: 'HR',
-            'buyerDocumentID' => $customer->b2bAccount->erp_customer_id,
-            'buyerCode' => data_get($customer->b2bAccount->payload, 'eracuni.buyerCode'),
-        ]);
-        abort_unless($identity['known_buyer'], 422, 'Za ERP usporedbu potreban je OIB ili ERP ID odabranog kupca.');
-        $aliases = DB::table('sales_opportunity_buyer_aliases')->where('snapshot_id', $snapshot->id)
-            ->whereIn('alias_key', array_filter([$identity['tax_key'], $identity['document_key']]))->pluck('buyer_key', 'alias_key');
-        $canonicalKeys = [];
-        if ($identity['tax_key']) {
-            $canonicalKeys = array_filter([$identity['tax_key'], $aliases[$identity['tax_key']] ?? null]);
-            $documentRoot = $identity['document_key'] ? ($aliases[$identity['document_key']] ?? null) : null;
-            if ($documentRoot && in_array($documentRoot, [...$canonicalKeys, $identity['document_key']], true)) {
-                $canonicalKeys[] = $documentRoot;
-            }
-        } elseif ($identity['document_key'] && isset($aliases[$identity['document_key']])) {
-            $canonicalKeys[] = $aliases[$identity['document_key']];
-        }
-        $bought = DB::table('sales_opportunity_purchases')->where('snapshot_id', $snapshot->id)
-            ->where('quantity_365', '>', 0)->where('known_buyer', true)->where(function ($query) use ($identity, $canonicalKeys): void {
-                $query->whereIn('buyer_key', $canonicalKeys);
-                if ($identity['tax_key']) {
-                    $query->orWhere('tax_key', $identity['tax_key']);
-                } elseif (! $identity['document_key'] && $identity['code_key']) {
-                    // Codes can be reused for cash buyers, so never join them
-                    // to another customer's stronger tax/ERP-ID identity.
-                    $query->orWhere(fn ($code) => $code->where('buyer_key', $identity['code_key'])->whereNull('tax_key')->whereNull('document_key'));
-                }
-            })->select('product_id');
+        $purchases = app(InvoicedBuyerPurchases::class)->matching($customer->b2bAccount, $snapshot, $customer->profile?->oib, allowBuyerCode: true);
+        abort_unless($purchases, 422, 'Za ERP usporedbu potreban je OIB ili ERP ID odabranog kupca.');
+        $bought = $purchases->where('quantity_365', '>', 0)->select('product_id');
         $ranking = DB::table('sales_opportunity_purchases')->where('snapshot_id', $snapshot->id)
             ->select('product_id')->selectRaw('SUM(CASE WHEN known_buyer = 1 AND quantity_90 > 0 THEN 1 ELSE 0 END) AS opportunity_buyers')
             ->selectRaw('SUM(quantity_90) AS opportunity_quantity')

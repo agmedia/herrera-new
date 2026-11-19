@@ -2,13 +2,12 @@
 
 namespace App\Http\Controllers\Front;
 
-use App\Services\Sales\ReceivedReturnQuantities;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Front\Concerns\ResolvesFrontendView;
 use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Product\ProductOptionValue;
 use App\Models\Sales\Order\Order;
-use App\Models\Sales\Order\OrderItem;
+use App\Services\Analytics\InvoicedBuyerPurchases;
 use App\Models\User\B2BAccount;
 use App\Services\Front\B2BQuickOrderFileReader;
 use App\Services\Front\B2BQuickOrderSearchService;
@@ -103,30 +102,29 @@ class B2BController extends Controller
         ]);
     }
 
-    public function frequentProducts(Request $request): View
+    public function frequentProducts(Request $request, InvoicedBuyerPurchases $invoices): View
     {
         $account = $this->approvedAccount($request);
         $user = $request->user();
-        $netQuantity = 'SUM(CASE WHEN order_items.quantity > COALESCE(receipts.returned_quantity, 0) THEN order_items.quantity - COALESCE(receipts.returned_quantity, 0) ELSE 0 END)';
-        $purchases = OrderItem::query()
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->leftJoinSub(app(ReceivedReturnQuantities::class)->query(), 'receipts', 'receipts.order_item_id', '=', 'order_items.id')
-            ->whereIn('order_items.order_id', Order::query()->withoutCancelled()->where('user_id', $user->id)->select('orders.id'))
-            ->whereRaw('COALESCE(orders.placed_at, orders.created_at) BETWEEN ? AND ?', [now()->subMonthsNoOverflow(12)->startOfDay(), now()])
-            ->whereNotNull('order_items.product_id')
-            ->select('order_items.product_id')
-            ->selectRaw($netQuantity.' AS purchased_qty')
-            ->groupBy('order_items.product_id')
-            ->havingRaw($netQuantity.' > 0')
-            ->orderByDesc('purchased_qty')->orderBy('order_items.product_id')
-            ->paginate(40)->withQueryString();
-        $quantities = $purchases->getCollection()->pluck('purchased_qty', 'product_id');
+        $snapshot = $invoices->latestSnapshot();
+        $rows = $snapshot ? $invoices->matching($account, $snapshot) : null;
+        $purchases = $rows?->select('product_id')->selectRaw('SUM(quantity_365) AS purchased_qty')
+            ->groupBy('product_id')->havingRaw('SUM(quantity_365) > 0')
+            ->orderByDesc('purchased_qty')->orderBy('product_id')->paginate(40)->withQueryString();
+        $quantities = $purchases?->getCollection()->pluck('purchased_qty', 'product_id') ?? collect();
 
         return view($this->frontendView($request, 'account.b2b-product-list'), [
             'b2bAccount' => $account,
             'current' => 'b2b_frequent_products',
             'title' => __('Često naručivani artikli'),
-            'subtitle' => __('Kupljeno u zadnjih 12 mjeseci prema webshop narudžbama, uz odbitak zaprimljenih povrata.'),
+            'subtitle' => $snapshot
+                ? __('Fakturirane količine iz e-Računa od :od do :do, uz obračun storna i odobrenja.', [
+                    'od' => \Illuminate\Support\Carbon::parse($snapshot->coverage_from)->format('d.m.Y.'),
+                    'do' => \Illuminate\Support\Carbon::parse($snapshot->as_of)->format('d.m.Y.'),
+                ])
+                : __('Fakturirane količine u zadnjih 12 mjeseci prema podacima iz e-Računa.'),
+            'emptyMessage' => ! $snapshot ? __('Čekamo prvi dovršeni prijenos iz e-Računa.')
+                : ($rows ? __('Za ovo razdoblje nema povezanih artikala s pozitivnom fakturiranom količinom.') : __('Za prikaz kupnje potrebno je povezati B2B račun s kupcem u e-Računima.')),
             'products' => $this->productSuggestions($quantities->keys()->all(), $user, true),
             'quantities' => $quantities, 'purchases' => $purchases,
         ]);

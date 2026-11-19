@@ -200,6 +200,11 @@
                 <p class="mt-1 text-sm text-slate-600">{{ __('Sales, orders, and recent activity at a glance.') }}</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
+            @if (auth()->user()?->isA('superadmin') || auth()->user()?->can('sales.opportunities.view'))
+                <a href="{{ route('admin.users.rep-statistics') }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-200 bg-white px-4 py-2.5 text-sm font-semibold text-cyan-800 hover:bg-cyan-50">
+                    <x-fa-icon name="chart-column" class="h-4 w-4" /> Statistika komercijalista
+                </a>
+            @endif
             @if (auth()->user()?->isA('superadmin') || (auth()->user()?->can('users.list.view') && auth()->user()?->can('sales.orders.view')))
                 <a href="{{ route('admin.users.statistics') }}" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-cyan-200 bg-white px-4 py-2.5 text-sm font-semibold text-cyan-800 transition hover:bg-cyan-50">
                     <x-fa-icon name="chart-line" class="h-4 w-4" />

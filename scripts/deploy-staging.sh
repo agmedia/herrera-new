@@ -211,7 +211,8 @@ fi
     --path=database/migrations/2026_11_09_150000_add_structured_return_receipts.php \
     --path=database/migrations/2026_11_09_180000_create_sales_opportunity_snapshots.php \
     --path=database/migrations/2026_11_19_090000_add_catalog_selection_fields.php \
-    --path=database/migrations/2026_11_19_091000_add_sales_report_evidence.php
+    --path=database/migrations/2026_11_19_091000_add_sales_report_evidence.php \
+    --path=database/migrations/2026_11_19_193000_apply_supplier_availability_without_xml.php
 "$php_bin" artisan supplier-catalogs:seed --publish
 "$php_bin" artisan supplier-catalogs:covers --apply
 "$php_bin" artisan config:cache

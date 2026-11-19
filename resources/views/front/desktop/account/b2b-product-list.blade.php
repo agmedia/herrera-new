@@ -50,7 +50,7 @@ document.querySelector('[data-toggle-ean]').addEventListener('change', function 
                                     <td class="px-4 py-3 font-semibold text-slate-900">@php($photo = \App\Support\Media\LegacyCatalogImage::first($row['product'], ['thumb_100x100']))
                                         @if ($photo)<img src="{{ $photo }}" alt="" width="48" height="48" loading="lazy" class="mr-2 inline-block object-contain">@endif
                                         {{ $row['name'] }}</td>
-                                    @isset($quantities)<td class="px-4 py-3">{{ (int) $quantities[$row['product']->id] }} {{ \App\Models\Catalog\Product\Product::unitOptions()[$row['product']->unit_of_measure] ?? $row['product']->unit_of_measure }}</td>@endisset
+                                    @isset($quantities)<td class="px-4 py-3">{{ rtrim(rtrim(number_format((float) $quantities[$row['product']->id], 4, ',', '.'), '0'), ',') }} {{ \App\Models\Catalog\Product\Product::unitOptions()[$row['product']->unit_of_measure] ?? $row['product']->unit_of_measure }}</td>@endisset
                                     <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ $row['identifier'] }}</td>
                                     <td class="px-4 py-3" hidden data-ean-column><x-ean-barcode :value="$row['barcode']" /></td>
                                     <td class="px-4 py-3 text-right font-semibold text-slate-900">
@@ -74,7 +74,7 @@ document.querySelector('[data-toggle-ean]').addEventListener('change', function 
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="{{ isset($quantities) ? 6 : 5 }}" class="px-4 py-10 text-center text-slate-500">{{ __('Još nema artikala u ovoj grupi.') }}</td>
+                                    <td colspan="{{ isset($quantities) ? 6 : 5 }}" class="px-4 py-10 text-center text-slate-500">{{ $emptyMessage ?? __('Još nema artikala u ovoj grupi.') }}</td>
                                 </tr>
                             @endforelse
                         </tbody>

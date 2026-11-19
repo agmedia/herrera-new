@@ -33,6 +33,7 @@ class OpenCartStaffAuthenticationTest extends TestCase
         $this->assertAuthenticatedAs($staff);
         $event = \App\Models\User\UserTrackingEvent::where('event', 'staff_login')->sole();
         $this->assertSame($staff->id, $event->user_id);
+        $this->assertSame('admin', $event->payload['login_surface']);
         $this->assertSame(45.8, $event->payload['location']['latitude']);
         $this->assertTrue(Hash::check('Customer-password123!', $customer->fresh()->password));
     }
@@ -83,6 +84,7 @@ class OpenCartStaffAuthenticationTest extends TestCase
         $event = \App\Models\User\UserTrackingEvent::where('event', 'customer_login')->sole();
         $this->assertSame($customer->id, $event->user_id);
         $this->assertNull($event->payload['location']);
+        $this->assertSame('storefront', $event->payload['login_surface']);
     }
 
     public function test_storefront_preserves_staff_email_login_when_no_customer_exists(): void

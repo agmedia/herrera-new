@@ -12,9 +12,8 @@
     <label class="flex items-start gap-3 text-sm text-slate-700"><input type="checkbox" wire:model="includePurchasedProducts" @disabled(! $canUpdate) class="mt-1 rounded border-slate-300 text-cyan-700"><span>{{ __('Dodatno odobravam proizvode iz B2B povijesti kupnje ovog kupca.') }}<span class="mt-1 block text-xs text-slate-500">{{ __('Ovo uključuje i buduće kupljene proizvode. Otkazane narudžbe i potpuno zaprimljeni povrati ne ulaze u taj skup. Cijeli katalog nikada se ne uključuje automatski.') }}</span></span></label>
     @if ($canUpdate)
         <fieldset class="rounded-xl border p-4 space-y-3"><legend class="px-2 font-semibold">Skupno odobravanje artikala</legend>
-            <div class="grid gap-3 md:grid-cols-3">
+            <div class="grid gap-3 md:grid-cols-2">
                 <label>Kategorija i podkategorije<select class="admin-select w-full" wire:model.live="categoryId"><option value="">Odaberite kategoriju</option>@foreach ($categories as $category)<option value="{{ $category->id }}">{{ $category->translations->firstWhere('locale', 'hr')?->name ?: $category->code }}</option>@endforeach</select></label>
-                <label>Brend<select class="admin-select w-full" wire:model.live="brandId"><option value="">Svi brendovi</option>@foreach ($brands as $brand)<option value="{{ $brand->id }}">{{ $brand->translations->firstWhere('locale', 'hr')?->name ?: $brand->code }}</option>@endforeach</select></label>
                 <label>Katalog dobavljača<select class="admin-select w-full" wire:model.live="supplier"><option value="">Svi dobavljači</option>@foreach (\App\Services\Integrations\SupplierCatalog\SupplierCatalogFeedClient::SUPPLIERS as $id => $name)<option value="{{ $id }}">{{ $name }}</option>@endforeach</select></label>
             </div>
             <button type="button" wire:click="previewCategory" class="rounded-lg border px-3 py-2">Pregledaj obuhvat</button>

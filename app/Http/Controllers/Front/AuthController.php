@@ -92,7 +92,7 @@ class AuthController extends Controller
         }
 
         $request->session()->regenerate();
-        app(UserTrackingService::class)->track(Auth::user()->account_type === 'staff' ? 'staff_login' : 'customer_login', null, ['location' => $location], $request);
+        app(UserTrackingService::class)->track(Auth::user()->account_type === 'staff' ? 'staff_login' : 'customer_login', null, ['login_surface' => 'storefront', 'location' => $location], $request);
 
         return redirect()->to($this->resolveIntendedPath($request));
     }

@@ -4,7 +4,8 @@ namespace Tests\Feature\Front;
 
 use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Product\ProductPackage;
-use App\Models\Sales\Order\Order;
+use App\Services\Analytics\SalesOpportunitySync;
+use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use App\Models\User\B2BAccount;
 use App\Services\Front\CartService;
@@ -49,14 +50,16 @@ class EanAndBoxOrderingTest extends TestCase
         ]);
         $product = $this->product(['barcode' => '4006381333931']);
         $other = $this->product(['code' => 'OTHER', 'sku' => 'OTHER', 'barcode' => '0123456789012']);
-        $order = Order::query()->create(['order_number' => 'WEB-EAN-1', 'user_id' => $customer->id, 'customer_name' => $customer->name, 'customer_email' => $customer->email]);
-        $order->items()->create(['product_id' => $product->id, 'name' => 'Baterija', 'quantity' => 4, 'unit_price' => 2.5, 'line_total' => 10]);
-        $old = $order->replicate()->fill(['order_number' => 'WEB-OLD', 'placed_at' => today()->subMonthsNoOverflow(12)->subDay()]);
-        $old->save();
-        $old->items()->create(['product_id' => $other->id, 'name' => 'Stari artikl', 'quantity' => 10, 'unit_price' => 1, 'line_total' => 10]);
+        $this->actingAs($customer)->get(route('account.b2b.frequent-products'))->assertOk()->assertSee('Čekamo prvi');
+        $snapshot = DB::table('sales_opportunity_snapshots')->insertGetId(['status' => 'completed', 'as_of' => today(), 'coverage_from' => today()->subYear()]);
+        $newer = DB::table('sales_opportunity_snapshots')->insertGetId(['status' => 'running', 'as_of' => today(), 'coverage_from' => today()->subYear()]);
+        foreach ([[$snapshot, $product, '12345678901', 4.25], [$snapshot, $other, '98765432109', 10], [$newer, $other, '12345678901', 9]] as [$snapshotId, $item, $oib, $quantity]) {
+            $identity = app(SalesOpportunitySync::class)->buyerIdentity(['buyerTaxNumber' => $oib, 'buyerCountry' => 'HR']);
+            DB::table('sales_opportunity_purchases')->insert($identity + ['snapshot_id' => $snapshotId, 'product_id' => $item->id, 'quantity_365' => $quantity]);
+        }
         $this->actingAs($customer)->get(route('account.b2b.frequent-products'))->assertOk()
-            ->assertViewHas('quantities', fn ($quantities) => (int) $quantities->get($product->id) === 4 && ! $quantities->has($other->id))
-            ->assertSee('Prikaži EAN crtične kodove')
+            ->assertViewHas('quantities', fn ($quantities) => (float) $quantities->get($product->id) === 4.25 && ! $quantities->has($other->id))
+            ->assertSee('4,25')->assertSee('Prikaži EAN crtične kodove')
             ->assertSee('data-ean-barcode="4006381333931"', false)
             ->assertDontSee($other->barcode);
         $this->actingAs(User::factory()->create())->get(route('account.b2b.frequent-products'))->assertForbidden();

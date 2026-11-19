@@ -376,9 +376,9 @@ class B2BCommerceFeatureTest extends TestCase
             ->get(route('account.b2b.frequent-products'))
             ->assertOk()
             ->assertSee('Često naručivani artikli')
-            ->assertSee('Artikl FREQUENT-100')
-            ->assertDontSee('Artikl FAVORITE-100')
-            ->assertSee(route('account.b2b.quick-order', ['code' => $frequentProduct->sku]), false);
+            ->assertSee('Čekamo prvi dovršeni prijenos iz e-Računa.')
+            ->assertDontSee('Artikl FREQUENT-100')
+            ->assertDontSee('Artikl FAVORITE-100');
 
         $this->actingAs($customer)
             ->get(route('account.b2b.favorite-products'))

@@ -50,7 +50,7 @@ class LoginForm extends Form
             ]);
         }
 
-        app(UserTrackingService::class)->track('staff_login', null, ['location' => $location]);
+        app(UserTrackingService::class)->track('staff_login', null, ['login_surface' => 'admin', 'location' => $location]);
         $this->issueMaintenanceBypassCookieForPrivilegedUser();
 
         RateLimiter::clear($this->throttleKey());

@@ -463,6 +463,8 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
         })->name('b2b-prices.edit');
         Route::view('users', 'admin.users.index')->name('users');
         Route::get('users/statistics', CustomerStatisticsController::class)->name('users.statistics');
+        Route::get('users/statistics/representatives', \App\Http\Controllers\Admin\RepresentativeStatisticsController::class)->name('users.rep-statistics');
+        Route::get('users/statistics/representatives/export', \App\Http\Controllers\Admin\RepresentativeStatisticsController::class)->name('users.rep-statistics.export');
         Route::get('users/opportunities', [\App\Http\Controllers\Admin\SalesOpportunityController::class, 'index'])->name('users.opportunities');
         Route::post('users/opportunities/products', [\App\Http\Controllers\Admin\SalesOpportunityController::class, 'workWithProducts'])->name('users.opportunities.products');
         Route::get('users/opportunities/export', [\App\Http\Controllers\Admin\SalesOpportunityController::class, 'export'])->name('users.opportunities.export');
@@ -477,7 +479,7 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
         })->name('users.groups.edit');
         Route::view('users/access', 'admin.users.access')->name('users.access');
         Route::view('users/activity', 'admin.users.activity')->name('users.activity');
-        Route::get('users/sales-reports', \App\Http\Controllers\Admin\SalesActivityReportController::class)->name('users.sales-reports');
+        Route::get('users/sales-reports', fn () => to_route('admin.users.rep-statistics'))->name('users.sales-reports');
         Route::view('users/crm', 'admin.users.crm')->name('users.crm');
         Route::middleware('user.feature:user_loyalty_enabled')->group(function (): void {
             Route::view('users/loyalty', 'admin.users.loyalty')->name('users.loyalty');

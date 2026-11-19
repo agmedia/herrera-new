@@ -118,7 +118,7 @@ class Form extends Component
                 'type' => (string) $data['type'],
                 'discount_value' => $this->nullableDecimal($data['discount_value'] ?? null),
                 'target_type' => (string) $data['target_type'],
-                'filter_manufacturer_id' => $data['target_type'] === CatalogAction::TARGET_CATEGORY ? (($data['filter_manufacturer_id'] ?? null) ?: null) : null,
+                'filter_manufacturer_id' => null,
                 'filter_supplier' => $data['target_type'] === CatalogAction::TARGET_CATEGORY ? (($data['filter_supplier'] ?? '') ?: null) : null,
                 'audience_type' => (string) $data['audience_type'],
                 'customer_group_id' => $data['audience_type'] === CatalogAction::AUDIENCE_USER_GROUP ? (int) $data['customer_group_id'] : null,
@@ -310,7 +310,6 @@ class Form extends Component
             'scopeOptions' => $this->scopeOptions(),
             'typeOptions' => $this->typeOptions(),
             'targetOptions' => $this->targetTypeOptions(),
-            'filterBrands' => $this->form['target_type'] === CatalogAction::TARGET_CATEGORY ? Manufacturer::with('translations')->orderBy('code')->get() : collect(),
             'audienceOptions' => $this->audienceTypeOptions(),
         ]);
     }
@@ -335,7 +334,6 @@ class Form extends Component
             'form.locale' => ['required', 'string', 'max:12'],
             'form.is_active' => ['boolean'],
             'form.is_exclusive' => ['boolean'],
-            'form.filter_manufacturer_id' => ['nullable', 'integer', 'exists:catalog_manufacturers,id'],
             'form.filter_supplier' => ['nullable', Rule::in(array_keys(SupplierCatalogFeedClient::SUPPLIERS))],
             'form.scope' => ['required', Rule::in(CatalogAction::availableScopes())],
             'form.type' => ['required', Rule::in(CatalogAction::availableTypes())],

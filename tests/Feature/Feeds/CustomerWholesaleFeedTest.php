@@ -154,13 +154,25 @@ class CustomerWholesaleFeedTest extends TestCase
         $first = $this->product('LED-1');
         $first->categories()->attach($category);
         $unselected = $this->product('OTHER-2');
+        $second = $this->product('LED-OTHER-BRAND');
+        $second->categories()->attach($category);
+        $unselected->categories()->attach($category);
+        foreach ([[$first, 'videx'], [$second, 'videx'], [$unselected, 'master']] as [$product, $supplier]) {
+            $brand = \App\Models\Catalog\Manufacturer\Manufacturer::create(['code' => 'brand-'.$product->id]);
+            $product->update(['manufacturer_id' => $brand->id]);
+            \Illuminate\Support\Facades\DB::table('supplier_catalog_items')->insert(['product_id' => $product->id,
+                'supplier' => $supplier, 'external_id' => $product->sku, 'sku' => $product->sku, 'name' => $product->sku, 'is_current' => true]);
+        }
         $component = \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Admin\User\CustomerCatalogFeedManager::class, ['userId'=>$buyer->id])
-            ->set('categoryId', $category->id)->call('previewCategory')->assertSet('previewIds', [$first->id])
+            ->set('categoryId', $category->id)->set('supplier', 'videx')->call('previewCategory')->assertSet('previewIds', [$first->id, $second->id])
             ->call('addPreview')->call('issueToken')->assertHasNoErrors();
         $late = $this->product('LED-NEW');
         $late->categories()->attach($category);
+        \Illuminate\Support\Facades\DB::table('supplier_catalog_items')->insert(['product_id' => $late->id,
+            'supplier' => 'videx', 'external_id' => $late->sku, 'sku' => $late->sku, 'name' => $late->sku, 'is_current' => true]);
         $response = $this->get($component->get('issuedUrl'))->assertOk()->streamedContent();
         $this->assertStringContainsString($first->sku, $response);
+        $this->assertStringContainsString($second->sku, $response);
         $this->assertStringNotContainsString($late->sku, $response);
         $this->assertStringNotContainsString($unselected->sku, $response);
     }

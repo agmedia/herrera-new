@@ -201,7 +201,7 @@
 
                 @if ($form['target_type'] === \App\Models\Catalog\Action\CatalogAction::TARGET_CATEGORY)
                     <div class="mt-3 grid gap-3 sm:grid-cols-2">
-                        <label>Brend unutar kategorije<select wire:model="form.filter_manufacturer_id" class="admin-select w-full"><option value="">Svi brendovi</option>@foreach ($filterBrands as $brand)<option value="{{ $brand->id }}">{{ $brand->translations->first()?->name ?: $brand->code }}</option>@endforeach</select></label>
+                        @if ($form['filter_manufacturer_id'])<p class="text-sm text-amber-800">Ova akcija ima stari filter brenda. Spremanjem uklanjate to ograničenje. Prije spremanja provjerite odabir dobavljača.</p>@endif
                         <label>Katalog dobavljača<select wire:model="form.filter_supplier" class="admin-select w-full"><option value="">Svi dobavljači</option>@foreach (\App\Services\Integrations\SupplierCatalog\SupplierCatalogFeedClient::SUPPLIERS as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select></label>
                     </div>
                     <p class="mt-1 text-xs">Primjenjuju se svi odabrani uvjeti. Dobavljač se određuje prema aktualnoj vezi s njegovim katalogom.</p>

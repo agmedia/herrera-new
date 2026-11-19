@@ -70,7 +70,7 @@ class SalesOpportunityController extends Controller
         if ($data['operation'] === 'presented') {
             app(CustomerCrmService::class)->recordPresentations($customer, $actor, $products, $data['batch'], $data['note'] ?? null, now(), DeviceLocation::from($request->input('location')));
 
-            return back()->with('status', 'Predstavljeni artikli spremljeni su u izvještaj kupca i komercijalista.');
+            return back()->with('status', 'Predstavljeni artikli su evidentirani.');
         }
 
         $session = app(CustomerImpersonationService::class);
@@ -129,7 +129,7 @@ class SalesOpportunityController extends Controller
             abort_unless($customer->b2bAccount?->status === B2BAccount::STATUS_APPROVED, 422);
         }
 
-        return [$validated, $customer, DB::table('sales_opportunity_snapshots')->where('status', 'completed')->latest('id')->first()];
+        return [$validated, $customer, app(\App\Services\Analytics\InvoicedBuyerPurchases::class)->latestSnapshot()];
     }
 
     public function refresh(Request $request, SalesOpportunities $opportunities): RedirectResponse

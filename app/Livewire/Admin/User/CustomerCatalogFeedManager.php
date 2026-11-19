@@ -3,7 +3,6 @@
 namespace App\Livewire\Admin\User;
 
 use App\Models\Catalog\Category\Category;
-use App\Models\Catalog\Manufacturer\Manufacturer;
 use App\Models\Catalog\Product\Product;
 use App\Models\User;
 use App\Models\User\CustomerCatalogFeed;
@@ -25,8 +24,6 @@ class CustomerCatalogFeedManager extends Component
 
     public ?int $categoryId = null;
 
-    public ?int $brandId = null;
-
     public string $supplier = '';
 
     #[Locked]
@@ -34,7 +31,7 @@ class CustomerCatalogFeedManager extends Component
 
     public function updated($property): void
     {
-        if (in_array($property, ['categoryId', 'brandId', 'supplier'], true)) {
+        if (in_array($property, ['categoryId', 'supplier'], true)) {
             $this->previewIds = [];
         }
     }
@@ -45,13 +42,11 @@ class CustomerCatalogFeedManager extends Component
         $this->previewIds = [];
         $this->validate([
             'categoryId' => ['required', 'integer', Rule::exists('categories', 'id')->where('scope', 'catalog')],
-            'brandId' => ['nullable', 'integer', 'exists:catalog_manufacturers,id'],
             'supplier' => ['nullable', Rule::in(array_keys(SupplierCatalogFeedClient::SUPPLIERS))],
         ]);
         $categories = Category::query()->descendantsAndSelf($this->categoryId)->modelKeys();
         $ids = Product::query()->where('is_active', true)
             ->whereHas('categories', fn ($query) => $query->whereIn('categories.id', $categories))
-            ->when($this->brandId, fn ($query) => $query->where('manufacturer_id', $this->brandId))
             ->when($this->supplier, fn ($query) => $query->whereHas('currentSupplierLinks', fn ($links) => $links->where('supplier', $this->supplier)))
             ->orderBy('id')->limit(5001)->pluck('id')->all();
         if (count(array_unique(array_merge($this->productIds, $ids))) > 5000) {
@@ -140,7 +135,6 @@ class CustomerCatalogFeedManager extends Component
             'selectedProducts' => Product::query()->whereKey($this->productIds)->with('translations')->orderBy('sku')->limit(50)->get(),
             'canUpdate' => $this->canUpdate(),
             'categories' => Category::where('scope', 'catalog')->with('translations')->defaultOrder()->get(),
-            'brands' => Manufacturer::with('translations')->orderBy('code')->get(),
             'previewProducts' => Product::whereKey(array_slice($this->previewIds, 0, 20))->with('translations')->orderBy('id')->get(),
         ]);
     }

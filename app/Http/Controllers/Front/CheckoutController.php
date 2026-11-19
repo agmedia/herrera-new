@@ -432,6 +432,9 @@ class CheckoutController extends Controller
         }
 
         $request->session()->regenerate();
+        app(\App\Services\UserTracking\UserTrackingService::class)->track(
+            $request->user()->account_type === 'staff' ? 'staff_login' : 'customer_login', null, ['login_surface' => 'checkout'], $request
+        );
 
         return redirect()->route('checkout.create');
     }

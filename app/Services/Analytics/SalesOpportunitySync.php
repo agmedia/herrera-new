@@ -24,7 +24,7 @@ class SalesOpportunitySync
     public function run(?callable $progress = null): array
     {
         return Cache::lock('sales:opportunities-sync', 7200)->block(1, function () use ($progress): array {
-            $from = today()->subDays(365)->toDateString();
+            $from = today()->subMonthsNoOverflow(12)->toDateString();
             $asOf = today()->toDateString();
             $rankFrom = today()->subDays(90)->toDateString();
             $snapshotId = DB::table('sales_opportunity_snapshots')->insertGetId([

@@ -691,7 +691,15 @@ class Form extends Component
 
     public function addPackage(): void
     {
-        $this->packages[] = $this->blankPackageRow();
+        $row = $this->blankPackageRow();
+        $used = collect($this->packages)->map(fn ($package) => strtoupper(trim((string) ($package['code'] ?? ''))));
+        $number = 1;
+        while ($used->contains('KUT-'.$number)) {
+            $number++;
+        }
+        $row['code'] = 'KUT-'.$number;
+        $row['name'] = 'Kutija '.$number;
+        $this->packages[] = $row;
     }
 
     public function removePackage(int $index): void

@@ -588,7 +588,7 @@
                     @if ($isPurchasable)
                         <div class="product-detail-quantity-control" data-qty-control>
                             <button type="button" data-qty-dec aria-label="Decrease quantity">-</button>
-                            <input type="text" name="quantity" value="{{ max(1, (int) $product->minimum_order_quantity) }}" min="{{ max(1, (int) $product->minimum_order_quantity) }}" step="{{ max(1, (int) $product->order_quantity_step) }}" max="999" inputmode="numeric" readonly aria-label="{{ __('ui.cart.modal.quantity') }}" data-qty-input>
+                            <input type="number" name="quantity" value="{{ max(1, (int) $product->minimum_order_quantity) }}" min="{{ max(1, (int) $product->minimum_order_quantity) }}" step="{{ max(1, (int) $product->order_quantity_step) }}" max="999" inputmode="numeric" required aria-label="{{ __('ui.cart.modal.quantity') }}" data-qty-input>
                             <button type="button" data-qty-inc aria-label="Increase quantity">+</button>
                         </div>
 

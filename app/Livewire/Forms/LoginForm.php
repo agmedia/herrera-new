@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Forms;
 
+use App\Services\UserTracking\UserTrackingService;
+use App\Services\User\DeviceLocation;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\MaintenanceModeBypassCookie;
 use Illuminate\Support\Facades\Auth;
@@ -24,6 +26,8 @@ class LoginForm extends Form
     #[Validate('boolean')]
     public bool $remember = false;
 
+    public array $location = [];
+
     /**
      * Attempt to authenticate the request's credentials.
      *
@@ -32,6 +36,7 @@ class LoginForm extends Form
     public function authenticate(): void
     {
         $this->ensureIsNotRateLimited();
+        $location = DeviceLocation::from($this->location);
 
         if (! Auth::attempt([
             'login' => $this->email,
@@ -45,6 +50,7 @@ class LoginForm extends Form
             ]);
         }
 
+        app(UserTrackingService::class)->track('staff_login', null, ['location' => $location]);
         $this->issueMaintenanceBypassCookieForPrivilegedUser();
 
         RateLimiter::clear($this->throttleKey());

@@ -51,7 +51,11 @@ class EanAndBoxOrderingTest extends TestCase
         $other = $this->product(['code' => 'OTHER', 'sku' => 'OTHER', 'barcode' => '0123456789012']);
         $order = Order::query()->create(['order_number' => 'WEB-EAN-1', 'user_id' => $customer->id, 'customer_name' => $customer->name, 'customer_email' => $customer->email]);
         $order->items()->create(['product_id' => $product->id, 'name' => 'Baterija', 'quantity' => 4, 'unit_price' => 2.5, 'line_total' => 10]);
+        $old = $order->replicate()->fill(['order_number' => 'WEB-OLD', 'placed_at' => today()->subMonthsNoOverflow(12)->subDay()]);
+        $old->save();
+        $old->items()->create(['product_id' => $other->id, 'name' => 'Stari artikl', 'quantity' => 10, 'unit_price' => 1, 'line_total' => 10]);
         $this->actingAs($customer)->get(route('account.b2b.frequent-products'))->assertOk()
+            ->assertViewHas('quantities', fn ($quantities) => (int) $quantities->get($product->id) === 4 && ! $quantities->has($other->id))
             ->assertSee('Prikaži EAN crtične kodove')
             ->assertSee('data-ean-barcode="4006381333931"', false)
             ->assertDontSee($other->barcode);

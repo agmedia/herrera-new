@@ -173,7 +173,7 @@ class CustomerIdentityPresentationFeatureTest extends TestCase
         $xpath = new \DOMXPath($dom);
         foreach (['approved' => 'Naruči za kupca', 'pending' => 'Prijavi se kao kupac'] as $status => $label) {
             $action = route('admin.users.impersonate', $customers[$status]);
-            $buttons = $xpath->query('//form[@action="'.$action.'"]//button');
+            $buttons = $xpath->query('//form[@action="'.$action.'"]//button[@type="submit"]');
             $this->assertSame(1, $buttons->count());
             $this->assertSame($label, trim($buttons->item(0)->textContent));
         }

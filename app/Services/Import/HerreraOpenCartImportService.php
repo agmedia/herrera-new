@@ -491,6 +491,7 @@ class HerreraOpenCartImportService
             $this->mapped('product', $row['product_id'], 'products', [
                 'code' => 'herrera-oc-product-'.$row['product_id'], 'sku' => $sku ?: null,
                 'barcode' => $barcode, 'is_active' => (bool) $row['status'],
+                ...(! $existing && $row['status'] ? ['first_published_at' => \App\Models\Catalog\Product\Product::legacyPublicationDate($row)] : []),
                 'manufacturer_id' => $this->id('manufacturer', $row['manufacturer_id']), 'tax_rate_id' => $classRates[$row['tax_class_id']] ?? null,
                 'base_price' => $row['price'], 'stock_qty' => $row['quantity'], 'supplier_stock_qty' => (int) ($row['suplierqty'] ?? 0), 'minimum_order_quantity' => max(1, $row['minimum']), 'order_quantity_step' => max(1, $row['minimum']),
                 'weight_kg' => (float) $row['weight'] / ($weightClasses[$row['weight_class_id'] ?? 0] ?? 1), 'length_cm' => (float) $row['length'] / ($lengthClasses[$row['length_class_id'] ?? 0] ?? 1), 'width_cm' => (float) $row['width'] / ($lengthClasses[$row['length_class_id'] ?? 0] ?? 1), 'height_cm' => (float) $row['height'] / ($lengthClasses[$row['length_class_id'] ?? 0] ?? 1),

@@ -215,6 +215,28 @@ class HerreraCatalogStockPriorityTest extends TestCase
         $this->get(route('products.show', ['slug' => $inactive->code]))->assertNotFound();
     }
 
+    public function test_new_arrivals_use_first_publication_for_exactly_sixty_calendar_days(): void
+    {
+        $today = $this->product('today', 12, 10, 0);
+        $last = $this->product('last', 12, 10, 0);
+        $last->forceFill(['first_published_at' => today()->subDays(59)])->save();
+        $outside = $this->product('earlier', 12, 10, 0);
+        $outside->forceFill(['first_published_at' => today()->subDays(60)->endOfDay()])->save();
+        $outside->update(['is_active' => false]);
+        $outside->update(['is_active' => true]);
+        $unknown = $this->product('unknown', 12, 10, 0);
+        Product::whereKey($unknown->id)->update(['first_published_at' => null]);
+        $draft = Product::create(['code' => 'draft', 'sku' => 'draft', 'is_active' => false, 'stock_qty' => 4]);
+        $this->assertNull($draft->first_published_at);
+        $draft->update(['is_active' => true]);
+        $this->assertNotNull($draft->fresh()->first_published_at);
+        foreach ($this->catalogUrls(['new_arrivals' => 1]) as $url) {
+            $this->get($url)->assertOk()
+                ->assertViewHas('products', fn ($page) => $page->pluck('id')->contains($today->id) && $page->pluck('id')->contains($last->id)
+                    && ! $page->pluck('id')->contains($outside->id) && ! $page->pluck('id')->contains($unknown->id));
+        }
+    }
+
     private function product(string $code, float $price, int $local, int $supplier, ?string $name = null): Product
     {
         $product = Product::query()->create([

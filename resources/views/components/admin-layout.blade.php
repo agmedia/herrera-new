@@ -1271,6 +1271,7 @@
                     $usersB2BActive = request()->routeIs('admin.users.b2b');
                     $usersStatisticsActive = request()->routeIs('admin.users.statistics');
                     $usersOpportunitiesActive = request()->routeIs('admin.users.opportunities*');
+                    $salesReportsActive = request()->routeIs('admin.users.sales-reports');
                     $usersGroupsActive = request()->routeIs('admin.users.groups*');
                     $usersAccessActive = $canManageUsersAccess && request()->routeIs('admin.users.access');
                     $usersActivityActive = request()->routeIs('admin.users.activity');
@@ -1288,7 +1289,7 @@
                     $canViewUserLoyalty = $userLoyaltyEnabled
                         && auth()->user()
                         && (auth()->user()->isA('superadmin') || auth()->user()->can('users.loyalty.view'));
-                    $usersOpen = $usersListActive || $usersB2BActive || $usersStatisticsActive || $usersOpportunitiesActive || $usersGroupsActive || $usersAccessActive || $usersActivityActive || $usersNewsletterActive || ($userLoyaltyEnabled && $usersLoyaltyActive);
+                    $usersOpen = $usersListActive || $usersB2BActive || $usersStatisticsActive || $salesReportsActive || $usersOpportunitiesActive || $usersGroupsActive || $usersAccessActive || $usersActivityActive || $usersNewsletterActive || ($userLoyaltyEnabled && $usersLoyaltyActive);
                     $canAdminAbility = static fn (string $ability): bool => auth()->user()
                         && (auth()->user()->isA('superadmin') || auth()->user()->can($ability));
                     $catalogLinks = [
@@ -1338,6 +1339,7 @@
                     $manualTopic = 'uvod';
                     $canViewUsersSection = auth()->user() && (
                         auth()->user()->isA('superadmin')
+                        || auth()->user()->can('sales.opportunities.view')
                         || auth()->user()->can('users.list.view')
                         || auth()->user()->can('users.groups.manage')
                         || auth()->user()->can('users.activity.view')
@@ -1971,6 +1973,9 @@
                                     </a>
                                 @endif
                                 @if (auth()->user()->isA('superadmin') || auth()->user()->can('sales.opportunities.view'))
+                                    <a href="{{ route('admin.users.sales-reports') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ $salesReportsActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
+                                        <span class="flex items-center gap-2"><span class="sidebar-dot"></span><span>{{ __('Izvještaji po kupcima i komercijalistima') }}</span></span>
+                                    </a>
                                     <a href="{{ route('admin.users.opportunities') }}" class="sidebar-dropdown-link block rounded-lg font-medium {{ $usersOpportunitiesActive ? 'is-active-leaf' : 'text-slate-700 hover:bg-slate-100' }}">
                                         <span class="flex items-center gap-2"><span class="sidebar-dot"></span><span>{{ __('Prodajne prilike') }}</span></span>
                                     </a>

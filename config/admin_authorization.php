@@ -368,6 +368,13 @@ return [
         'admin.users.opportunities' => [
             'view' => ['sales.opportunities.view'],
         ],
+        'admin.orders.erp-cost-centres' => ['view' => ['sales.orders.view']],
+        'admin.users.sales-reports' => [
+            'view' => ['sales.opportunities.view'],
+        ],
+        'admin.users.opportunities.products' => [
+            'mutate' => ['sales.opportunities.view'],
+        ],
         'admin.users.opportunities.export' => [
             'view' => ['sales.opportunities.view'],
         ],

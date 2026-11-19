@@ -35,6 +35,9 @@ class CustomerCrmManager extends Component
 
     public array $visit = [];
 
+    #[Locked]
+    public int $visitFormVersion = 0;
+
     public function mount(?int $customerId = null): void
     {
         $this->customerId = $customerId;
@@ -46,6 +49,10 @@ class CustomerCrmManager extends Component
 
     public function updated($property): void
     {
+        if ($property === 'visit.contact_type') {
+            unset($this->visit['location']);
+            $this->visitFormVersion++;
+        }
         if (in_array($property, ['representative', 'dateFrom', 'dateTo', 'outcome', 'source', 'includePreviews'], true)) {
             $this->resetPage(pageName: 'crmPage');
         }
@@ -96,6 +103,7 @@ class CustomerCrmManager extends Component
 
     private function resetVisit(): void
     {
+        $this->visitFormVersion++;
         $this->visit = ['visited_at' => now()->format('Y-m-d\TH:i'), 'contact_type' => 'visit', 'outcome' => 'nothing', 'note' => '', 'order_id' => null, 'quote_reference' => ''];
         $this->resetValidation();
     }

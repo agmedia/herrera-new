@@ -31,6 +31,7 @@
                 @if($captchaEnabled) data-recaptcha-form data-recaptcha-site-key="{{ $captchaSiteKey }}" data-recaptcha-action="login_form" @endif
             >
                 @csrf
+                <x-device-location />
                 <input type="hidden" name="intended" value="{{ old('intended', (string) request('intended', route('account.dashboard'))) }}">
                 <input type="hidden" name="recaptcha_token" value="" data-recaptcha-token>
 

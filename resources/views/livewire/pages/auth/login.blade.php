@@ -173,6 +173,7 @@ new #[Layout('layouts.guest')] class extends Component
             class="store-auth-form store-auth-form--flush"
             novalidate
         >
+            <x-device-location model="form.location" />
             <div class="store-auth-field">
                 <label for="email">{{ __('E-mail ili korisničko ime') }}</label>
                 <input

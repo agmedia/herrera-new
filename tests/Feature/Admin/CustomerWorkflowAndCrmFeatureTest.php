@@ -279,6 +279,87 @@ class CustomerWorkflowAndCrmFeatureTest extends TestCase
         $this->assertNotNull($session->fresh()->ended_at);
     }
 
+    public function test_report_separates_device_location_own_logins_and_multiple_orders_in_a_session(): void
+    {
+        $admin = $this->staff('superadmin');
+        $rep = $this->staff('order_manager');
+        $customer = $this->buyer('Terasna rasvjeta');
+        $this->assign($rep, $customer);
+        $this->actingAs($rep);
+        $service = app(\App\Services\User\CustomerCrmService::class);
+        $service->recordVisit($customer, $this->visit(['location' => ['latitude' => 46.02, 'longitude' => 16.55, 'accuracy' => 12]]), $rep);
+        $session = $service->startSession($customer, $rep);
+        request()->setLaravelSession(app('session.store'));
+        request()->session()->put(\App\Services\User\CustomerImpersonationService::SESSION_KEY.'.sales_session_id', $session->id);
+        foreach ([[125,25], [50,10]] as [$gross,$tax]) {
+            $service->recordSessionOrder(request(), $this->order($customer, $gross, $tax), $rep);
+        }
+        request()->session()->forget(\App\Services\User\CustomerImpersonationService::SESSION_KEY);
+        $this->order($customer, 500, 100);
+        $this->actingAs($customer);
+        app(\App\Services\UserTracking\UserTrackingService::class)->track('customer_login');
+        $this->actingAs($admin);
+        $filter = ['customer' => $customer->id, 'rep' => $rep->id];
+        $this->get(route('admin.users.sales-reports', $filter + ['tab'=>'sales']))->assertOk()
+            ->assertViewHas('totals', fn ($totals) => (int) $totals->sole()->orders_count === 2 && (float) $totals->sole()->net === 140.0);
+        $this->get(route('admin.users.sales-reports', $filter + ['tab'=>'visits']))->assertOk()->assertSee('46.02')->assertSee('16.55');
+        $this->get(route('admin.users.sales-reports', $filter + ['tab'=>'logins']))->assertOk()->assertSee('Prijava kupca');
+    }
+
+    public function test_contact_can_record_any_catalog_sku_and_rejects_unknown_items_before_saving(): void
+    {
+        $customer = $this->buyer('Test rasvjeta');
+        $rep = $this->staff('order_manager');
+        $this->assign($rep, $customer);
+        $product = \App\Models\Catalog\Product\Product::create(['code' => 'ROOM-LIGHT', 'sku' => 'ROOM-LIGHT', 'is_active' => true]);
+        $form = Livewire::actingAs($rep)->test(CustomerCrmManager::class, ['customerId' => $customer->id]);
+        $visit = $this->visit(['presented_skus' => 'ROOM-LIGHT, KRIVA']);
+        $form->set('visit', $visit)->call('saveVisit')->assertHasErrors('visit.presented_skus');
+        $this->assertDatabaseCount('customer_visits', 0);
+        $form->set('visit.presented_skus', "ROOM-LIGHT,\nROOM-LIGHT")->call('saveVisit')->assertHasNoErrors();
+        $this->assertDatabaseCount('customer_product_presentations', 1);
+        $this->assertDatabaseHas('customer_product_presentations', [
+            'customer_user_id' => $customer->id, 'sales_rep_id' => $rep->id, 'product_id' => $product->id,
+            'presented_at' => $visit['visited_at'], 'note' => $visit['note'],
+        ]);
+    }
+
+    public function test_old_checkout_audit_attributes_sales_and_excludes_staff_preview_without_a_linked_session(): void
+    {
+        $admin = $this->staff('superadmin');
+        $rep = $this->staff('order_manager');
+        $buyer = $this->buyer('Povijesni kupac');
+        $audit = ['customer_impersonation' => ['admin_id' => $rep->id, 'customer_id' => $buyer->id]];
+        $this->order($buyer, 50, 10)->forceFill(['created_by' => $rep->id, 'payload' => $audit])->save();
+        $this->order($buyer, 250, 50)->forceFill(['created_by' => $admin->id,
+            'payload' => $audit + ['staff_impersonation' => ['admin_id' => $admin->id, 'staff_id' => $rep->id]]])->save();
+        $this->order($buyer, 125, 25);
+        $this->actingAs($admin)->get(route('admin.users.sales-reports', ['customer' => $buyer->id, 'rep' => $rep->id]))
+            ->assertOk()->assertViewHas('totals', fn ($totals) => $totals->sole()->orders_count === 1 && (float) $totals->sole()->net === 40.0);
+        $this->get(route('admin.users.sales-reports', ['customer' => $buyer->id]))
+            ->assertOk()->assertViewHas('totals', fn ($totals) => $totals->sole()->orders_count === 2 && (float) $totals->sole()->net === 140.0);
+    }
+
+    public function test_portfolio_turnover_includes_self_orders_and_counts_shared_customers_once(): void
+    {
+        $admin = $this->staff('superadmin');
+        $first = $this->staff('order_manager');
+        $second = $this->staff('order_manager');
+        $shared = $this->buyer('Zajednički');
+        $other = $this->buyer('Drugi kupac');
+        $this->assign($first, $shared);
+        $this->assign($second, $shared);
+        $this->assign($second, $other);
+        $this->order($shared, 125, 25);
+        $this->order($other, 50, 10);
+        $this->actingAs($admin)->get(route('admin.users.sales-reports', ['scope' => 'portfolio']))->assertOk()
+            ->assertViewHas('totals', fn ($totals) => (int) $totals->sole()->orders_count === 2 && (float) $totals->sole()->net === 140.0);
+        $this->get(route('admin.users.sales-reports', ['scope' => 'portfolio', 'rep' => $first->id]))->assertOk()
+            ->assertViewHas('totals', fn ($totals) => (float) $totals->sole()->net === 100.0);
+        $this->actingAs($first)->get(route('admin.users.sales-reports', ['scope' => 'portfolio', 'rep' => $second->id]))
+            ->assertOk()->assertViewHas('rows', fn ($rows) => $rows->count() === 1 && $rows->first()->customer_user_id === $shared->id);
+    }
+
     private function staff(string $role): User
     {
         $user = User::factory()->create(['account_type' => 'staff', 'admin_login_enabled' => true]);

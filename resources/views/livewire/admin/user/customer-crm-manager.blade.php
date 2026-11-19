@@ -1,4 +1,8 @@
 <div class="space-y-6">
+    @if (auth()->user()?->isA('superadmin') || auth()->user()?->can('sales.opportunities.view'))
+        <a href="{{ route('admin.users.sales-reports', ['customer' => $customerId ?? null, 'tab' => auth()->user()->isA('superadmin') || auth()->user()->can('sales.orders.view') ? 'sales' : 'sessions']) }}" class="inline-block rounded-lg border px-3 py-2 font-semibold text-cyan-800">Izvještaji po kupcima i komercijalistima</a>
+    @endif
+
     <div class="admin-panel p-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -113,6 +117,9 @@
             <h3 class="font-semibold">
                 {{ __('Evidentiraj kontakt s kupcem') }}
             </h3>
+            @if (($visit['contact_type'] ?? '') === 'visit')
+                <div wire:key="visit-location-{{ $visitFormVersion }}"><x-device-location model="visit.location" /></div>
+            @endif
             <div class="grid gap-3 md:grid-cols-3">
                 <label class="text-sm">
                     {{ __('Datum i vrijeme') }}
@@ -120,7 +127,7 @@
                 </label>
                 <label class="text-sm">
                     {{ __('Vrsta kontakta') }}
-                    <select wire:model="visit.contact_type" class="admin-select mt-1 w-full rounded-lg border px-3 py-2">
+                    <select wire:model.live="visit.contact_type" class="admin-select mt-1 w-full rounded-lg border px-3 py-2">
                         <option value="visit">
                             {{ __('Posjet kupcu') }}
                         </option>
@@ -171,6 +178,10 @@
                     {{ __('Unesite referencu ponude izrađene u vanjskom sustavu.') }}
                 </p>
             @endif
+            <label class="block text-sm">
+                Predstavljeni artikli (ADV)
+                <textarea wire:model="visit.presented_skus" rows="2" class="mt-1 w-full rounded-lg border px-3 py-2" placeholder="Unesite šifre SKU odvojene zarezom ili novim redom"></textarea>
+            </label>
             <label class="block text-sm">
                 {{ __('Bilješka') }}
                 <textarea wire:model="visit.note" rows="3" class="mt-1 w-full rounded-lg border px-3 py-2">

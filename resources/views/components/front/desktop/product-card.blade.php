@@ -144,7 +144,7 @@
                         <button type="button" class="inline-flex h-8 w-8 items-center justify-center border border-white/55 text-sm font-semibold text-white hover:border-white hover:bg-white/10" data-qty-dec aria-label="{{ __('ui.cart.modal.quantity') }} -">
                             <x-fa-icon name="minus" class="h-3 w-3" />
                         </button>
-                        <input type="text" name="quantity" value="{{ $minimumQuantity }}" min="{{ $minimumQuantity }}" step="{{ $quantityStep }}" max="999" inputmode="numeric" readonly aria-label="{{ __('ui.cart.modal.quantity') }}" class="h-8 w-8 border-y border-r border-white/55 border-l-0 bg-transparent p-0 text-center text-xs font-semibold text-white focus:ring-0" data-qty-input data-qty-value>
+                        <input type="number" name="quantity" value="{{ $minimumQuantity }}" min="{{ $minimumQuantity }}" step="{{ $quantityStep }}" max="999" inputmode="numeric" required aria-label="{{ __('ui.cart.modal.quantity') }}" class="h-8 w-8 border-y border-r border-white/55 border-l-0 bg-transparent p-0 text-center text-xs font-semibold text-white focus:ring-0" data-qty-input data-qty-value>
                         <button type="button" class="inline-flex h-8 w-8 items-center justify-center border border-white/55 text-sm font-semibold text-white hover:border-white hover:bg-white/10" data-qty-inc aria-label="{{ __('ui.cart.modal.quantity') }} +">
                             <x-fa-icon name="plus" class="h-3 w-3" />
                         </button>
@@ -271,7 +271,7 @@
                                 <x-fa-icon name="minus" class="h-3 w-3" />
                             </button>
                             <label class="flex min-w-0 flex-col items-center justify-center border-x border-slate-300">
-                                <input type="text" name="quantity" value="{{ $minimumQuantity }}" min="{{ $minimumQuantity }}" step="{{ $quantityStep }}" max="999" inputmode="numeric" readonly aria-label="{{ __('ui.cart.modal.quantity') }}" class="h-full w-full border-0 bg-transparent p-0 text-center text-xs font-semibold text-slate-900 focus:ring-0" data-qty-input data-qty-value>
+                                <input type="number" name="quantity" value="{{ $minimumQuantity }}" min="{{ $minimumQuantity }}" step="{{ $quantityStep }}" max="999" inputmode="numeric" required aria-label="{{ __('ui.cart.modal.quantity') }}" class="h-full w-full border-0 bg-transparent p-0 text-center text-xs font-semibold text-slate-900 focus:ring-0" data-qty-input data-qty-value>
                             </label>
                             <button type="button" class="inline-flex h-full items-center justify-center text-slate-900 transition hover:bg-slate-100" data-qty-inc aria-label="{{ __('ui.cart.modal.quantity') }} +">
                                 <x-fa-icon name="plus" class="h-3 w-3" />

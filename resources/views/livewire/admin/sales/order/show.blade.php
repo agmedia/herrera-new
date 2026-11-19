@@ -67,7 +67,7 @@
                     <p class="mt-1 text-sm font-semibold text-slate-900">{{ $order->customerDisplayName() }} <span class="inline-flex rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{{ $order->commerceCustomerType() }}</span></p>
                             @if ($order->customerDisplayName() !== $order->customer_name)<p class="text-xs text-slate-500">{{ __('Kontakt') }}: {{ $order->customer_name }}</p>@endif
                     <p class="text-xs text-slate-600">{{ $order->customer_email }}</p>
-                    @if ($order->commerceCostCentre())<p class="mt-1 text-xs font-semibold text-slate-600">{{ __('Mjesto troška') }}: {{ $order->commerceCostCentre() }}</p>@endif
+                    @if ($order->commerceCostCentre())<p class="mt-1 text-xs font-semibold text-slate-600">{{ __('Mjesto troška') }}: {{ $order->commerceCostCentre() }} @if ($order->erp_cost_centre) · e-Računi: {{ $order->erp_cost_centre }}@endif</p>@endif
                     @if ($order->customer_phone)
                         <p class="text-xs text-slate-600">{{ $order->customer_phone }}</p>
                     @endif

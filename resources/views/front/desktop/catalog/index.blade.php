@@ -45,6 +45,7 @@
     };
     $catalogHeading = match (true) {
         $isManufacturerPage => ($translation?->name ?? $manufacturerPageModel->code),
+        $isShopPage && request()->boolean('new_arrivals') => __('NOVO u ponudi · zadnjih 60 dana'),
         $isShopPage => __('ui.shop.title'),
         default => ($translation?->name ?? $category->code),
     };
@@ -55,6 +56,7 @@
     $catalogNavigationQuery = array_filter([
         'manufacturer' => trim((string) ($filters['manufacturer'] ?? '')),
         'promo_only' => $promoOnlyEnabled ? 1 : null,
+        'new_arrivals' => request()->boolean('new_arrivals') ? 1 : null,
     ], static fn ($value): bool => $value !== null && $value !== '');
     $catalogCurrentCategoryUrl = url()->query($catalogBaseUrl, $catalogNavigationQuery);
     $hasSearchQuery = trim((string) ($filters['q'] ?? '')) !== '';
@@ -314,6 +316,7 @@
                         </button>
                     </div>
                     <form method="GET" action="{{ $catalogBaseUrl }}" class="catalog-mobile-filter-panel" data-mobile-filter-panel id="category-mobile-filter-panel">
+                        @if (request()->boolean('new_arrivals'))<input type="hidden" name="new_arrivals" value="1">@endif
                         <input type="hidden" name="q" value="{{ $filters['q'] ?? '' }}">
                         <div class="catalog-mobile-filter-content">
                         @if (($hasSubcategories || $catalogParentCategory) && $categoryFilterPanel['visible'])
@@ -673,6 +676,7 @@
                                 action="{{ $catalogBaseUrl }}"
                                 data-desktop-filter-form
                             >
+                                @if (request()->boolean('new_arrivals'))<input type="hidden" name="new_arrivals" value="1">@endif
                                 <input type="hidden" name="q" value="{{ $filters['q'] ?? '' }}">
                                 <input type="hidden" name="cols" value="{{ $currentCols }}">
 

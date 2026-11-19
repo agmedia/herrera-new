@@ -156,6 +156,53 @@ class B2CRetailManagementTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_b2c_reconciliation_export_keeps_confirmed_erp_cost_centre_separate_from_webshop_label(): void
+    {
+        $buyer = User::factory()->create();
+        $this->order($buyer, 'WEB-TEST-1', 75);
+        $order = Order::where('order_number', 'WEB-TEST-1')->sole();
+        $this->assertSame('web', $order->erp_cost_centre);
+        $this->assertSame('Web prodaja', $order->cost_centre);
+        $admin = $this->admin();
+        Bouncer::allow($admin)->to('integrations.eracuni.manage');
+        Bouncer::allow($admin)->to('sales.orders.view');
+        Bouncer::refresh();
+        $stream = $this->actingAs($admin)->get(route('admin.orders.erp-cost-centres', ['from' => today()->subDay()->toDateString(), 'to' => today()->toDateString()]))
+            ->assertOk()->streamedContent();
+        $rows = array_map(fn ($line) => str_getcsv($line, ',', '"', ''), explode("\n", trim($stream)));
+        $this->assertSame('erp_cost_centre', $rows[0][2]);
+        $this->assertSame(['WEB-TEST-1', '', 'web'], array_slice($rows[1], 0, 3));
+    }
+
+    public function test_category_action_combines_selected_brand_and_current_supplier(): void
+    {
+        config(['commerce.b2b_only' => false]);
+        app(SystemSettingsService::class)->put('catalog_use_actions', true);
+        $category = \App\Models\Catalog\Category\Category::create(['code' => 'indoor', 'scope' => 'catalog', 'is_active' => true]);
+        $brand = Manufacturer::create(['code' => 'lamp', 'is_active' => true]);
+        $products = [];
+        foreach (['match', 'wrong-brand', 'old-supplier', 'other-category'] as $code) {
+            $product = Product::create(['code' => $code, 'sku' => $code, 'stock_qty' => 10, 'is_active' => true,
+                'base_price' => 100, 'manufacturer_id' => $code === 'wrong-brand' ? null : $brand->id]);
+            if ($code !== 'other-category') {
+                $product->categories()->attach($category);
+            }
+            DB::table('supplier_catalog_items')->insert(['product_id' => $product->id, 'supplier' => 'videx',
+                'name' => $code, 'sku' => $code, 'external_id' => $code, 'is_current' => $code !== 'old-supplier']);
+            $products[$code] = $product;
+        }
+        Livewire::actingAs($this->admin())->test(ActionForm::class)
+            ->set('form.code', 'videx-lamp')->set('form.locale', 'hr')->set('form.title', 'Unutarnja rasvjeta')
+            ->set('form.type', CatalogAction::TYPE_PERCENTAGE)->set('form.discount_value', '10')
+            ->set('form.target_type', CatalogAction::TARGET_CATEGORY)->set('form.target_ids', [$category->id])
+            ->set('form.filter_manufacturer_id', $brand->id)->set('form.filter_supplier', 'videx')
+            ->set('form.is_active', true)->call('save')->assertHasNoErrors();
+        foreach ($products as $code => $product) {
+            $price = app(ProductPricePresentationService::class)->forProduct($product, null);
+            $this->assertSame($code === 'match' ? 90.0 : 100.0, $price['current_net'], $code);
+        }
+    }
+
     private function admin(): User
     {
         $admin = User::factory()->create(['account_type' => 'staff']);

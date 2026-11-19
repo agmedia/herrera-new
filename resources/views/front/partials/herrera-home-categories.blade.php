@@ -70,6 +70,21 @@
             @endif
         </header>
         @endif
+            @if (request()->routeIs('home') && str_contains(strtolower((string) ($storeSettings['branding']['store_name'] ?? config('app.name'))), 'herrera'))
+                @php
+                    $clearanceId = app(\App\Services\Catalog\Clearance\ClearanceService::class)->settings()['category_id'];
+                    $saleCategory = \App\Models\Catalog\Category\Category::where('scope', 'catalog')->currentlyVisible()
+                        ->when($clearanceId, fn ($q) => $q->whereKey($clearanceId), fn ($q) => $q->where(fn ($match) => $match->whereIn('code', ['rasprodaja', 'clearance'])->orWhereHas('translations', fn ($t) => $t->where('slug', 'rasprodaja'))))
+                        ->with('translations')->first();
+                    $saleSlug = $saleCategory?->translations->firstWhere('locale', $locale)?->slug ?? $saleCategory?->translations->first()?->slug;
+                @endphp
+                <nav aria-label="Posebne ponude" class="mb-3 grid grid-cols-2 gap-3">
+                @if ($saleSlug)
+                    <a class="herrera-category-tile is-icon-only" href="{{ route('categories.show', ['slug' => $saleSlug]) }}"><span class="herrera-category-tile-media"><x-fa-icon name="tag" class="herrera-category-tile-fallback" /></span><span class="herrera-category-tile-caption">Rasprodaja</span></a>
+                @endif
+                <a class="herrera-category-tile is-icon-only" href="{{ route('shop.index', ['new_arrivals' => 1]) }}"><span class="herrera-category-tile-media"><x-fa-icon name="star" class="herrera-category-tile-fallback" /></span><span class="herrera-category-tile-caption">NOVO u ponudi</span></a>
+                </nav>
+            @endif
         <div class="herrera-category-module-grid category-index-grid">
             @foreach ($categories as $category)
                 @php

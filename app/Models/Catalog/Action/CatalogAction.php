@@ -53,6 +53,8 @@ class CatalogAction extends Model
         'type',
         'discount_value',
         'target_type',
+        'filter_manufacturer_id',
+        'filter_supplier',
         'audience_type',
         'customer_group_id',
         'role_id',
@@ -185,6 +187,36 @@ class CatalogAction extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /** Apply optional category refinements, also in correlated storefront listing queries. */
+    public function scopeMatchingCatalogFilters(Builder $query, ?Product $product = null): Builder
+    {
+        return $query->where(function ($brand) use ($product) {
+            $brand->whereNull('filter_manufacturer_id');
+            if ($product === null) {
+                $brand->orWhereColumn('filter_manufacturer_id', 'products.manufacturer_id');
+            } elseif ($product->manufacturer_id !== null) {
+                $brand->orWhere('filter_manufacturer_id', $product->manufacturer_id);
+            }
+        })->where(function ($source) use ($product) {
+            $source->whereNull('filter_supplier')->orWhereExists(function ($links) use ($product) {
+                $links->selectRaw('1')->from('supplier_catalog_items')
+                    ->whereColumn('supplier_catalog_items.supplier', 'catalog_actions.filter_supplier')
+                    ->where('supplier_catalog_items.is_current', true);
+                if ($product) {
+                    $links->where('supplier_catalog_items.product_id', $product->id);
+                } else {
+                    $links->whereColumn('supplier_catalog_items.product_id', 'products.id');
+                }
+            });
+        });
+    }
+
+    public function acceptsCatalogProduct(Product $product): bool
+    {
+        return (! $this->filter_manufacturer_id || (int) $this->filter_manufacturer_id === (int) $product->manufacturer_id)
+            && (! $this->filter_supplier || $product->currentSupplierLinks->contains('supplier', $this->filter_supplier));
     }
 
     public function scopeActive(Builder $query, Carbon|string|null $at = null): Builder

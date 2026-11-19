@@ -19,10 +19,10 @@ class CustomerManagementService
         return (bool) ($actor && ($actor->account_type !== 'staff' || $actor->admin_login_enabled) && $actor->isA('superadmin', 'admin'));
     }
 
-    public function representatives(): Builder
+    public function representatives(bool $includeDisabled = false): Builder
     {
         return User::query()->whereHas('roles', fn (Builder $query) => $query->whereIn('name', ['order_manager', 'admin', 'superadmin']))
-            ->where(fn (Builder $query) => $query->where('account_type', '!=', 'staff')->orWhere('admin_login_enabled', true));
+            ->when(! $includeDisabled, fn (Builder $query) => $query->where(fn (Builder $staff) => $staff->where('account_type', '!=', 'staff')->orWhere('admin_login_enabled', true)));
     }
 
     public function assertCustomer(User $customer, User $actor): void

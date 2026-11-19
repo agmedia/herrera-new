@@ -11,11 +11,11 @@ class CustomerVisit extends Model
 {
     protected $table = 'customer_visits';
 
-    protected $fillable = ['customer_user_id', 'sales_rep_id', 'performed_by_id', 'visited_at', 'contact_type', 'outcome', 'order_id', 'quote_reference', 'note'];
+    protected $fillable = ['customer_user_id', 'sales_rep_id', 'performed_by_id', 'visited_at', 'contact_type', 'outcome', 'order_id', 'quote_reference', 'note', 'location'];
 
     protected function casts(): array
     {
-        return ['visited_at' => 'datetime'];
+        return ['visited_at' => 'datetime', 'location' => 'array'];
     }
 
     public function customer(): BelongsTo

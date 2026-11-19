@@ -199,6 +199,13 @@
                     @error('form.target_type') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                 </div>
 
+                @if ($form['target_type'] === \App\Models\Catalog\Action\CatalogAction::TARGET_CATEGORY)
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                        <label>Brend unutar kategorije<select wire:model="form.filter_manufacturer_id" class="admin-select w-full"><option value="">Svi brendovi</option>@foreach ($filterBrands as $brand)<option value="{{ $brand->id }}">{{ $brand->translations->first()?->name ?: $brand->code }}</option>@endforeach</select></label>
+                        <label>Katalog dobavljača<select wire:model="form.filter_supplier" class="admin-select w-full"><option value="">Svi dobavljači</option>@foreach (\App\Services\Integrations\SupplierCatalog\SupplierCatalogFeedClient::SUPPLIERS as $key => $label)<option value="{{ $key }}">{{ $label }}</option>@endforeach</select></label>
+                    </div>
+                    <p class="mt-1 text-xs">Primjenjuju se svi odabrani uvjeti. Dobavljač se određuje prema aktualnoj vezi s njegovim katalogom.</p>
+                @endif
                 @if ($form['target_type'] !== \App\Models\Catalog\Action\CatalogAction::TARGET_ALL)
                     <div class="mt-3">
                         <label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{{ __('Target Search') }}</label>

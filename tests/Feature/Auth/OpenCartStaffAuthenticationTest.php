@@ -25,11 +25,15 @@ class OpenCartStaffAuthenticationTest extends TestCase
         Volt::test('pages.auth.login')
             ->set('form.email', $identity === 'username' ? '  OPERATOR  ' : 'SHARED@example.test')
             ->set('form.password', 'Staff-password123!')
+            ->set('form.location', ['latitude' => 45.8, 'longitude' => 15.9, 'accuracy' => 10])
             ->call('login')
             ->assertHasNoErrors()
             ->assertRedirect(route('dashboard', absolute: false));
 
         $this->assertAuthenticatedAs($staff);
+        $event = \App\Models\User\UserTrackingEvent::where('event', 'staff_login')->sole();
+        $this->assertSame($staff->id, $event->user_id);
+        $this->assertSame(45.8, $event->payload['location']['latitude']);
         $this->assertTrue(Hash::check('Customer-password123!', $customer->fresh()->password));
     }
 
@@ -76,6 +80,9 @@ class OpenCartStaffAuthenticationTest extends TestCase
             'email' => $customer->email, 'password' => 'Customer-password123!',
         ])->assertSessionHasNoErrors()->assertRedirect();
         $this->assertAuthenticatedAs($customer);
+        $event = \App\Models\User\UserTrackingEvent::where('event', 'customer_login')->sole();
+        $this->assertSame($customer->id, $event->user_id);
+        $this->assertNull($event->payload['location']);
     }
 
     public function test_storefront_preserves_staff_email_login_when_no_customer_exists(): void

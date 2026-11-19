@@ -59,6 +59,7 @@ class NabavaNetFeedService
             ->where('base_price', '>', 0)
             ->with([
                 'taxRate:id,rate,rate_type,is_active',
+                'currentSupplierLinks:id,product_id,supplier',
                 'translations:id,product_id,locale,name,slug,excerpt,description',
                 'categories' => fn ($query) => $query
                     ->select(['categories.id'])
@@ -215,6 +216,9 @@ class NabavaNetFeedService
      */
     private function actionAppliesToProduct(CatalogAction $action, Product $product, array $categoryIds): bool
     {
+        if (! $action->acceptsCatalogProduct($product)) {
+            return false;
+        }
         if ($action->target_type === CatalogAction::TARGET_ALL) {
             return true;
         }

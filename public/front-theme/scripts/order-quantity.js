@@ -1,7 +1,7 @@
 (() => {
     const positiveInteger = (value, fallback) => {
-        const parsed = Number.parseInt(String(value ?? ''), 10);
-        return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+        const parsed = Number(value);
+        return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
     };
 
     const limits = (input) => {

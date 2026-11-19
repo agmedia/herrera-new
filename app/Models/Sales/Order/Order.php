@@ -100,6 +100,7 @@ class Order extends Model
         static::creating(function (self $order): void {
             $type = $order->commerceCustomerType();
             $order->customer_type = $type;
+            $order->erp_cost_centre = $type === 'B2C' ? 'web' : null;
             $order->cost_centre = $type === 'B2C' ? 'Web prodaja' : $order->cost_centre;
         });
     }

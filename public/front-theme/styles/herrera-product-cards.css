@@ -208,3 +208,12 @@
         font-size: 16px;
     }
 }
+
+.herrera-storefront :is([data-qty-input], [data-cart-qty-input])[type="number"] {
+    appearance: textfield;
+}
+.herrera-storefront :is([data-qty-input], [data-cart-qty-input])::-webkit-inner-spin-button,
+.herrera-storefront :is([data-qty-input], [data-cart-qty-input])::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}

@@ -138,6 +138,41 @@ class SalesOpportunityPresentationTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_presentations_are_explicit_idempotent_scoped_and_reported(): void
+    {
+        $product = $this->product('LED-DEMO', null, 8);
+        $this->manager->forceFill(['admin_login_enabled' => true])->save();
+        $this->actingAs($this->manager);
+        $data = ['user_id' => $this->partner->id, 'selection' => [$product->id], 'operation' => 'presented',
+            'batch' => (string) \Illuminate\Support\Str::uuid(), 'note' => 'Predstavljen na sastanku',
+            'location' => ['latitude' => 45.82, 'longitude' => 15.99, 'accuracy' => 9]];
+        $this->post(route('admin.users.opportunities.products'), $data)->assertRedirect()->assertSessionHasNoErrors();
+        $this->post(route('admin.users.opportunities.products'), $data)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('customer_product_presentations', 1);
+        $this->get(route('admin.users.opportunities', ['user_id' => $this->partner->id, 'unpresented' => 1]))
+            ->assertOk()->assertViewHas('products', fn ($products) => $products->total() === 0);
+        $this->get(route('admin.users.sales-reports', ['tab' => 'products', 'customer' => $this->partner->id]))->assertOk()
+            ->assertSee('LED-DEMO')->assertSee('Predstavljen na sastanku')->assertSee('45.82')->assertSee('15.99');
+        $other = $this->customer('Nedodijeljeni partner', '22222222222');
+        $this->get(route('admin.users.sales-reports', ['tab' => 'products', 'customer' => $other->id]))->assertForbidden();
+        $this->post(route('admin.users.opportunities.products'), array_merge($data, ['user_id' => $other->id]))->assertForbidden();
+    }
+
+    public function test_selected_opportunity_opens_customer_cart_with_requested_quantity(): void
+    {
+        $product = $this->product('KUPOVINA-1', null, 9);
+        $this->manager->forceFill(['admin_login_enabled' => true])->save();
+        Bouncer::allow($this->manager)->to('users.profile.update');
+        Bouncer::refresh();
+        $this->actingAs($this->manager);
+        $this->post(route('admin.users.opportunities.products'), ['user_id' => $this->partner->id, 'selection' => [$product->id],
+            'operation' => 'cart', 'quantities' => [$product->id => 4], 'batch' => (string) \Illuminate\Support\Str::uuid()])
+            ->assertRedirect(route('cart.index'))->assertSessionHasNoErrors();
+        $this->assertAuthenticatedAs($this->partner);
+        $this->assertSame(4, app(\App\Services\Front\CartService::class)->lines()->sole()['quantity']);
+        $this->assertDatabaseCount('customer_product_presentations', 0);
+    }
+
     private function customer(string $name, string $tax): User
     {
         $user = User::factory()->create(['name' => $name, 'account_type' => 'customer']);

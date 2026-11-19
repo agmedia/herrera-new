@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Front;
 
+use App\Services\UserTracking\UserTrackingService;
+use App\Services\User\DeviceLocation;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Front\Concerns\ResolvesFrontendView;
 use App\Models\User;
@@ -79,6 +81,7 @@ class AuthController extends Controller
             );
         }
 
+        $location = DeviceLocation::from($request->input('location'));
         if (! Auth::attempt([
             'email' => (string) $credentials['email'],
             'password' => (string) $credentials['password'],
@@ -89,6 +92,7 @@ class AuthController extends Controller
         }
 
         $request->session()->regenerate();
+        app(UserTrackingService::class)->track(Auth::user()->account_type === 'staff' ? 'staff_login' : 'customer_login', null, ['location' => $location], $request);
 
         return redirect()->to($this->resolveIntendedPath($request));
     }
@@ -341,6 +345,7 @@ class AuthController extends Controller
         event(new Registered($user));
         Auth::login($user);
         $request->session()->regenerate();
+        app(UserTrackingService::class)->track('customer_registration', null, [], $request);
 
         return redirect()
             ->route('account.dashboard')
@@ -440,6 +445,7 @@ class AuthController extends Controller
 
         Auth::login($user);
         $request->session()->regenerate();
+        app(UserTrackingService::class)->track('customer_registration', null, [], $request);
 
         return redirect()->to($this->resolveIntendedPath($request));
     }

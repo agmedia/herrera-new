@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Catalog\Action;
 
+use App\Services\Integrations\SupplierCatalog\SupplierCatalogFeedClient;
 use App\Models\Catalog\Action\CatalogAction;
 use App\Models\Catalog\Action\CatalogActionTranslation;
 use App\Models\Catalog\Category\Category;
@@ -32,6 +33,8 @@ class Form extends Component
         'discount_value' => '',
         'target_type' => CatalogAction::TARGET_ALL,
         'target_ids' => [],
+        'filter_manufacturer_id' => null,
+        'filter_supplier' => null,
         'audience_type' => CatalogAction::AUDIENCE_ALL,
         'customer_group_id' => null,
         'user_id' => null,
@@ -115,6 +118,8 @@ class Form extends Component
                 'type' => (string) $data['type'],
                 'discount_value' => $this->nullableDecimal($data['discount_value'] ?? null),
                 'target_type' => (string) $data['target_type'],
+                'filter_manufacturer_id' => $data['target_type'] === CatalogAction::TARGET_CATEGORY ? (($data['filter_manufacturer_id'] ?? null) ?: null) : null,
+                'filter_supplier' => $data['target_type'] === CatalogAction::TARGET_CATEGORY ? (($data['filter_supplier'] ?? '') ?: null) : null,
                 'audience_type' => (string) $data['audience_type'],
                 'customer_group_id' => $data['audience_type'] === CatalogAction::AUDIENCE_USER_GROUP ? (int) $data['customer_group_id'] : null,
                 'role_id' => null,
@@ -305,6 +310,7 @@ class Form extends Component
             'scopeOptions' => $this->scopeOptions(),
             'typeOptions' => $this->typeOptions(),
             'targetOptions' => $this->targetTypeOptions(),
+            'filterBrands' => $this->form['target_type'] === CatalogAction::TARGET_CATEGORY ? Manufacturer::with('translations')->orderBy('code')->get() : collect(),
             'audienceOptions' => $this->audienceTypeOptions(),
         ]);
     }
@@ -329,6 +335,8 @@ class Form extends Component
             'form.locale' => ['required', 'string', 'max:12'],
             'form.is_active' => ['boolean'],
             'form.is_exclusive' => ['boolean'],
+            'form.filter_manufacturer_id' => ['nullable', 'integer', 'exists:catalog_manufacturers,id'],
+            'form.filter_supplier' => ['nullable', Rule::in(array_keys(SupplierCatalogFeedClient::SUPPLIERS))],
             'form.scope' => ['required', Rule::in(CatalogAction::availableScopes())],
             'form.type' => ['required', Rule::in(CatalogAction::availableTypes())],
             'form.discount_value' => ['nullable', 'numeric', 'min:0'],
@@ -420,6 +428,8 @@ class Form extends Component
         $this->form['scope'] = (string) $action->scope;
         $this->form['type'] = (string) $action->type;
         $this->form['discount_value'] = $action->discount_value !== null ? (string) $action->discount_value : '';
+        $this->form['filter_manufacturer_id'] = $action->filter_manufacturer_id;
+        $this->form['filter_supplier'] = $action->filter_supplier;
         $this->form['target_type'] = (string) $action->target_type;
         $this->form['target_ids'] = $action->targets
             ->where('target_type', $action->target_type)

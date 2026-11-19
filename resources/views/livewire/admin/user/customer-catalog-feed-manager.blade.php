@@ -10,6 +10,23 @@
     @error('products')<p role="alert" class="text-sm text-rose-700">{{ $message }}</p>@enderror
     @error('products.*')<p role="alert" class="text-sm text-rose-700">{{ $message }}</p>@enderror
     <label class="flex items-start gap-3 text-sm text-slate-700"><input type="checkbox" wire:model="includePurchasedProducts" @disabled(! $canUpdate) class="mt-1 rounded border-slate-300 text-cyan-700"><span>{{ __('Dodatno odobravam proizvode iz B2B povijesti kupnje ovog kupca.') }}<span class="mt-1 block text-xs text-slate-500">{{ __('Ovo uključuje i buduće kupljene proizvode. Otkazane narudžbe i potpuno zaprimljeni povrati ne ulaze u taj skup. Cijeli katalog nikada se ne uključuje automatski.') }}</span></span></label>
+    @if ($canUpdate)
+        <fieldset class="rounded-xl border p-4 space-y-3"><legend class="px-2 font-semibold">Skupno odobravanje artikala</legend>
+            <div class="grid gap-3 md:grid-cols-3">
+                <label>Kategorija i podkategorije<select class="admin-select w-full" wire:model.live="categoryId"><option value="">Odaberite kategoriju</option>@foreach ($categories as $category)<option value="{{ $category->id }}">{{ $category->translations->firstWhere('locale', 'hr')?->name ?: $category->code }}</option>@endforeach</select></label>
+                <label>Brend<select class="admin-select w-full" wire:model.live="brandId"><option value="">Svi brendovi</option>@foreach ($brands as $brand)<option value="{{ $brand->id }}">{{ $brand->translations->firstWhere('locale', 'hr')?->name ?: $brand->code }}</option>@endforeach</select></label>
+                <label>Katalog dobavljača<select class="admin-select w-full" wire:model.live="supplier"><option value="">Svi dobavljači</option>@foreach (\App\Services\Integrations\SupplierCatalog\SupplierCatalogFeedClient::SUPPLIERS as $id => $name)<option value="{{ $id }}">{{ $name }}</option>@endforeach</select></label>
+            </div>
+            <button type="button" wire:click="previewCategory" class="rounded-lg border px-3 py-2">Pregledaj obuhvat</button>
+            @error('categoryId')<span role="alert">{{ $message }}</span>@enderror
+            @if ($previewIds)
+                <p>Odabrano {{ count($previewIds) }} trenutačnih artikala. Prikaz prvih {{ $previewProducts->count() }}:</p>
+                <ul class="text-xs">@foreach ($previewProducts as $p)<li>{{ $p->sku ?: $p->code }} · {{ $p->translations->firstWhere('locale', 'hr')?->name }}</li>@endforeach</ul>
+                <button type="button" wire:click="addPreview" class="rounded-lg border px-3 py-2">Dodaj pregledane u odabir</button>
+            @endif
+            <p class="text-xs">Spremite odobreni asortiman nakon pregleda. Budući artikli traže novo odobrenje.</p>
+        </fieldset>
+    @endif
     <div class="grid gap-5 lg:grid-cols-2">
         <div>
             <label class="block text-xs font-semibold text-slate-600" for="feed-search-{{ $userId }}">{{ __('Pronađi proizvod za odobrenje') }}</label>

@@ -1,5 +1,9 @@
 <x-admin-layout :title="__('Prodajne prilike')">
     <div class="space-y-6">
+    @if (auth()->user()?->isA('superadmin') || auth()->user()?->can('sales.opportunities.view'))
+        <a href="{{ route('admin.users.sales-reports', ['customer' => $customerId ?? null, 'tab' => auth()->user()->isA('superadmin') || auth()->user()->can('sales.orders.view') ? 'sales' : 'sessions']) }}" class="inline-block rounded-lg border px-3 py-2 font-semibold text-cyan-800">Izvještaji po kupcima i komercijalistima</a>
+    @endif
+
         <section class="admin-panel p-5 sm:p-6">
             <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">{{ __('Komercijala') }}</p>
             <h1 class="mt-2 text-2xl font-semibold text-slate-900">{{ __('Prodajne prilike za partnera') }}</h1>
@@ -28,7 +32,7 @@
             <label class="min-w-0 text-sm font-semibold text-slate-600">{{ __('Partner') }}
                 <select name="user_id" data-tom-select data-tom-placeholder="{{ __('Pretražite i odaberite partnera') }}" class="mt-2 admin-select block w-full rounded-xl border-slate-300 text-sm" required>
                     <option value="">{{ __('Odaberite partnera') }}</option>
-                    @foreach ($customers as $customer)<option value="{{ $customer->id }}" @selected($selectedCustomer?->id === $customer->id)>{{ trim((string) $customer->b2bAccount?->company_name) ?: $customer->name }}</option>@endforeach
+                    @foreach ($customers as $customer)<option value="{{ $customer->id }}" @selected($selectedCustomer?->id === $customer->id)>{{ trim((string) $customer->b2bAccount?->company_name) ?: $customer->name }} · {{ $customer->b2bAccount?->city ?: '#'.$customer->id }}</option>@endforeach
                 </select>
             </label>
             <label class="min-w-0 text-sm font-semibold text-slate-600">{{ __('Kategorija') }}
@@ -43,25 +47,34 @@
                 </select>
             </label>
             <button class="rounded-xl bg-cyan-700 px-4 py-2 text-sm font-semibold text-white">{{ __('Prikaži prilike') }}</button>
+            <label class="text-sm"><input type="checkbox" name="unpresented" value="1" @checked(request()->boolean('unpresented')) onchange="this.form.submit()"> Samo još nepredstavljeni artikli</label>
         </form>
         @if ($products)
             <section class="admin-panel overflow-hidden">
                 <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 p-5">
                     <div class="min-w-0 flex-1">
-                        <h2 class="break-words text-lg font-semibold">{{ $selectedCustomer->customerDisplayName() }}</h2>
+                        <h2 class="break-words text-lg font-semibold">{{ $selectedCustomer->customerDisplayName() }} · {{ $selectedCustomer->b2bAccount?->city ?: '#'.$selectedCustomer->id }}</h2>
                         <p class="mt-1 text-sm font-semibold text-cyan-800">{{ number_format($products->total(), 0, ',', '.') }} {{ __('prodajnih prilika') }}@if ($products->total()) · {{ __('Prikaz') }} {{ $products->firstItem() }}–{{ $products->lastItem() }}@endif</p>
                         <p class="mt-2 text-xs text-slate-500">{{ __('Nakon nove potvrđene kupnje artikl nestaje iz prijedloga, a sljedeći po rangu zauzima njegovo mjesto.') }}</p>
                     </div>
                     <div class="flex flex-col items-start gap-1 sm:items-end">
-                        <a href="{{ route('admin.users.opportunities.export', ['user_id' => $selectedCustomer->id, 'category_id' => $categoryId ?: null, 'per_page' => $perPage]) }}" class="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-cyan-800" data-opportunities-export>
+                        <a href="{{ route('admin.users.opportunities.export', ['user_id' => $selectedCustomer->id, 'category_id' => $categoryId ?: null, 'per_page' => $perPage, 'unpresented' => (int) request()->boolean('unpresented')]) }}" class="inline-flex items-center gap-2 rounded-xl bg-cyan-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-cyan-800" data-opportunities-export>
                             <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3v9m-3-3 3 3 3-3M4 13v4h12v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             {{ __('Preuzmi Excel') }}
                         </a>
                         <span class="text-xs text-slate-500">{{ __('Sve filtrirane prilike, ne samo ova stranica.') }}</span>
                     </div>
                 </div>
+                <form method="POST" action="{{ route('admin.users.opportunities.products') }}">
+                    @csrf
+                    @if ($canOrder || $canPresent)<x-device-location />@endif
+                    <input type="hidden" name="user_id" value="{{ $selectedCustomer->id }}">
+                    <input type="hidden" name="unpresented" value="{{ (int) request()->boolean('unpresented') }}">
+                    <input type="hidden" name="category_id" value="{{ $categoryId ?: '' }}">
+                    <input type="hidden" name="batch" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
+                    @if ($errors->any())<p role="alert" class="m-3 text-red-700">{{ $errors->first() }}</p>@endif
                 <div class="overflow-x-auto"><table class="w-full min-w-[760px] text-left text-sm">
-                    <thead class="bg-slate-50 text-xs text-slate-500"><tr><th class="w-16 p-4 text-right">#</th><th class="p-4">{{ __('Artikl') }}</th><th class="p-4">{{ __('Šifra / SKU / EAN') }}</th><th class="p-4 text-right">{{ __('Poznati kupci · 90 dana') }}</th><th class="p-4 text-right">{{ __('Neto količina · 90 dana') }}</th></tr></thead>
+                    <thead class="bg-slate-50 text-xs text-slate-500"><tr><th class="p-4">Odabir / količina</th><th class="w-16 p-4 text-right">#</th><th class="p-4">{{ __('Artikl') }}</th><th class="p-4">{{ __('Šifra / SKU / EAN') }}</th><th class="p-4 text-right">{{ __('Poznati kupci · 90 dana') }}</th><th class="p-4 text-right">{{ __('Neto količina · 90 dana') }}</th></tr></thead>
                     <tbody>
                     @forelse ($products as $product)
                         @php
@@ -71,6 +84,14 @@
                             $categoryNames = $product->categories->map(fn ($category) => ($category->translations->firstWhere('locale', 'hr') ?: $category->translations->first())?->name ?: $category->code)->implode(', ');
                         @endphp
                         <tr class="border-t border-slate-200 align-top hover:bg-slate-50/60">
+                            <td class="p-4"><small class="block">{{ $product->last_presented_at ? 'Predstavljen '.\Carbon\Carbon::parse($product->last_presented_at)->format('d.m.Y.') : 'Još nije predstavljen' }}</small>@if ($canOrder || $canPresent)<label><input type="checkbox" name="selection[]" value="{{ $product->id }}" aria-label="Odaberi {{ $product->code }}"> {{ __('Odaberi') }}</label>@endif
+                                @if ($canOrder)
+                                    <input type="number" name="quantities[{{ $product->id }}]" min="{{ max(1, $product->minimum_order_quantity) }}" max="999" step="{{ max(1, $product->order_quantity_step) }}" value="{{ max(1, $product->minimum_order_quantity) }}" aria-label="Količina za {{ $product->code }}" class="mt-1 w-20 rounded border">
+                                    @if ($product->hasVisibleOptionRows())
+                                        <select name="variants[{{ $product->id }}]" aria-label="Varijanta za {{ $product->code }}"><option value="">Odaberite varijantu</option>@foreach ($product->availableOptionRows() as $option)<option value="{{ $option->id }}">{{ $option->sku ?: $option->optionValue?->translations->first()?->name ?: '#'.$option->id }}</option>@endforeach</select>
+                                    @endif
+                                @endif
+                            </td>
                             <td class="p-4 text-right text-xs tabular-nums text-slate-400">{{ $products->firstItem() + $loop->index }}</td>
                             <td class="p-4"><div class="flex min-w-64 items-start gap-3">
                                 <div class="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50" data-opportunity-thumbnail>
@@ -84,10 +105,16 @@
                             <td class="p-4 text-right tabular-nums">{{ number_format($product->opportunity_quantity, 2, ',', '.') }}</td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="p-8 text-center text-slate-600">{{ __('Za ovaj presjek i odabranu kategoriju nema novih prijedloga.') }}</td></tr>
+                        <tr><td colspan="6" class="p-8 text-center text-slate-600">{{ __('Za ovaj presjek i odabranu kategoriju nema novih prijedloga.') }}</td></tr>
                     @endforelse
                     </tbody>
                 </table></div>
+                    <div class="flex flex-wrap items-end gap-3 p-4">
+                        @if ($canOrder)<button name="operation" value="cart" class="rounded bg-cyan-700 px-3 py-2 text-white">Dodaj odabrane u košaricu kupca</button>@endif
+                        @if ($canPresent)<label>Bilješka uz predstavljanje<input type="text" name="note" maxlength="1000" class="ml-2 rounded border"></label>
+                        <button name="operation" value="presented" class="rounded border px-3 py-2">Evidentiraj predstavljene artikle</button>@endif
+                    </div>
+                </form>
                 <div class="p-5">{{ $products->links() }}</div>
             </section>
         @endif

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Front;
 
+use App\Services\Sales\ReceivedReturnQuantities;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Front\Concerns\ResolvesFrontendView;
 use App\Models\Catalog\Product\Product;
@@ -106,24 +107,28 @@ class B2BController extends Controller
     {
         $account = $this->approvedAccount($request);
         $user = $request->user();
-        $productIds = OrderItem::query()
-            ->select('product_id')
-            ->selectRaw('SUM(quantity) as ordered_quantity')
-            ->whereNotNull('product_id')
-            ->whereHas('order', fn ($query) => $query->where('user_id', $user->getKey())->withoutCancelled())
-            ->groupBy('product_id')
-            ->orderByDesc('ordered_quantity')
-            ->limit(12)
-            ->pluck('product_id')
-            ->map(static fn ($id): int => (int) $id)
-            ->all();
+        $netQuantity = 'SUM(CASE WHEN order_items.quantity > COALESCE(receipts.returned_quantity, 0) THEN order_items.quantity - COALESCE(receipts.returned_quantity, 0) ELSE 0 END)';
+        $purchases = OrderItem::query()
+            ->join('orders', 'orders.id', '=', 'order_items.order_id')
+            ->leftJoinSub(app(ReceivedReturnQuantities::class)->query(), 'receipts', 'receipts.order_item_id', '=', 'order_items.id')
+            ->whereIn('order_items.order_id', Order::query()->withoutCancelled()->where('user_id', $user->id)->select('orders.id'))
+            ->whereRaw('COALESCE(orders.placed_at, orders.created_at) BETWEEN ? AND ?', [now()->subMonthsNoOverflow(12)->startOfDay(), now()])
+            ->whereNotNull('order_items.product_id')
+            ->select('order_items.product_id')
+            ->selectRaw($netQuantity.' AS purchased_qty')
+            ->groupBy('order_items.product_id')
+            ->havingRaw($netQuantity.' > 0')
+            ->orderByDesc('purchased_qty')->orderBy('order_items.product_id')
+            ->paginate(40)->withQueryString();
+        $quantities = $purchases->getCollection()->pluck('purchased_qty', 'product_id');
 
         return view($this->frontendView($request, 'account.b2b-product-list'), [
             'b2bAccount' => $account,
             'current' => 'b2b_frequent_products',
             'title' => __('Često naručivani artikli'),
-            'subtitle' => __('Artikli koje najčešće naručujete, poredani prema ukupnoj količini.'),
-            'products' => $this->productSuggestions($productIds, $user),
+            'subtitle' => __('Kupljeno u zadnjih 12 mjeseci prema webshop narudžbama, uz odbitak zaprimljenih povrata.'),
+            'products' => $this->productSuggestions($quantities->keys()->all(), $user, true),
+            'quantities' => $quantities, 'purchases' => $purchases,
         ]);
     }
 
@@ -447,7 +452,7 @@ class B2BController extends Controller
      * @param  array<int, int>  $ids
      * @return Collection<int, array{product:Product,name:string,identifier:string,price:array<string,mixed>}>
      */
-    private function productSuggestions(array $ids, $user): Collection
+    private function productSuggestions(array $ids, $user, bool $includeInactive = false): Collection
     {
         if ($ids === []) {
             return collect();
@@ -459,9 +464,9 @@ class B2BController extends Controller
 
         return Product::query()
             ->whereIn('id', $ids)
-            ->where('is_active', true)
+            ->when(! $includeInactive, fn ($query) => $query->where('is_active', true))
             ->with([
-                'taxRate',
+                'taxRate', 'media',
                 'categories:id',
                 'packages',
                 'translations' => fn ($query) => $query->whereIn('locale', [$locale, $fallbackLocale]),

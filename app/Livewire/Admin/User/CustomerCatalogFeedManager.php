@@ -2,11 +2,15 @@
 
 namespace App\Livewire\Admin\User;
 
+use App\Models\Catalog\Category\Category;
+use App\Models\Catalog\Manufacturer\Manufacturer;
 use App\Models\Catalog\Product\Product;
 use App\Models\User;
 use App\Models\User\CustomerCatalogFeed;
 use App\Services\Feeds\CustomerCatalogFeedAccess;
+use App\Services\Integrations\SupplierCatalog\SupplierCatalogFeedClient;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\Rule;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 
@@ -18,6 +22,55 @@ class CustomerCatalogFeedManager extends Component
     public string $search = '';
 
     public array $productIds = [];
+
+    public ?int $categoryId = null;
+
+    public ?int $brandId = null;
+
+    public string $supplier = '';
+
+    #[Locked]
+    public array $previewIds = [];
+
+    public function updated($property): void
+    {
+        if (in_array($property, ['categoryId', 'brandId', 'supplier'], true)) {
+            $this->previewIds = [];
+        }
+    }
+
+    public function previewCategory(): void
+    {
+        $this->customer('update');
+        $this->previewIds = [];
+        $this->validate([
+            'categoryId' => ['required', 'integer', Rule::exists('categories', 'id')->where('scope', 'catalog')],
+            'brandId' => ['nullable', 'integer', 'exists:catalog_manufacturers,id'],
+            'supplier' => ['nullable', Rule::in(array_keys(SupplierCatalogFeedClient::SUPPLIERS))],
+        ]);
+        $categories = Category::query()->descendantsAndSelf($this->categoryId)->modelKeys();
+        $ids = Product::query()->where('is_active', true)
+            ->whereHas('categories', fn ($query) => $query->whereIn('categories.id', $categories))
+            ->when($this->brandId, fn ($query) => $query->where('manufacturer_id', $this->brandId))
+            ->when($this->supplier, fn ($query) => $query->whereHas('currentSupplierLinks', fn ($links) => $links->where('supplier', $this->supplier)))
+            ->orderBy('id')->limit(5001)->pluck('id')->all();
+        if (count(array_unique(array_merge($this->productIds, $ids))) > 5000) {
+            $this->addError('categoryId', 'Odobrenje može sadržavati do 5.000 artikala. Suzite odabir.');
+
+            return;
+        }
+        $this->previewIds = $ids;
+        if (! $ids) {
+            $this->addError('categoryId', 'Nema aktivnih artikala za odabrane uvjete.');
+        }
+    }
+
+    public function addPreview(): void
+    {
+        $this->customer('update');
+        $this->productIds = array_values(array_unique(array_merge($this->productIds, $this->previewIds)));
+        $this->previewIds = [];
+    }
 
     public bool $includePurchasedProducts = false;
 
@@ -86,6 +139,9 @@ class CustomerCatalogFeedManager extends Component
             'products' => $products,
             'selectedProducts' => Product::query()->whereKey($this->productIds)->with('translations')->orderBy('sku')->limit(50)->get(),
             'canUpdate' => $this->canUpdate(),
+            'categories' => Category::where('scope', 'catalog')->with('translations')->defaultOrder()->get(),
+            'brands' => Manufacturer::with('translations')->orderBy('code')->get(),
+            'previewProducts' => Product::whereKey(array_slice($this->previewIds, 0, 20))->with('translations')->orderBy('id')->get(),
         ]);
     }
 

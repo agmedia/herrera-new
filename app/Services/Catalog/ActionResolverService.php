@@ -19,6 +19,7 @@ class ActionResolverService
         $manufacturerId = $product->manufacturer_id ? (int) $product->manufacturer_id : null;
 
         $actions = CatalogAction::query()
+            ->matchingCatalogFilters($product)
             ->active()
             ->where('scope', CatalogAction::SCOPE_PRODUCT)
             ->availableForAudience($user)

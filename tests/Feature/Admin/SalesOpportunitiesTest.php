@@ -153,7 +153,7 @@ class SalesOpportunitiesTest extends TestCase
                 $this->assertNotNull($last);
                 $this->assertArrayNotHasKey('email', $last->getAttributes());
                 $this->assertArrayNotHasKey('password', $last->getAttributes());
-                $this->assertSame(['id', 'user_id', 'company_name'], array_keys($last->b2bAccount->getAttributes()));
+                $this->assertSame(['id', 'user_id', 'company_name', 'city'], array_keys($last->b2bAccount->getAttributes()));
 
                 return true;
             });

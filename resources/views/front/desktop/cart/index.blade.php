@@ -110,7 +110,7 @@
                                     @endif
                                     <div class="cart-quantity-stepper" data-cart-qty-control>
                                         <button type="button" data-cart-qty-dec aria-label="{{ __('ui.cart.modal.quantity') }} -">−</button>
-                                        <input type="text" name="quantity" value="{{ (int) $line['quantity'] }}" min="{{ max(1, (int) $product->minimum_order_quantity) }}" step="{{ max(1, (int) $product->order_quantity_step) }}" max="999" inputmode="numeric" readonly aria-label="{{ __('ui.cart.table.quantity') }}" data-cart-qty-input>
+                                        <input type="number" name="quantity" value="{{ (int) $line['quantity'] }}" min="{{ max(1, (int) $product->minimum_order_quantity) }}" step="{{ max(1, (int) $product->order_quantity_step) }}" max="999" inputmode="numeric" required aria-label="{{ __('ui.cart.table.quantity') }}" data-cart-qty-input>
                                         <button type="button" data-cart-qty-inc aria-label="{{ __('ui.cart.modal.quantity') }} +">+</button>
                                     </div>
                                     <button type="submit" class="commerce-primary-action cart-save-action flex-1 px-3 py-2 text-xs">{{ __('ui.cart.table.save') }}</button>
@@ -244,7 +244,7 @@
                                     @endif
                                     <div class="cart-quantity-stepper" data-cart-qty-control>
                                         <button type="button" data-cart-qty-dec aria-label="{{ __('ui.cart.modal.quantity') }} -">−</button>
-                                        <input type="text" name="quantity" value="{{ (int) $line['quantity'] }}" min="{{ max(1, (int) $product->minimum_order_quantity) }}" step="{{ max(1, (int) $product->order_quantity_step) }}" max="999" inputmode="numeric" readonly aria-label="{{ __('ui.cart.table.quantity') }}" data-cart-qty-input>
+                                        <input type="number" name="quantity" value="{{ (int) $line['quantity'] }}" min="{{ max(1, (int) $product->minimum_order_quantity) }}" step="{{ max(1, (int) $product->order_quantity_step) }}" max="999" inputmode="numeric" required aria-label="{{ __('ui.cart.table.quantity') }}" data-cart-qty-input>
                                         <button type="button" data-cart-qty-inc aria-label="{{ __('ui.cart.modal.quantity') }} +">+</button>
                                     </div>
                                     <button type="submit" class="commerce-primary-action cart-save-action px-3 py-2 text-xs">{{ __('ui.cart.table.save') }}</button>

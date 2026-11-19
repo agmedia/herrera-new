@@ -416,7 +416,7 @@ class CartService
         return (string) $rate->rate_type === 'fixed' ? $value : max(0.0, $netAmount * $value / 100);
     }
 
-    public function add(Product $product, int $quantity = 1, ?int $productOptionValueId = null): bool
+    public function add(Product $product, int $quantity = 1, ?int $productOptionValueId = null, bool $exact = false): bool
     {
         app(B2BAccessService::class)->ensureCanPurchase(auth()->user());
 
@@ -441,7 +441,7 @@ class CartService
         }
 
         $normalizedQuantity = $this->normalizeOrderQuantity($product, $target, $stock);
-        if ($normalizedQuantity <= 0) {
+        if ($normalizedQuantity <= 0 || ($exact && $normalizedQuantity !== $existing + $quantity)) {
             return false;
         }
 
@@ -768,7 +768,7 @@ class CartService
 
         return $lines->filter(function (array $line) use ($action, $targetIds): bool {
             $product = $line['product'] ?? null;
-            if (! $product instanceof Product) {
+            if (! $product instanceof Product || ! $action->acceptsCatalogProduct($product)) {
                 return false;
             }
 

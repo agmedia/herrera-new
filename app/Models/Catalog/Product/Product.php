@@ -2,6 +2,7 @@
 
 namespace App\Models\Catalog\Product;
 
+use App\Models\Integrations\SupplierCatalog\SupplierCatalogItem;
 use App\Models\Catalog\Action\CatalogAction;
 use App\Models\Catalog\Attribute\Attribute;
 use App\Models\Catalog\Category\Category;
@@ -89,8 +90,43 @@ class Product extends Model implements HasMedia
         'technical_specifications' => 'array',
         'energy_label_required' => 'bool',
         'energy_data_synced_at' => 'datetime',
+        'first_published_at' => 'datetime',
         'payload' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $product) {
+            if (($product->is_active ?? ! $product->exists) && ! $product->first_published_at && (! $product->exists || $product->isDirty('is_active'))) {
+                $legacy = data_get($product->payload, 'opencart');
+                $product->first_published_at = is_array($legacy) ? self::legacyPublicationDate($legacy) : now();
+            }
+        });
+    }
+
+    public static function legacyPublicationDate(array $source): ?string
+    {
+        $dates = [];
+        foreach (['date_added', 'date_available'] as $field) {
+            $value = substr((string) ($source[$field] ?? ''), 0, 10);
+            $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+            if ($date && $date->format('Y-m-d') === $value && $date->format('Y') !== '0000') {
+                $dates[] = $value;
+            }
+        }
+
+        return $dates ? max($dates).' 00:00:00' : null;
+    }
+
+    public function scopeNewArrivals(Builder $query): Builder
+    {
+        return $query->whereBetween('products.first_published_at', [today()->subDays(59), now()]);
+    }
+
+    public function currentSupplierLinks(): HasMany
+    {
+        return $this->hasMany(SupplierCatalogItem::class)->where('is_current', true);
+    }
 
     public static function unitOptions(): array
     {

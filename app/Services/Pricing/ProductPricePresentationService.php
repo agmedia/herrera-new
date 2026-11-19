@@ -200,6 +200,7 @@ class ProductPricePresentationService
         $manufacturerId = $product->manufacturer_id ? (int) $product->manufacturer_id : null;
 
         $actions = CatalogAction::query()
+            ->matchingCatalogFilters($product)
             ->where('scope', CatalogAction::SCOPE_PRODUCT)
             ->whereIn('type', [CatalogAction::TYPE_PERCENTAGE, CatalogAction::TYPE_FIXED, CatalogAction::TYPE_FIXED_PRICE])
             ->availableForAudience($user)

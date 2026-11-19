@@ -147,6 +147,24 @@ class CustomerWholesaleFeedTest extends TestCase
         $this->get(route('feed.customer-wholesale', ['token' => $token]))->assertNotFound();
     }
 
+    public function test_category_selection_exports_only_confirmed_current_products(): void
+    {
+        [$admin, $buyer] = $this->actors();
+        $category = \App\Models\Catalog\Category\Category::create(['scope'=>'catalog','code'=>'svjetla','is_active'=>true]);
+        $first = $this->product('LED-1');
+        $first->categories()->attach($category);
+        $unselected = $this->product('OTHER-2');
+        $component = \Livewire\Livewire::actingAs($admin)->test(\App\Livewire\Admin\User\CustomerCatalogFeedManager::class, ['userId'=>$buyer->id])
+            ->set('categoryId', $category->id)->call('previewCategory')->assertSet('previewIds', [$first->id])
+            ->call('addPreview')->call('issueToken')->assertHasNoErrors();
+        $late = $this->product('LED-NEW');
+        $late->categories()->attach($category);
+        $response = $this->get($component->get('issuedUrl'))->assertOk()->streamedContent();
+        $this->assertStringContainsString($first->sku, $response);
+        $this->assertStringNotContainsString($late->sku, $response);
+        $this->assertStringNotContainsString($unselected->sku, $response);
+    }
+
     private function actors(): array
     {
         $admin = User::factory()->create(['account_type' => 'staff']);

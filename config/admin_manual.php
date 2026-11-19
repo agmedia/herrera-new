@@ -939,6 +939,22 @@ return [
                     ],
                 ],
                 [
+                    'id' => 'izvjestaji-kupaca-i-komercijalista',
+                    'title' => 'Izvještaji po kupcima i komercijalistima',
+                    'route' => 'admin.users.sales-reports',
+                    'route_patterns' => ['admin.users.sales-reports'],
+                    'ability' => 'sales.opportunities.view',
+                    'purpose' => 'Pregled prometa, prijava, posjeta i artikala predstavljenih kupcima.',
+                    'steps' => [
+                        'U izborniku Korisnici otvorite Izvještaji po kupcima i komercijalistima. Odaberite razdoblje, izvještaj i kupca ili komercijalista te pritisnite Prikaži.',
+                        'Webshop promet zbraja neotkazane narudžbe bez PDV-a po kupcu, komercijalistu i valuti. Početni prikaz obuhvaća B2B. Komercijalistu se pripisuju narudžbe s evidentiranim radom u računu kupca.',
+                        'Za ukupan promet portfelja odaberite Promet dodijeljenih kupaca. Obuhvaća i kupčeve samostalne narudžbe prema trenutačnoj dodjeli komercijalistu.',
+                        'U pregledu Prijave i registracije provjerite vrijeme prijave, IP i lokaciju uređaja ako ju je korisnik dodao. Rad u računu kupca prikazuje zasebne sesije komercijalista.',
+                        'Na kartici kupca otvorite CRM, odaberite vrstu kontakta i upišite bilješku. Za posjet možete dodati lokaciju uređaja. Unesite predstavljene šifre SKU i spremite kontakt.',
+                        'U prodajnim prilikama možete označiti artikle te izabrati Evidentiraj predstavljene artikle. Izaberite dodavanje u košaricu kada kupac želi naručiti. Narudžbu zatim dovršite na blagajni.',
+                    ],
+                ],
+                [
                     'id' => 'grupe-korisnika',
                     'title' => 'Grupe',
                     'route' => 'admin.users.groups',

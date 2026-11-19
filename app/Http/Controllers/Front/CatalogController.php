@@ -555,6 +555,9 @@ class CatalogController extends Controller
                     ]),
             ]);
 
+        if ($request->boolean('new_arrivals')) {
+            $query->newArrivals();
+        }
         $this->applyProductSearch($query, $locale, $fallbackLocale, $search);
 
         if ($categorySlug !== '') {
@@ -855,6 +858,9 @@ class CatalogController extends Controller
                         ->whereIn('categories.id', $categoryTreeIds);
                 });
 
+            if ($request->boolean('new_arrivals')) {
+                $productsQuery->newArrivals();
+            }
             $this->applyProductSearch($productsQuery, $locale, $fallbackLocale, $search);
 
             if ($manufacturerSlug !== '') {
@@ -2587,6 +2593,7 @@ class CatalogController extends Controller
             return;
         }
         $promotionQuery = CatalogAction::query()
+            ->matchingCatalogFilters()
             ->selectRaw('1')
             ->active()
             ->where('scope', CatalogAction::SCOPE_PRODUCT)

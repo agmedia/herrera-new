@@ -365,6 +365,7 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
         })->name('shipping.edit');
         Route::post('orders/{order}/gls/send', [OrderGlsController::class, 'send'])->name('orders.gls.send');
         Route::get('orders/{order}/gls/label', [OrderGlsController::class, 'label'])->name('orders.gls.label');
+        Route::get('orders/erp-cost-centres.csv', \App\Http\Controllers\Admin\EracuniCostCentreExportController::class)->name('orders.erp-cost-centres');
         Route::get('orders/{order}/show', function (SalesOrder $order) {
             app(\App\Services\Admin\OrderManagerAccess::class)->assertOrder($order);
 
@@ -463,6 +464,7 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
         Route::view('users', 'admin.users.index')->name('users');
         Route::get('users/statistics', CustomerStatisticsController::class)->name('users.statistics');
         Route::get('users/opportunities', [\App\Http\Controllers\Admin\SalesOpportunityController::class, 'index'])->name('users.opportunities');
+        Route::post('users/opportunities/products', [\App\Http\Controllers\Admin\SalesOpportunityController::class, 'workWithProducts'])->name('users.opportunities.products');
         Route::get('users/opportunities/export', [\App\Http\Controllers\Admin\SalesOpportunityController::class, 'export'])->name('users.opportunities.export');
         Route::post('users/opportunities/refresh', [\App\Http\Controllers\Admin\SalesOpportunityController::class, 'refresh'])
             ->middleware('throttle:1,5')->name('users.opportunities.refresh');
@@ -475,6 +477,7 @@ Route::middleware(['admin.locale', 'auth', 'verified', 'admin.access', 'admin.ma
         })->name('users.groups.edit');
         Route::view('users/access', 'admin.users.access')->name('users.access');
         Route::view('users/activity', 'admin.users.activity')->name('users.activity');
+        Route::get('users/sales-reports', \App\Http\Controllers\Admin\SalesActivityReportController::class)->name('users.sales-reports');
         Route::view('users/crm', 'admin.users.crm')->name('users.crm');
         Route::middleware('user.feature:user_loyalty_enabled')->group(function (): void {
             Route::view('users/loyalty', 'admin.users.loyalty')->name('users.loyalty');

@@ -20,7 +20,7 @@ class SalesOpportunities
         abort_unless($actor && ($actor->isA('superadmin') || ($actor->can('admin.access') && $actor->can('sales.opportunities.view'))), 403);
     }
 
-    public function products(User $customer, object $snapshot, ?int $categoryId = null): Builder
+    public function products(User $customer, object $snapshot, ?int $categoryId = null, bool $unpresented = false): Builder
     {
         $this->authorize();
         app(OrderManagerAccess::class)->assertCustomer($customer);
@@ -62,7 +62,12 @@ class SalesOpportunities
             ->groupBy('product_id')->havingRaw('SUM(quantity_90) > 0');
         $categoryIds = $categoryId ? Category::query()->descendantsAndSelf($categoryId)->pluck('id')->all() : [];
 
+        $presentations = DB::table('customer_product_presentations')
+            ->where('customer_user_id', $customer->id)->whereColumn('customer_product_presentations.product_id', 'products.id')
+            ->where(fn ($q) => $q->whereNull('performed_by_id')->orWhereColumn('performed_by_id', 'sales_rep_id'));
         return Product::query()->select('products.*', 'ranking.opportunity_buyers', 'ranking.opportunity_quantity')
+            ->selectSub((clone $presentations)->selectRaw('MAX(presented_at)'), 'last_presented_at')
+            ->when($unpresented, fn ($query) => $query->whereNotExists((clone $presentations)->selectRaw('1')))
             ->joinSub($ranking, 'ranking', 'ranking.product_id', '=', 'products.id')
             ->where('products.is_active', true)->whereNotIn('products.id', $bought)
             ->whereNotIn('products.id', $this->confirmedLocalProducts($customer))

@@ -10,7 +10,7 @@
             ->orderBy('sort_order')
             ->orderBy('id');
         if (request()->routeIs('home')) {
-            app(\App\Services\Content\FeaturedCategoriesService::class)->excludeClearance($rootCategories);
+            app(\App\Services\Content\FeaturedCategoriesService::class)->excludeHomeShortcuts($rootCategories);
         }
         $categories = $rootCategories->get();
     }

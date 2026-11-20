@@ -7,6 +7,7 @@ use App\Models\Catalog\Product\Product;
 use App\Models\Integrations\SupplierDeliverySchedule;
 use App\Services\Settings\SystemSettingsService;
 use App\Support\Integrations\Stock\StockSyncRegistry;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -58,9 +59,8 @@ class FixedSupplierAvailabilityService
                 $changed = $preserved = 0;
                 $byId = $manufacturers->keyBy('id');
                 Product::query()->withExists('currentSupplierLinks')
-                    ->addSelect(['previous_xml_stock' => DB::table('stock_sync_items')->join('stock_sync_runs', 'stock_sync_runs.id', '=', 'stock_sync_items.run_id')
-                        ->whereColumn('stock_sync_items.product_id', 'products.id')->where('stock_sync_runs.supplier', '!=', 'eracuni')
-                        ->where('stock_sync_runs.status', 'completed')->whereIn('stock_sync_items.status', ['updated', 'unchanged'])
+                    ->addSelect(['previous_xml_stock' => $this->completedSupplierFeedItems()
+                        ->whereColumn('stock_sync_items.product_id', 'products.id')
                         ->selectRaw('1')->limit(1)])
                     ->whereIn('manufacturer_id', $manufacturerIds)->lockForUpdate()->chunkById(300, function ($products) use (&$changed, &$preserved, $byId, $apply, $actorId, $preserveOverrides): void {
                     foreach ($products as $product) {
@@ -95,9 +95,36 @@ class FixedSupplierAvailabilityService
     {
         $manufacturer = $product->manufacturer_id ? Manufacturer::query()->find($product->manufacturer_id) : null;
         if ($manufacturer && data_get($manufacturer->payload, 'supplier_availability.mode') === 'fixed'
-            && ! $this->usesSupplierFeed($product)) {
+            && ! $this->synchronizedManufacturer($manufacturer) && ! $this->usesSupplierFeed($product)) {
             $this->set($product, (int) data_get($manufacturer->payload, 'supplier_availability.quantity', self::QUANTITY), $manufacturer->code, $product->updated_by);
         }
+    }
+
+    public function preservesFixedStockDuringImport(Product $product, int $incomingManufacturerId): bool
+    {
+        $policy = data_get($product->payload, 'supplier_availability', []);
+        if ($product->supplier_stock_qty !== self::QUANTITY || ($policy['mode'] ?? null) !== 'fixed'
+            || ($policy['source'] ?? null) !== 'fixed_policy' || ($policy['quantity'] ?? null) !== self::QUANTITY
+            || ! $incomingManufacturerId || (int) $product->manufacturer_id !== $incomingManufacturerId) {
+            return false;
+        }
+
+        $manufacturer = $product->manufacturer;
+        if (! $manufacturer || $manufacturer->code !== ($policy['supplier'] ?? null)
+            || data_get($manufacturer->payload, 'supplier_availability.mode') !== 'fixed'
+            || data_get($manufacturer->payload, 'supplier_availability.quantity') !== self::QUANTITY
+            || $this->synchronizedManufacturer($manufacturer) || $this->usesSupplierFeed($product)) {
+            return false;
+        }
+
+        return ! $this->completedSupplierFeedItems()->where('stock_sync_items.product_id', $product->id)->exists();
+    }
+
+    private function completedSupplierFeedItems(): Builder
+    {
+        return DB::table('stock_sync_items')->join('stock_sync_runs', 'stock_sync_runs.id', '=', 'stock_sync_items.run_id')
+            ->where('stock_sync_runs.supplier', '!=', 'eracuni')->where('stock_sync_runs.status', 'completed')
+            ->whereIn('stock_sync_items.status', ['updated', 'unchanged']);
     }
 
     public function usesSupplierFeed(Product $product, ?string $onlySupplier = null): bool

@@ -27,6 +27,7 @@ class FeaturedCategoriesService
         bool $hideOutOfStockProducts = false,
         bool $includeCounts = true,
         bool $excludeClearance = false,
+        bool $excludeHomeShortcuts = false,
     ): Collection {
         $source = self::source(is_array($block->payload) ? $block->payload : null);
         $selectedIds = $block->items
@@ -56,7 +57,9 @@ class FeaturedCategoriesService
 
         if ($source === 'all_root') {
             $query->whereNull('parent_id')->orderBy('sort_order')->orderBy('id');
-            if ($excludeClearance) {
+            if ($excludeHomeShortcuts) {
+                $this->excludeHomeShortcuts($query);
+            } elseif ($excludeClearance) {
                 $this->excludeClearance($query);
             }
         } else {
@@ -94,6 +97,16 @@ class FeaturedCategoriesService
         });
 
         return $categories;
+    }
+
+    public function excludeHomeShortcuts(Builder $query): Builder
+    {
+        // The Herrera home page already has dedicated clearance and new-arrivals links.
+        return $this->excludeClearance($query)->where(fn (Builder $categories) => $categories
+            ->whereNull('code')
+            ->orWhere('code', 'not like', 'herrera-oc-category-%')
+            ->orWhereDoesntHave('translations', fn (Builder $translations) => $translations
+                ->where('locale', 'hr')->where('slug', 'novo')->where('name', 'Novo')));
     }
 
     public function excludeClearance(Builder $query): Builder

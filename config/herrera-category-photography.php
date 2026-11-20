@@ -299,6 +299,7 @@ return [
     'litijeve-baterije-videx' => 'assets/categories/generated/subcategories/litijeve-baterije-videx-v1.jpg',
     'lithium-ion-baterije-videx' => 'assets/categories/generated/subcategories/lithium-ion-baterije-videx-v1.jpg',
     'ni-mh-punjive-baterije-videx' => 'assets/categories/generated/subcategories/ni-mh-punjive-baterije-videx-v1.jpg',
+    'punjive-baterije-videx' => 'assets/categories/generated/subcategories/ni-mh-punjive-baterije-videx-v1.jpg',
     'prehrambena-industrija' => 'assets/categories/generated/subcategories/prehrambena-industrija-v1.jpg',
     'radna-odjeca' => 'assets/categories/generated/subcategories/radna-odjeca-v1.jpg',
     'zastita-ruku' => 'assets/categories/generated/subcategories/zastita-ruku-v1.jpg',

@@ -85,7 +85,7 @@
                 $fallbackLocale,
                 $hideOutOfStockProducts,
                 includeCounts: ! $usesHerreraCategoryTiles,
-                excludeClearance: $isHerreraFeaturedCategories && str_starts_with((string) $slot?->placement, 'home.'),
+                excludeHomeShortcuts: $isHerreraFeaturedCategories && str_starts_with((string) $slot?->placement, 'home.'),
             );
         } elseif ($categoryIds !== []) {
             $categoryRelations = [

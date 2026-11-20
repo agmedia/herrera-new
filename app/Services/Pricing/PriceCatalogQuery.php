@@ -55,7 +55,7 @@ class PriceCatalogQuery
             (clone $candidate)->where('audience_price.kind', PriceCatalogEntry::BASE)
                 ->whereNull('audience_price.user_id')->whereNull('audience_price.customer_group_id'),
         ];
-        app(PriceCatalogResolver::class)->customerDiscounts()->applyLegacyEntryExclusions($candidates[1], $user, 'audience_price');
+        app(PriceCatalogResolver::class)->customerDiscounts()->applyLegacyEntryExclusions($candidates[1], $user, 'audience_price', $catalog);
         if (in_array($candidate->getConnection()->getDriverName(), ['mysql', 'mariadb'], true)) {
             $candidates[1]->forceIndex('price_entries_customer_lookup');
         }

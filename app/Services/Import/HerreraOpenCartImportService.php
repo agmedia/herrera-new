@@ -3,7 +3,9 @@
 namespace App\Services\Import;
 
 use App\Models\Catalog\Category\Category;
+use App\Models\Catalog\Product\Product;
 use App\Models\User\LegacyCredential;
+use App\Services\Integrations\Stock\FixedSupplierAvailabilityService;
 use App\Support\ImportedDescriptionHtmlCleaner;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
@@ -507,7 +509,9 @@ class HerreraOpenCartImportService
             $product = $this->id('product', $row['product_id']);
             $category = $this->id('category', $row['category_id']);
             if ($product && $category) {
-                $this->sourceEdge('category_product', ['product_id' => $product, 'category_id' => $category], ['sort_order' => 0, 'is_primary' => false, 'created_at' => now(), 'updated_at' => now()], isset($this->newMappings['product'][(string) $row['product_id']]));
+                $newEndpoint = isset($this->newMappings['product'][(string) $row['product_id']])
+                    || isset($this->newMappings['category'][(string) $row['category_id']]);
+                $this->sourceEdge('category_product', ['product_id' => $product, 'category_id' => $category], ['sort_order' => 0, 'is_primary' => false, 'created_at' => now(), 'updated_at' => now()], $newEndpoint);
             }
         });
         $gallery = [];
@@ -1285,8 +1289,13 @@ class HerreraOpenCartImportService
                 $updates = $fields;
                 if ($this->finalSync) {
                     $current = DB::table($table)->where('id', $id)->lockForUpdate()->first();
-                    $updates = $this->ownership->merge($entity, $sourceId, (array) $current, $fields);
+                    $verifiedPriceUpdate = [];
+                    $updates = $this->ownership->merge($entity, $sourceId, (array) $current, $fields, $verifiedPriceUpdate);
                     if ($updates === null) {
+                        if ($verifiedPriceUpdate !== []) {
+                            DB::table($table)->where('id', $id)->update($verifiedPriceUpdate + ['updated_at' => now()]);
+                        }
+
                         return;
                     }
                 }
@@ -1298,6 +1307,9 @@ class HerreraOpenCartImportService
                 $this->newMappings[$entity][$sourceId] = true;
                 if ($this->finalSync && $entity === 'customer') {
                     $this->ownership->rememberCreatedParent($entity, $sourceId, $table, $id);
+                }
+                if ($this->finalSync && $entity === 'product') {
+                    app(FixedSupplierAvailabilityService::class)->applyToNewProduct(Product::query()->findOrFail($id));
                 }
             }
             DB::table('herrera_import_maps')->updateOrInsert(['source' => 'herrera-opencart', 'entity' => $entity, 'source_id' => $sourceId], ['target_id' => $id, 'checksum' => $checksum, 'created_at' => now(), 'updated_at' => now()]);

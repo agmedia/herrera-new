@@ -270,7 +270,7 @@ class PriceCatalogResolver
                     ->orWhere(fn (Builder $q) => $q->where('kind', PriceCatalogEntry::CUSTOMER)->where('user_id', $user->getKey())->whereNull('customer_group_id'))
                     ->orWhere(fn (Builder $q) => $q->where('kind', PriceCatalogEntry::BASE)->whereNull('user_id')->whereNull('customer_group_id'));
             })
-            ->tap(fn (Builder $query) => $this->customerDiscounts()->applyLegacyEntryExclusions($query, $user))
+            ->tap(fn (Builder $query) => $this->customerDiscounts()->applyLegacyEntryExclusions($query, $user, catalog: $catalog))
             ->orderByRaw(PriceCatalogEntry::precedenceSql())
             ->orderByRaw(PriceCatalogEntry::manualGroupPrecedenceSql())
             ->orderByRaw("CASE WHEN kind = 'quantity' THEN minimum_quantity ELSE 0 END DESC")

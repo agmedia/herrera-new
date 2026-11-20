@@ -2,6 +2,8 @@
 
 namespace App\Services\Import;
 
+use App\Models\Catalog\Product\Product;
+use App\Services\Integrations\Stock\FixedSupplierAvailabilityService;
 use Illuminate\Support\Facades\DB;
 
 /** Private source-field/edge baselines support a conservative three-way final merge. */
@@ -110,9 +112,10 @@ class HerreraFinalSyncOwnership
         }
     }
 
-    /** null means a native/source overlap must be reviewed; no row is overwritten. */
-    public function merge(string $entity, string $sourceId, array $current, array $incoming): ?array
+    /** A null result keeps the row and its import baseline open for review. */
+    public function merge(string $entity, string $sourceId, array $current, array $incoming, array &$verifiedPriceUpdate = []): ?array
     {
+        $verifiedPriceUpdate = [];
         $baseline = $this->fields($entity, $sourceId);
         $updates = [];
         $conflicts = [];
@@ -124,6 +127,13 @@ class HerreraFinalSyncOwnership
             if ($field === 'payload') {
                 $native = $this->decoded($current[$field] ?? null);
                 $source = $this->decoded($value);
+                if ($entity === 'category' && is_array($source['opencart'] ?? null)) {
+                    // Existing category artwork, including an explicitly empty image, belongs to the storefront.
+                    unset($source['opencart']['image']);
+                    if (array_key_exists('image', (array) ($native['opencart'] ?? []))) {
+                        $source['opencart']['image'] = $native['opencart']['image'];
+                    }
+                }
                 // Existing native branches (documents, workflow, presentation,
                 // integration provenance) have no OpenCart authority.
                 $updates[$field] = $this->json(array_replace($native, array_intersect_key($source, ['opencart' => true])));
@@ -132,6 +142,15 @@ class HerreraFinalSyncOwnership
             }
             if ($this->same($current[$field] ?? null, $value, $field)) {
                 continue;
+            }
+            if ($entity === 'product' && $field === 'supplier_stock_qty'
+                && ($current['code'] ?? null) === 'herrera-oc-product-'.$sourceId
+                && (int) ($current[$field] ?? 0) === FixedSupplierAvailabilityService::QUANTITY) {
+                $product = (new Product)->newFromBuilder($current);
+                if ((string) data_get($product->payload, 'opencart.product_id') === $sourceId
+                    && app(FixedSupplierAvailabilityService::class)->preservesFixedStockDuringImport($product, (int) ($incoming['manufacturer_id'] ?? 0))) {
+                    continue;
+                }
             }
             if ($baseline !== null && array_key_exists($field, $baseline)) {
                 if ($this->same($baseline[$field], $value, $field)) {
@@ -163,6 +182,13 @@ class HerreraFinalSyncOwnership
         }
         if ($conflicts !== []) {
             ($this->conflict)($entity, $sourceId, 'final_sync_field_conflict', $conflicts);
+            if ($entity === 'product' && array_key_exists('base_price', $updates)
+                && array_diff($conflicts, ['stock_qty', 'supplier_stock_qty']) === []
+                && ($current['code'] ?? null) === 'herrera-oc-product-'.$sourceId
+                && (string) data_get($this->decoded($current['payload'] ?? null), 'opencart.product_id') === $sourceId) {
+                // The three-way match above proves the price can move independently of stock.
+                $verifiedPriceUpdate = ['base_price' => $updates['base_price']];
+            }
 
             return null;
         }

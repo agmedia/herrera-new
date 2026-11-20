@@ -85,9 +85,10 @@ class CustomerDiscountService
         return $query;
     }
 
-    /** Original category rules, including tombstones, supersede their old generated product prices. */
-    public function applyLegacyEntryExclusions(Builder|QueryBuilder $query, User $customer, string $alias = 'catalog_price_entries'): void
+    /** Preserve deliberate rule edits and removals when replaying captured customer prices. */
+    public function applyLegacyEntryExclusions(Builder|QueryBuilder $query, User $customer, string $alias = 'catalog_price_entries', ?PriceCatalog $catalog = null): void
     {
+        $unchangedRuleIds = $catalog?->usesOpenCartFinalSyncPrices() ? $this->unchangedImportedRuleIds($this->scopes($customer)) : [];
         $entryCategory = $this->legacyIdSql($alias.'.payload', 'category_id');
         $entryCustomer = $this->legacyIdSql($alias.'.payload', 'customer_id');
         $ruleCategory = $this->legacyIdSql('replaced_customer_rule.payload', 'category_id');
@@ -97,10 +98,11 @@ class CustomerDiscountService
             : "CONCAT('opencart:customer-category:', ".$entryCustomer.", ':', ".$entryCategory.')';
         // Intentionally use the table builder: inactive/deleted rules are still
         // authoritative replacements for their original generated price rows.
-        $query->whereNotExists(function (QueryBuilder $replacement) use ($customer, $alias, $entryCategory, $entryCustomer, $ruleCategory, $ruleCustomer, $sourceKey): void {
+        $query->whereNotExists(function (QueryBuilder $replacement) use ($customer, $alias, $entryCategory, $entryCustomer, $ruleCategory, $ruleCustomer, $sourceKey, $unchangedRuleIds): void {
             $replacement->selectRaw('1')->from('customer_discount_rules as replaced_customer_rule')
                 ->where('replaced_customer_rule.user_id', $customer->id)
                 ->where('replaced_customer_rule.source_system', 'opencart')->whereNotNull('replaced_customer_rule.source_key')
+                ->when($unchangedRuleIds, fn (QueryBuilder $rules) => $rules->whereIntegerNotInRaw('replaced_customer_rule.id', $unchangedRuleIds))
                 ->where($alias.'.kind', PriceCatalogEntry::CUSTOMER)
                 ->whereRaw($entryCategory.' > 0')->whereRaw($entryCustomer.' > 0')
                 ->where(fn (QueryBuilder $mapping) => $mapping->whereRaw('('.$ruleCategory.' = '.$entryCategory.' AND '.$ruleCustomer.' = '.$entryCustomer.')')
@@ -123,6 +125,14 @@ class CustomerDiscountService
                 continue;
             }
             $query = $this->winnerQuery($matchingRules, $customer, $at, $column === 'rule_id' ? 'id' : 'percent');
+            if ($catalog->usesOpenCartFinalSyncPrices() && ($unchanged = $this->unchangedImportedRuleIds($matchingRules))) {
+                // OpenCart materialized its category percentages into absolute prices for the captured catalog.
+                // Those definitions can still price products added after the snapshot.
+                $query->where(fn (QueryBuilder $rules) => $rules->whereIntegerNotInRaw('customer_discount_rule.id', $unchanged)
+                    ->orWhereNotExists(fn (QueryBuilder $base) => $base->selectRaw('1')->from('catalog_price_entries as captured_product')
+                        ->where('captured_product.price_catalog_id', $catalog->id)->whereColumn('captured_product.product_id', 'products.id')
+                        ->where('captured_product.kind', PriceCatalogEntry::BASE)->where('captured_product.source_key', 'like', 'product:%')));
+            }
             $selectors[] = '('.$query->toSql().')';
             $bindings = [...$bindings, ...$query->getBindings()];
         }
@@ -234,10 +244,17 @@ class CustomerDiscountService
 
         return $this->scopes[$customer->id] = $rules->map(fn (CustomerDiscountRule $rule) => [
             'id' => $rule->id, 'manufacturer_ids' => $rule->manufacturer_ids,
+            'unchanged_import' => $rule->source_system === 'opencart' && str_starts_with((string) $rule->source_key, 'opencart:customer-category:')
+                && data_get($rule->payload, 'customer_rule_edited') === false,
             'category_ids' => $this->categoryIds($rule->category_ids, $rule->include_descendants),
             'excluded_product_ids' => $rule->excluded_product_ids,
             'specificity' => $rule->category_ids !== [] ? ($rule->manufacturer_ids !== [] ? 0 : 1) : ($rule->manufacturer_ids !== [] ? 2 : 3),
         ])->all();
+    }
+
+    private function unchangedImportedRuleIds(array $rules): array
+    {
+        return array_column(array_filter($rules, static fn (array $rule): bool => $rule['unchanged_import']), 'id');
     }
 
     private function categoryIds(array $ids, bool $includeDescendants): array

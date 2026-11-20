@@ -22,6 +22,13 @@ class PriceCatalog extends Model
         return ['metadata' => 'array', 'activated_at' => 'datetime'];
     }
 
+    public function usesOpenCartFinalSyncPrices(): bool
+    {
+        return $this->source_system === 'herrera-opencart'
+            && ($this->metadata['final_sync'] ?? false) === true
+            && ($this->metadata['absolute_source_prices'] ?? false) === true;
+    }
+
     public function entries(): HasMany
     {
         return $this->hasMany(PriceCatalogEntry::class, 'price_catalog_id');

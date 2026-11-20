@@ -292,6 +292,40 @@ class CustomerDiscountPricingTest extends TestCase
         $this->assertPrices($buyer, [$manual->id => 20.0, $otherCategory->id => 35.0, $otherSourceCustomer->id => 30.0]);
     }
 
+    public function test_final_source_snapshot_honours_exact_customer_prices_and_preserves_later_rule_edits(): void
+    {
+        [$buyer, $group, $catalog, $actor] = $this->fixture();
+        $catalog->update(['source_system' => 'herrera-opencart', 'metadata' => ['final_sync' => true, 'absolute_source_prices' => true]]);
+        $category = Category::create(['code' => 'captured', 'scope' => 'catalog', 'is_active' => true]);
+        $captured = $this->product($catalog, $group, category: $category);
+        $later = $this->product($catalog, $group, category: $category);
+        DB::table('catalog_price_entries')->where('price_catalog_id', $catalog->id)->where('product_id', $captured->id)
+            ->where('kind', PriceCatalogEntry::BASE)->update(['source_key' => 'product:123']);
+        $this->legacyEntry($catalog, $captured, $buyer, '52.1234', 90);
+        $rule = $this->save($buyer, $actor, ['percent' => 60, 'category_ids' => [$category->id]]);
+        $rule->forceFill(['source_system' => 'opencart', 'source_key' => 'opencart:customer-category:326:90',
+            'payload' => ['opencart' => ['customer_id' => 326, 'category_id' => 90], 'customer_rule_edited' => false]])->save();
+        $resolver = app(PriceCatalogResolver::class);
+        $resolver->forgetActiveCatalog();
+        $this->assertSame(52.1234, $resolver->resolve($captured, $buyer)->price);
+        $resolver->preloadProducts([$captured, $later], $buyer);
+        $this->assertSame('price_catalog_customer', $resolver->resolve($captured, $buyer)->source_type);
+        $this->assertSame(40.0, $resolver->resolve($later, $buyer)->price);
+        $this->assertPrices($buyer, [$captured->id => 52.1234, $later->id => 40.0]);
+
+        $this->entry($catalog, $captured, PriceCatalogEntry::SPECIAL, '22.1111', $group);
+        $resolver->forgetActiveCatalog();
+        $this->assertSame(22.1111, $resolver->resolve($captured, $buyer)->price);
+        $this->assertPrices($buyer, [$captured->id => 22.1111]);
+        $this->save($buyer, $actor, ['percent' => 65, 'category_ids' => [$category->id]], $rule->id);
+        $this->assertSame(35.0, $resolver->resolve($captured, $buyer)->price);
+        $this->assertPrices($buyer, [$captured->id => 35.0]);
+        app(CustomerDiscountService::class)->deleteRule($buyer, $rule->id, $actor);
+        DB::table('catalog_price_entries')->where('price_catalog_id', $catalog->id)->where('kind', PriceCatalogEntry::SPECIAL)->delete();
+        $this->assertSame(50.0, $resolver->resolve($captured, $buyer)->price);
+        $this->assertPrices($buyer, [$captured->id => 50.0]);
+    }
+
     public function test_large_explicit_category_scope_keeps_direct_batch_and_query_prices_identical(): void
     {
         [$buyer, $group, $catalog, $actor] = $this->fixture();

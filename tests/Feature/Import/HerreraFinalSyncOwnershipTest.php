@@ -9,6 +9,7 @@ use App\Models\Catalog\Option\OptionValue;
 use App\Models\Catalog\Product\Product;
 use App\Models\Catalog\Product\ProductOptionValue;
 use App\Services\Import\HerreraOpenCartImportService;
+use App\Services\Integrations\Stock\FixedSupplierAvailabilityService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -105,6 +106,80 @@ class HerreraFinalSyncOwnershipTest extends TestCase
         $this->assertSame('CURATED-VARIANT-SKU', $variant->fresh()->sku);
         $this->assertDatabaseHas('media', ['id' => $document->id, 'collection_name' => 'product_documents']);
         $this->assertSame($beforeFile, file_get_contents($document->getPath()));
+    }
+
+    public function test_refresh_preserves_a_proven_fixed_supplier_policy_and_still_refreshes_local_stock_and_price(): void
+    {
+        $this->import();
+        $this->import(finalSync: true);
+        $product = $this->product();
+        app(FixedSupplierAvailabilityService::class)->run([$product->manufacturer_id], apply: true);
+        $other = Product::where('code', 'herrera-oc-product-31')->sole();
+        $runId = DB::table('stock_sync_runs')->insertGetId(['supplier' => 'videx', 'trigger' => 'manual', 'status' => 'completed']);
+        DB::table('stock_sync_items')->insert(['run_id' => $runId, 'product_id' => $other->id, 'identifier' => $other->sku,
+            'status' => 'updated', 'new_quantity' => 13]);
+        $this->sourceQuery('product')->update(['suplierqty' => 99, 'quantity' => 20, 'price' => '101.6789']);
+        $this->sourceQuery('product')->insert($this->sourceProduct(32));
+
+        $this->import(finalSync: true);
+        $this->import(finalSync: true);
+
+        $after = $product->fresh();
+        $this->assertSame(100000, $after->supplier_stock_qty);
+        $this->assertSame(20, $after->stock_qty);
+        $this->assertEquals(101.6789, $after->base_price);
+        $this->assertSame(99, (int) data_get($after->payload, 'opencart.suplierqty'));
+        $this->assertSame(100000, Product::where('code', 'herrera-oc-product-32')->sole()->supplier_stock_qty);
+        $this->assertDatabaseMissing('herrera_import_issues', ['entity' => 'product', 'source_id' => '30', 'code' => 'final_sync_field_conflict']);
+        $this->assertDatabaseHas('herrera_import_issues', ['entity' => 'product', 'source_id' => '31', 'code' => 'final_sync_field_conflict']);
+    }
+
+    public function test_a_stock_conflict_allows_only_a_proven_source_price_change_and_remains_open_on_retry(): void
+    {
+        $this->import();
+        $this->import(finalSync: true);
+        $product = $this->product();
+        $other = Product::where('code', 'herrera-oc-product-31')->sole();
+        $product->update(['stock_qty' => 27]);
+        $other->update(['stock_qty' => 28, 'base_price' => '77.1222']);
+        $oldChecksum = DB::table('herrera_import_maps')->where('entity', 'product')->where('source_id', '30')->value('checksum');
+        $this->sourceQuery('product')->update(['quantity' => 20, 'price' => '104.4567']);
+
+        $this->import(finalSync: true);
+        $this->import(finalSync: true);
+
+        $this->assertEquals(104.4567, $product->fresh()->base_price);
+        $this->assertSame(27, $product->fresh()->stock_qty);
+        $this->assertEquals(77.1222, $other->fresh()->base_price);
+        $this->assertSame(28, $other->fresh()->stock_qty);
+        $this->assertDatabaseHas('herrera_import_maps', ['entity' => 'product', 'source_id' => '30', 'checksum' => $oldChecksum]);
+        $this->assertDatabaseHas('herrera_import_issues', ['entity' => 'product', 'source_id' => '30', 'code' => 'final_sync_field_conflict']);
+    }
+
+    public function test_refresh_keeps_existing_category_photography_and_imports_images_for_new_categories(): void
+    {
+        $this->import();
+        $this->import(finalSync: true);
+        $root = Category::query()->where('code', 'herrera-oc-category-10')->firstOrFail();
+        $child = Category::query()->where('code', 'herrera-oc-category-11')->firstOrFail();
+        $payload = $child->payload;
+        unset($payload['opencart']['image']);
+        $child->update(['payload' => $payload]);
+        $this->sourceQuery('category')->where('category_id', 10)->update(['image' => 'catalog/changed.jpg', 'sort_order' => 5]);
+        $this->sourceQuery('category')->where('category_id', 11)->update(['image' => 'catalog/changed-child.jpg']);
+        $this->sourceQuery('category')->insert(['category_id' => 12, 'parent_id' => 10, 'status' => 1,
+            'top' => 0, 'sort_order' => 0, 'image' => 'catalog/new.jpg']);
+        $this->sourceQuery('product_to_category')->insert(['product_id' => 30, 'category_id' => 12]);
+
+        $this->import(finalSync: true);
+        $this->import(finalSync: true);
+
+        $this->assertSame('catalog/root.jpg', data_get($root->fresh()->payload, 'opencart.image'));
+        $this->assertSame(5, $root->fresh()->sort_order);
+        $this->assertArrayNotHasKey('image', $child->fresh()->payload['opencart']);
+        $newCategory = Category::where('code', 'herrera-oc-category-12')->sole();
+        $this->assertSame('catalog/new.jpg', data_get($newCategory->payload, 'opencart.image'));
+        $this->assertDatabaseHas('category_product', ['category_id' => $newCategory->id, 'product_id' => $this->product()->id]);
     }
 
     public function test_final_sync_replaces_source_attribute_values_and_removes_source_edges_without_detaching_native_assignments(): void

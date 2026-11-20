@@ -138,10 +138,8 @@
                     @forelse ($rows as $row)
                         @php
                             $tr = $row->translations->first();
-                            $mainMedia = $row->getFirstMedia('product_main') ?: $row->getFirstMedia('product_gallery');
-                            $mainThumb = $mainMedia
-                                ? ($mainMedia->hasGeneratedConversion('thumb_100x100') ? $mainMedia->getUrl('thumb_100x100') : $mainMedia->getUrl())
-                                : null;
+                            $mainThumb = \App\Support\Media\LegacyCatalogImage::first($row, ['thumb_100x100', 'detail_960x960'], true)
+                                ?? \App\Support\Media\LegacyCatalogImage::gallery($row)->first();
                             $categoryRows = $row->categories->values();
                         @endphp
                         <tr class="align-top">

@@ -3,12 +3,15 @@
 namespace Tests\Feature\Admin;
 
 use App\Livewire\Admin\Catalog\Product\Manager as ProductManager;
+use App\Livewire\Admin\Media\Manager as MediaManager;
 use App\Models\Catalog\Action\CatalogAction;
 use App\Models\Catalog\Category\Category;
 use App\Models\Catalog\Product\Product;
 use App\Models\Content\Support\Comment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Silber\Bouncer\BouncerFacade as Bouncer;
 use Tests\TestCase;
@@ -16,6 +19,35 @@ use Tests\TestCase;
 class CatalogProductsListFeatureTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_admin_product_list_and_media_tab_show_the_imported_photos_until_an_upload_is_available(): void
+    {
+        config(['legacy_media.enabled' => true, 'legacy_media.origin' => 'https://www.herrera.hr']);
+        Storage::fake('public');
+        $admin = $this->makeAdminUser();
+        $product = $this->makeProduct($admin, 'P-IMAGES', 'Imported photos', true, 4, 25);
+        $product->update(['payload' => ['opencart' => [
+            'gallery_images' => [
+                ['image' => 'catalog/test/second.jpg', 'sort_order' => 2],
+                ['image' => 'catalog/test/first.jpg', 'sort_order' => 1],
+            ],
+        ]]]);
+        $first = 'https://www.herrera.hr/image/catalog/test/first.jpg';
+        $second = 'https://www.herrera.hr/image/catalog/test/second.jpg';
+        $list = fn () => Livewire::actingAs($admin)->test(ProductManager::class);
+        $editor = fn () => Livewire::actingAs($admin)->test(MediaManager::class, [
+            'modelClass' => Product::class, 'modelId' => $product->id,
+        ]);
+
+        $list()->assertSeeHtml('src="'.$first.'"');
+        $editor()->assertSeeInOrder([$first, $second], false)
+            ->assertSeeHtml('src="'.$first.'"')->assertSeeHtml('src="'.$second.'"');
+
+        $upload = $product->addMedia(UploadedFile::fake()->image('new-main.jpg', 24, 24))->toMediaCollection('product_main');
+        $list()->assertSeeHtml('src="'.rtrim(dirname($upload->getUrl()), '/').'/')->assertDontSee($first, false);
+        $editor()->assertSee('new-main')->assertDontSee($first, false)->assertDontSee($second, false);
+        $this->assertDatabaseCount('media', 1);
+    }
 
     public function test_product_list_filters_by_state_stock_and_category(): void
     {

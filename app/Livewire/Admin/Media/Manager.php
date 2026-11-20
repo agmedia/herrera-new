@@ -6,7 +6,9 @@ use App\Models\Catalog\Product\Product;
 use App\Models\Content\Blog\BlogPost;
 use App\Models\Content\ContentBlock;
 use App\Services\Content\InstagramPostOEmbedService;
+use App\Support\Media\LegacyCatalogImage;
 use App\Support\Media\MediaProfileRegistry;
+use App\Support\Media\MediaUrl;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -542,10 +544,24 @@ class Manager extends Component
         $isBlogPostMedia = $record instanceof BlogPost;
         $supportsProductHotspots = $isBlogPostMedia || $isLinkableSliderBlock;
 
+        $catalogImagesByCollection = [];
+        if ($record instanceof Product) {
+            $uploadedPhotos = ($mediaByCollection['product_main'] ?? collect())
+                ->concat($mediaByCollection['product_gallery'] ?? []);
+            if (! $uploadedPhotos->contains(fn (Media $photo) => MediaUrl::hasUsableSource($photo, ['detail_960x960', 'thumb_100x100']))) {
+                $photos = LegacyCatalogImage::gallery($record);
+                $catalogImagesByCollection = [
+                    'product_main' => $photos->take(1),
+                    'product_gallery' => $photos->skip(1),
+                ];
+            }
+        }
+
         return view('livewire.admin.media.manager', [
             'collections' => $this->collections,
             'modelProfile' => $this->modelProfile,
             'mediaByCollection' => $mediaByCollection,
+            'catalogImagesByCollection' => $catalogImagesByCollection,
             'recordExists' => (bool) $this->record,
             'isDualImageCtaBlock' => $isDualImageCtaBlock,
             'isCategoryEditorialTilesBlock' => $isCategoryEditorialTilesBlock,

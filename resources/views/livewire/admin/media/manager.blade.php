@@ -16,6 +16,8 @@
             @foreach ($collections as $collectionName => $collectionConfig)
                 @php
                     $collectionMedia = $mediaByCollection[$collectionName] ?? collect();
+                    $catalogImages = $catalogImagesByCollection[$collectionName] ?? collect();
+                    $imageCount = $collectionMedia->count() + $catalogImages->count();
                     $isSingle = (bool) ($collectionConfig['single_file'] ?? false);
                     $acceptMime = (array) ($collectionConfig['accept_mime_types'] ?? []);
                     $maxUploadKb = max(1, (int) ($collectionConfig['max_upload_kb'] ?? 8192));
@@ -37,7 +39,7 @@
                         <div class="flex flex-wrap items-center gap-2">
                             <h3 class="text-sm font-semibold text-slate-800">{{ $collectionLabel }}</h3>
                             <span class="admin-chip">{{ $collectionName }}</span>
-                            <span class="admin-chip">{{ $collectionMedia->count() }} {{ $collectionMedia->count() === 1 ? __('image') : __('images') }}</span>
+                            <span class="admin-chip">{{ $imageCount }} {{ $imageCount === 1 ? __('image') : __('images') }}</span>
                             @if ($isMainCollection)
                                 <span class="admin-chip">{{ __('Main') }}</span>
                             @endif
@@ -110,7 +112,17 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse ($collectionMedia as $media)
+                                @foreach ($catalogImages as $imageUrl)
+                                    <tr wire:key="catalog-photo-{{ $modelId }}-{{ sha1($imageUrl) }}">
+                                        <td class="px-3 py-3">
+                                            <a href="{{ $imageUrl }}" target="_blank" rel="noopener noreferrer" aria-label="{{ __('Open original image') }}">
+                                                <img src="{{ $imageUrl }}" alt="" width="80" height="80" loading="lazy" class="h-20 w-20 rounded-lg border border-slate-200 object-contain">
+                                            </a>
+                                        </td>
+                                        <td colspan="3" class="px-3 py-3 text-sm text-slate-600">{{ __('Image from the previous catalog') }}</td>
+                                    </tr>
+                                @endforeach
+                                @foreach ($collectionMedia as $media)
                                     @php
                                         $mediaMeta = (array) ($meta[$media->id] ?? []);
                                         $hotspots = collect((array) ($mediaMeta['hotspots'] ?? []))
@@ -368,13 +380,14 @@
                                             </div>
                                         </td>
                                     </tr>
-                                @empty
+                                @endforeach
+                                @if ($imageCount === 0)
                                     <tr>
                                         <td colspan="4" class="px-3 py-5 text-center text-sm text-slate-500">
                                             {{ __('No images in this collection yet.') }}
                                         </td>
                                     </tr>
-                                @endforelse
+                                @endif
                             </tbody>
                         </table>
                     </div>
